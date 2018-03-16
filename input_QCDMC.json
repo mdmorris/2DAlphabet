@@ -1,49 +1,35 @@
 {
     "GLOBAL": {
-        "HELP": "The 'global' item can be used to set global variables inside of this json configuration file. This is the only place where you can customize the keys of dictionaries. For example, you could store 'dir': 'path/to/my/files/' and then later use 'dir' instead of writing the same file path multiple times",
-        "dir/": "rootfiles/",
-        "histo_prefix_": "TH2_"
-
+        "HELP": "The 'global' item can be used to set global variables inside of this json configuration file. This is the only place where you can customize the keys of dictionaries. For example, you could store 'dir': 'path/to/my/files/' and then later use 'dir' instead of writing the same file path multiple times"
     },
 
     "PROCESS": {
         "HELP": "All processes should be configured here",
-        "process_name": {
+        "data_obs": {
             "HELP": "FILE is both the file path relative to the running directory. SYSTEMATICS is a list with all applicable systematic uncertainties listed with names that match those defined in SYSTEMATC. CODE can be 0 (signal), 1 (data), 2 (unchanged MC), 3 (MC to be renormalized)",
-            "FILE": "dir/file.root",
-            "HISTPASS": "histo_prefix_histogram_name_pass",
-            "HISTFAIL": "histo_prefix_histogram_name_fail",
-            "SYSTEMATICS":["syst1","syst3"],
+            "FILE": "../2DCombineFitCode/bstar/input_hists/rootfiles/TW2DalphabetQCD_Trigger_nominal_none_PSET_default.root",
+            "HISTPASS": "MtwvMtPass",
+            "HISTFAIL": "MtwvMtFail",
+            "SYSTEMATICS":["Tpt","Trig"],
             "CODE": 0
         }
     },
 
     "SYSTEMATIC": {
         "HELP": "All systematics should be configured here. The info for them will be pulled for each process that calls each systematic. These are classified by codes 0 (symmetric, lnN), 1 (asymmetric, lnN), 2 (shape and in same file as nominal), 3 (shape and NOT in same file as nominal)",
-        "syst0": {
-            "CODE": 0,
-            "VAL": 1.02
-        },
-        "syst1": {
-            "CODE": 1,
-            "VALUP": 1.02,
-            "VALDOWN": 1.01
-        },
-        "syst2": {
+        "Tpt": {
             "CODE": 2,
-            "HISTPASS_UP": "histogram_name_pass_up",
-            "HISTFAIL_UP": "histogram_name_fail_up",
-            "HISTPASS_DOWN": "histogram_name_pass_down",
-            "HISTFAIL_DOWN": "histogram_name_fail_down"
+            "HISTPASS_UP": "MtwvMtPassTptup",
+            "HISTFAIL_UP": "MtwvMtFailTptup",
+            "HISTPASS_DOWN": "MtwvMtPassTptdown",
+            "HISTFAIL_DOWN": "MtwvMtFailTptdown"
         },
-        "syst3": {
-            "CODE": 3,
-            "FILE_UP": "path/to/file_up.root",
-            "FILE_DOWN": "path/to/file_down.root",
-            "HISTPASS_UP": "histogram_name_pass_up",
-            "HISTFAIL_UP": "histogram_name_fail_up",
-            "HISTPASS_DOWN": "histogram_name_pass_down",
-            "HISTFAIL_DOWN": "histogram_name_fail_down"
+        "Trig": {
+            "CODE": 2,
+            "HISTPASS_UP": "MtwvMtPassTrigup",
+            "HISTFAIL_UP": "MtwvMtFailTrigup",
+            "HISTPASS_DOWN": "MtwvMtPassTrigdown",
+            "HISTFAIL_DOWN": "MtwvMtFailTrigdown"
 
         }
     },
@@ -51,18 +37,18 @@
     "BINNING": {
         "HELP": "The binning of the x and y axes should be configured here",
         "X": {
-            "NAME": "xvar_name",
-            "LOW": 0,
-            "HIGH": 100,
-            "NBINS": 10,
-            "SIGSTART": 40,
-            "SIGEND": 60
+            "NAME": "jetmass",
+            "LOW": 50,
+            "HIGH": 350,
+            "NBINS": 15,
+            "SIGSTART": 150,
+            "SIGEND": 190
         },
         "Y": {
             "NAME": "yvar_name",
-            "LOW": 500,
-            "HIGH": 1000,
-            "NBINS": 50
+            "LOW": 700,
+            "HIGH": 4000,
+            "NBINS": 33
         }
     },
 
@@ -78,12 +64,22 @@
             "LOW": -1.0,
             "HIGH": 1.0
         },
+        "X2Y0": {
+            "NOMINAL": 0.0,
+            "LOW": -1.0,
+            "HIGH": 1.0
+        },
         "X0Y1": {
             "NOMINAL": 0.0,
             "LOW": -1.0,
             "HIGH": 1.0
         },
         "X1Y1": {
+            "NOMINAL": 0.0,
+            "LOW": -1.0,
+            "HIGH": 1.0
+        },
+        "X2Y1": {
             "NOMINAL": 0.0,
             "LOW": -1.0,
             "HIGH": 1.0
