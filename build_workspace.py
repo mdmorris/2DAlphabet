@@ -12,13 +12,15 @@ import os
 import pickle
 from optparse import OptionParser
 import header
-from header import getRRVs,makeRDH
+from header import getRRVs,makeRDH,dictCopy,makeRHP
+import pprint
+pp = pprint.PrettyPrinter(indent = 2)
 
 
 #########################
 #       Start Here      #
 #########################
-def main(dictTH2s,inputConfig,blinded):
+def main(dictTH2s,inputConfig,blinded,tag):
 
     allVars = []    # This is a list of all RooFit objects made. It never gets used for anything but if the
                     # objects never get saved here, then the python memory management will throw them out
@@ -51,33 +53,44 @@ def main(dictTH2s,inputConfig,blinded):
     if blinded:
         catagories.extend(['passLow','failLow','passHigh','failHigh'])
 
-    Roo_dict = dictTH2s
+    Roo_dict = dictCopy(dictTH2s)
+    rateParam_lines = []
+
     # For procees, cat, dict...
     for process in Roo_dict.keys():
         for cat in catagories:
             for dist in Roo_dict[process][cat].keys():
 
-                    if cat.find('Low') != -1:
-                        this_var_list = low_var_list
-                    elif cat.find('High') != -1:
-                        this_var_list = high_var_list
-                    else:
-                        this_var_list = var_list
+                if cat.find('Low') != -1:
+                    this_var_list = low_var_list
+                elif cat.find('High') != -1:
+                    this_var_list = high_var_list
+                else:
+                    this_var_list = var_list
 
 
-                    if inputConfig["PROCESS"][process]["CODE"] != 3:
-                        Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],this_var_list)
+                if inputConfig["PROCESS"][process]["CODE"] != 3:
+                    Roo_dict[process][cat][dist] = {}
+                    Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],this_var_list)
 
 
-                    elif inputConfig["PROCESS"][process]["CODE"] == 3:         # Allowing normalization of this process to float
-                        # Get the normalization information
-                        norm_name = dictTH2s[process][cat][dist].GetName()+'_norm'
-                        norm_low = 0.0
-                        norm_high = 2.0 * dictTH2s[process][cat][dist].Integral()
+                elif inputConfig["PROCESS"][process]["CODE"] == 3:         # Allowing normalization of this process to float
+                    # Need to renormalize the TH2 to 1 so the norm can dictate the PDF normalization (1*norm=norm)
+                    # Normalization will come from rateParam in card
+                    dictTH2s[process][cat][dist+'_unitNorm'] =  dictTH2s[process][cat][dist].Clone()
+                    dictTH2s[process][cat][dist+'_unitNorm'].Scale(1/dictTH2s[process][cat][dist+'_unitNorm'].Integral())
 
-                        Roo_dict[process][cat][dist]['RHP'] = makeRooHistPdf(dictTH2s[process][cat][dist],this_var_list)
-                        Roo_dict[process][cat][dist]['norm_RRV'] = RooRealVar(norm_name,norm_name,norm_low,norm_high)
+                    Roo_dict[process][cat][dist] = {}
+                    Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist+'_unitNorm'],this_var_list) # Has to be made and saved because the RHP references it
+                    Roo_dict[process][cat][dist]['RHP'] = makeRHP(Roo_dict[process][cat][dist]['RDH'],this_var_list)
 
+                    # Make line for the card
+                    norm_name = Roo_dict[process][cat][dist]['RHP'].GetName()
+                    norm_start = dictTH2s[process][cat][dist].Integral()
+                    norm_low = 0.0
+                    norm_high = 2.0 * norm_start
+
+                    rateParam_lines.append(norm_name + ' rateParam * ' + process + ' ' + str(norm_start) + ' [0,' + str(norm_high)+ ']')
 
 
 #############################################################################################
@@ -90,7 +103,7 @@ def main(dictTH2s,inputConfig,blinded):
     # Polynomial Order
     polXO = 0
     polYO = 0
-    for param_name in inputConfig.keys():
+    for param_name in [key for key in inputConfig['FIT'].keys() if key != 'HELP']:
         # Assuming poly order is a single digit (pretty reasonable I think...)
         tempXorder = int(param_name[param_name.find('X')+1])
         tempYorder = int(param_name[param_name.find('Y')+1])
@@ -98,8 +111,6 @@ def main(dictTH2s,inputConfig,blinded):
             polXO = tempXorder
         if tempYorder > polYO:
             polYO = tempYorder
-
-    input_param_vals = inputConfig['FIT']
 
     PolyCoeffs = {}
     for yi in range(polYO+1):
@@ -234,16 +245,23 @@ def main(dictTH2s,inputConfig,blinded):
     # Make workspace to save in
     myWorkspace = RooWorkspace("w_2D")
     for process in Roo_dict.keys():
-        for cat in Roo_dict[process].keys():
-            rooObj = Roo_dict[process][cat]
-            print "Importing " + rooObj.GetName()
-            getattr(myWorkspace,'import')(rooObj,RooFit.RecycleConflictNodes())
+        for cat in [k for k in Roo_dict[process].keys() if k.find('file') == -1]:
+            for dist in Roo_dict[process][cat].keys():
+                rooObj = Roo_dict[process][cat][dist]
+                try: 
+                    print "Importing " + rooObj.GetName() + ' from ' + process + ', ' + cat + ', ' + dist
+                    getattr(myWorkspace,'import')(rooObj,RooFit.RecycleConflictNodes())
+                except:
+                    for itemkey in rooObj.keys():
+                        print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat + ', ' + dist + ', ' + itemkey
+                        getattr(myWorkspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes())
+                
 
 
     # Now save out the RooDataHists
-    myWorkspace.writeToFile('base.root',True)  
+    myWorkspace.writeToFile('base_'+tag+'.root',True)  
 
-    return myWorkspace
+    return myWorkspace, rateParam_lines
 
 
 

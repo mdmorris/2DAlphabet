@@ -34,7 +34,8 @@
             "HISTPASS_UP": "histogram_name_pass_up",
             "HISTFAIL_UP": "histogram_name_fail_up",
             "HISTPASS_DOWN": "histogram_name_pass_down",
-            "HISTFAIL_DOWN": "histogram_name_fail_down"
+            "HISTFAIL_DOWN": "histogram_name_fail_down",
+            "SCALE": 1.0
         },
         "syst3": {
             "CODE": 3,
@@ -43,7 +44,8 @@
             "HISTPASS_UP": "histogram_name_pass_up",
             "HISTFAIL_UP": "histogram_name_fail_up",
             "HISTPASS_DOWN": "histogram_name_pass_down",
-            "HISTFAIL_DOWN": "histogram_name_fail_down"
+            "HISTFAIL_DOWN": "histogram_name_fail_down",
+            "SCALE": 1.0
 
         }
     },

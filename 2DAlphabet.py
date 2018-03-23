@@ -13,8 +13,10 @@ from optparse import OptionParser
 import json
 import subprocess
 import os
+import pprint
+pp = pprint.PrettyPrinter(indent = 2)
 
-# import make_card
+import make_card
 import input_organizer
 import build_workspace
 # import plot_fit_results
@@ -27,10 +29,15 @@ from header import ascii_encode_dict
 #########################################################
 parser = OptionParser()
 
-parser.add_option('-i', '--input', metavar='F', type='string', action='store',
+parser.add_option('-i', '--input', metavar='FILE', type='string', action='store',
                   default   =   '',
                   dest      =   'input',
-                  help      =   'JSON file to be imported')
+                  help      =   'JSON file to be imported. Name should be "input_<tag>.json" where tag will be used to organize outputs')
+parser.add_option('-m', '--move', action="store_true",
+                  default   =   False,
+                  dest      =   'move',
+                  help      =   'Moves files to folder <tag> if True')
+
 
 (options, args) = parser.parse_args()
 
@@ -38,13 +45,24 @@ parser.add_option('-i', '--input', metavar='F', type='string', action='store',
 #                     JSON Processing                   #
 #########################################################
 with open(options.input) as fInput_config:
+    # try:
+        input_config = json.load(fInput_config, object_hook=ascii_encode_dict)  # Converts most of the unicode to ascii
+
+        for process in [proc for proc in input_config['PROCESS'].keys() if proc != 'HELP']:
+            for index,item in enumerate(input_config['PROCESS'][process]['SYSTEMATICS']):           # There's one list that also
+                input_config['PROCESS'][process]['SYSTEMATICS'][index] = item.encode('ascii')       # needs its items converted
+
+    # except:
+    #     print "Input configuration is not in JSON format. Quitting..."
+    #     quit()
+
+tag = options.input[options.input.find('_')+1:options.input.find('.')]
+
+if options.move:
     try:
-        input_config = json.load(fInput_config, object_hook=ascii_encode_dict)
-
+        subprocess.call(['mkdir ' + tag], shell=True)
     except:
-        print "Input configuration is not in JSON format. Quitting..."
-        quit()
-
+        print 'dir ' + tag + '/ already exists'
 
 #####################################
 # Do GLOBAL variable substitution   #
@@ -89,9 +107,11 @@ for glob_var in input_config['GLOBAL'].keys():
                                 continue
 
 # Save out the json with the GLOBAL var replacement
-fInput_config_vars_replaced = open('input_json_vars_replaced.json', 'w')
+fInput_config_vars_replaced = open('input_'+tag+'_vars_replaced.json', 'w')
 json.dump(input_config,fInput_config_vars_replaced,indent=2, sort_keys=True)
 fInput_config_vars_replaced.close()
+if options.move:
+    subprocess.call(['mv ' +'input_'+tag+'_vars_replaced.json ' + tag + '/'], shell=True)
 print 'Done'
 
 
@@ -110,38 +130,43 @@ else:
 #########################################################
 #               Organize input histograms               #
 #########################################################
-# input_organizer.main() saves the root file and returns a dictionary with all of the TH2s
+# input_organizer.main() returns a dictionary with all of the TH2s organized
 print 'Organizing histograms into single file...'
 organized_dict = input_organizer.main(input_config,blinded)
 print 'Done'
+
 
 #########################################################
 #             Make the workspace for Combine            #
 #########################################################
 # Make the RooWorkspace - creates workspace name 'w_2D' in base.root
-workspace = build_workspace.main(organized_dict,input_config,blinded)
-workspace.Print()
-quit()
-
+workspace, rateParam_lines = build_workspace.main(organized_dict,input_config,blinded,tag)
 
 #########################################################
 #             Make the data card for Combine            #
 #########################################################
 # Make the data card - makes a text file named card_2D.txt, return 0
-# make_card.main(input_config)
+print 'Making Combine card...'
+make_card.main(input_config, rateParam_lines, blinded, tag)
+print 'Done'
 
 
 # Run Combine
-subprocess.call(['combine -M MaxLikelihoodFit card_2D.txt --saveWithUncertainties --saveShapes -v 2 --rMin -50 --rMax 50'], shell=True)
+subprocess.call(['combine -M MaxLikelihoodFit card_'+tag+'.txt --saveWithUncertainties --saveWorkspace -v 2 --rMin -50 --rMax 50'], shell=True)
 
 # Test that Combine ran successfully 
 if not os.path.isfile('MaxLikelihoodFitResult.root'):
     print "Combine failed and never made MaxLikelihoodFitResult.root. Quitting..."
     quit()
 
+if options.move:
+    subprocess.call(['mv base_'+tag+'.root ' + tag + '/'], shell=True)
+    subprocess.call(['mv card_'+tag+'.txt ' + tag + '/'], shell=True)
+
+quit()
 # Try plotting
 try:
-    plot_fit_results.main()
+    plot_fit_results.main(organized_dict)
 except:
     print "Unable to plot. There was probably an issue running Combine."
 

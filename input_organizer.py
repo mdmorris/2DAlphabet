@@ -10,13 +10,15 @@ import ROOT
 from ROOT import *
 import header
 from header import copyHistWithNewXbounds
+import pprint
+pp = pprint.PrettyPrinter(indent = 2)
 
 
 # inputConfig is a dictionary from the input JSON
 def main(inputConfig, blinded):
 
     # Initialize an output root file
-    outfile = TFile('organized_TH2s.root','recreate')
+    # outfile = TFile('organized_TH2s.root','recreate')
 
     #################################################################################
     # First we need to get histograms from files and store them in a new dictionary #
@@ -83,29 +85,48 @@ def main(inputConfig, blinded):
                     dictHists[process]['fail'][syst+'Up']   = file_nominal.Get(thisSystDict['HISTFAIL_UP'])
                     dictHists[process]['fail'][syst+'Down'] = file_nominal.Get(thisSystDict['HISTFAIL_DOWN'])
 
-                if thisSystDict['CODE'] == 3:   # different file as norm, same hist name if not specified in inputConfig
-                    file_up = TFile.Open(thisSystDict['FILE_UP'])
-                    file_down = TFile.Open(thisSystDict['FILE_DOWN'])
+                if thisSystDict['CODE'] == 3:   # different file as norm and different files for each process if specified, same hist name if not specified in inputConfig
+                    # User will most likely have different file for each process but maybe not so check
+                    if 'FILE_UP' in thisSystDict:
+                        file_up = TFile.Open(thisSystDict['FILE_UP'])
+                    else:
+                        file_up = TFile.Open(thisSystDict['FILE_UP_'+process])
+
+                    if 'FILE_DOWN' in thisSystDict:
+                        file_down = TFile.Open(thisSystDict['FILE_DOWN'])
+                    else:
+                        file_down = TFile.Open(thisSystDict['FILE_DOWN_'+process])
+
+                    dictHists[process]['file_'+syst+'Up'] = file_up
+                    dictHists[process]['file_'+syst+'Down'] = file_down
 
                     if 'HISTPASS_UP' in thisSystDict:
-                        dictHists[process]['pass'][syst+'Up'] = file_up.Get(thisSystDict['HISTPASS_UP'])        # try to grab hist name from SYSTEMATIC dictionary
-                    else:
-                        dictHists[process]['pass'][syst+'Up'] = file_up.Get(thisProcessDict['HISTPASS'])        # else use the same one as nominal distribution
+                        dictHists[process]['pass'][syst+'Up'] = file_up.Get(thisSystDict['HISTPASS_UP'])            # try to grab hist name from SYSTEMATIC dictionary
+                    elif 'HISTPASS' in thisSystDict:
+                        dictHists[process]['pass'][syst+'Up'] = file_up.Get(thisSystDict['HISTPASS'])               # else use the same one as nominal distribution
+                    else: 
+                        dictHists[process]['pass'][syst+'Up'] = file_up.Get(thisSystDict['HISTPASS_UP_'+process])   # or use process specific name
 
                     if 'HISTPASS_DOWN' in thisSystDict:
                         dictHists[process]['pass'][syst+'Down'] = file_down.Get(thisSystDict['HISTPASS_DOWN'])
+                    elif 'HISTPASS' in thisSystDict:
+                        dictHists[process]['pass'][syst+'Down'] = file_down.Get(thisSystDict['HISTPASS'])
                     else:
-                        dictHists[process]['pass'][syst+'Down'] = file_down.Get(thisProcessDict['HISTPASS'])
+                        dictHists[process]['pass'][syst+'Down'] = file_down.Get(thisSystDict['HISTPASS_DOWN_' + process])
 
                     if 'HISTFAIL_UP' in thisSystDict:
                         dictHists[process]['fail'][syst+'Up'] = file_up.Get(thisSystDict['HISTFAIL_UP'])
+                    elif 'HISTFAIL' in thisSystDict:
+                        dictHists[process]['fail'][syst+'Up'] = file_up.Get(thisSystDict['HISTFAIL'])
                     else:
-                        dictHists[process]['fail'][syst+'Up'] = file_up.Get(thisProcessDict['HISTFAIL'])
+                        dictHists[process]['fail'][syst+'Up'] = file_up.Get(thisSystDict['HISTFAIL_UP_' + process])
 
                     if 'HISTFAIL_DOWN' in thisSystDict:
                         dictHists[process]['fail'][syst+'Down'] = file_down.Get(thisSystDict['HISTFAIL_DOWN'])
+                    elif 'HISTFAIL' in thisSystDict:
+                        dictHists[process]['fail'][syst+'Down'] = file_down.Get(thisSystDict['HISTFAIL'])
                     else:
-                        dictHists[process]['fail'][syst+'Down'] = file_down.Get(thisProcessDict['HISTFAIL'])
+                        dictHists[process]['fail'][syst+'Down'] = file_down.Get(thisSystDict['HISTFAIL_DOWN_' + process])
 
 
     #####################################################################
@@ -115,29 +136,28 @@ def main(inputConfig, blinded):
     # with minimumal pain.                                              #
     #####################################################################
     
-    # Quickly grab out axis names and binning
+    # Quickly grab our axis names and binning
     xVarName = inputConfig['BINNING']['X']['NAME']
     yVarName = inputConfig['BINNING']['Y']['NAME']
 
     newXmin = inputConfig['BINNING']['X']['LOW']
     newXmax = inputConfig['BINNING']['X']['HIGH']
-    sigStart = inputConfig['BINNING']['X']['SIGSTART']
-    sigEnd = inputConfig['BINNING']['X']['SIGEND']
     newXnbins = inputConfig['BINNING']['X']['NBINS']
     newXwidth = float(newXmax-newXmin)/float(newXnbins)
+    if blinded:
+        sigStart = inputConfig['BINNING']['X']['SIGSTART']
+        sigEnd = inputConfig['BINNING']['X']['SIGEND']
 
     newYmin = inputConfig['BINNING']['Y']['LOW']
     newYmax = inputConfig['BINNING']['Y']['HIGH']
     newYnbins = inputConfig['BINNING']['Y']['NBINS']
-
-
 
     # For each process, category, and dist (nominal, systUp, etc)
     for process in dictHists.keys():
         for cat in ['pass','fail']:
             thisProcessCatDict = dictHists[process][cat]
             for dist in thisProcessCatDict.keys():
-
+                print 'Making ' + process +'_' + cat + '_' + dist
                 # Check if the user has changed the binning in the config file
                 oldXmin = thisProcessCatDict[dist].GetXaxis().GetXmin()
                 oldXmax = thisProcessCatDict[dist].GetXaxis().GetXmax()
@@ -166,8 +186,6 @@ def main(inputConfig, blinded):
                 thisProcessCatDict[dist].SetName(histname)
                 thisProcessCatDict[dist].SetTitle(histname)
 
-                outfile.cd()
-                thisProcessCatDict[dist].Write()
 
                 if blinded:
                     low_histname = process + '_' + cat + 'Low'
@@ -180,13 +198,10 @@ def main(inputConfig, blinded):
                     hist_to_split = dictHists[process][cat][dist]
                     low_hist = copyHistWithNewXbounds(hist_to_split,low_histname,newXwidth,newXmin,sigStart)
                     high_hist = copyHistWithNewXbounds(hist_to_split,high_histname,newXwidth,sigEnd,newXmax)
+
                     # Save them
                     dictHists[process][cat+'Low'][dist] = low_hist
                     dictHists[process][cat+'High'][dist] = high_hist
 
-                    outfile.cd()
-                    dictHists[process][cat+'Low'][dist].Write()
-                    dictHists[process][cat+'High'][dist].Write()
 
-    outfile.Close()
     return dictHists

@@ -94,7 +94,7 @@
                     \item \verb"VALDOWN:" -1$\sigma$ uncertainty (float)
                 \end{itemize}
             \end{itemize}
-            Less obvious are codes 2 and 3 which are for shape based uncertainties (and thus have corresponding histograms) and are either in the same file as the process's nominal histogram (code 2) or in a separate file (code 3). 
+            Less obvious are codes 2 and 3 which are for shape based uncertainties (and thus have corresponding histograms) and are either in the same file as the process's nominal histogram (code 2) or in a separate file (code 3). Additionally, they have a scale value which allows the user to change the normalization of the shape. For no change in the normalization, use 1.0. If you have a histogram with a 2 sigma shift, use 0.5 to divide the unit gaussian by 2 before doing the interpolation with Combine.
             \begin{itemize}
                 \item Shape based uncertainty, in same file as nominal histogram
                 \begin{itemize}
@@ -103,17 +103,21 @@
                     \item \verb"HISTPASS_DOWN:" the name of the histogram (in the same file as the nominal histogram) for -1$\sigma$ uncertainty in the pass distribution (string)
                     \item \verb"HISTFAIL_UP:" the name of the histogram (in the same file as the nominal histogram) for +1$\sigma$ uncertainty in the fail distribution (string)
                     \item \verb"HISTFAIL_DOWN:" the name of the histogram (in the same file as the nominal histogram) for -1$\sigma$ uncertainty in the fail distribution (string)
+                    \item \verb"SCALE: " a scale value which allows the user to change the normalization of the shape (float)
 
                 \end{itemize}
-                \item Shape based uncertainty, in different file as nominal histogram. If histogram names are specified, they will be used. If not (keys do not exist in the dictionary), the same names as the nominal distributions are used.
+                \item Shape based uncertainty, in different file as nominal histogram. This is the more flexible but also more complicated option. 
+                The user can specify files two different ways. The first is by using \verb"FILEUP:" and \verb"FILEDOWN:" to pick a file that \textit{every} process can pull the shape uncertainty histograms from. The second (and more likely to be used) way is to use keys of the form \verb"FILEUP_myprocess:" where \verb"myprocess" matches the name of a process that is defined in the \verb"PROCESS" dictionary and has this shape uncertainty associated with it. This allows each systematic and process to come from a separate file. 
+                The user can also specify histogram names in three different ways. The first is \verb"HISTPASS" and \verb"HISTFAIL" which allows the user to specify only two histogram names if they don't change between "up" and "down" shapes. The second is if the "up" and "down" shapes \textit{do} have different histogram names and uses the form \verb"HISTPASS_UP" and \verb"HISTFAIL_UP". Finally, the totally generic way allows the user to use the form \verb"HISTPASS_UP_myprocess" where (again) \verb"myprocess" matches the name of a process that is defined in the \verb"PROCESS" dictionary and has this shape uncertainty associated with it. Below is the totally generic way (which hopefully gets no use).
                 \begin{itemize}
                     \item \verb"CODE: 3" (int)
-                    \item \verb"FILEUP:" \verb"/path/to/fileup.root" which contains the +1$\sigma$ uncertainty histogram (string)
-                    \item \verb"FILEDOWN:" \verb"/path/to/filedown.root" which contains the -1$\sigma$ uncertainty histogram (string)
-                    \item \verb"HISTPASS_UP:" \textit{optional} - the name of the histogram (in the same file as the nominal histogram) for +1$\sigma$ uncertainty in the pass distribution (string)
-                    \item \verb"HISTPASS_DOWN:" \textit{optional} - the name of the histogram (in the same file as the nominal histogram) for -1$\sigma$ uncertainty in the pass distribution (string)
-                    \item \verb"HISTFAIL_UP:" \textit{optional} - the name of the histogram (in the same file as the nominal histogram) for +1$\sigma$ uncertainty in the fail distribution (string)
-                    \item \verb"HISTFAIL_DOWN:" \textit{optional} - the name of the histogram (in the same file as the nominal histogram) for -1$\sigma$ uncertainty in the fail distribution (string)
+                    \item \verb"FILEUP_myprocess:" \verb"/path/to/fileup_myprocess.root" which contains the +1$\sigma$ uncertainty histogram for myprocess (string)
+                    \item \verb"FILEDOWN_myprocess:" \verb"/path/to/filedown_myprocess.root" which contains the -1$\sigma$ uncertainty histogram for myprocess (string)
+                    \item \verb"HISTPASS_UP_myprocess:" the name of histogram for myprocess in \verb"/path/to/fileup_myprocess.root" for +1$\sigma$ uncertainty in the pass distribution (string)
+                    \item \verb"HISTPASS_DOWN_myprocess:" the name of the histogram for myprocess in \verb"/path/to/filedown_myprocess.root" for -1$\sigma$ uncertainty in the pass distribution (string)
+                    \item \verb"HISTFAIL_UP_myprocess:" the name of histogram for myprocess in \verb"/path/to/fileup_myprocess.root" for +1$\sigma$ uncertainty in the fail distribution (string)
+                    \item \verb"HISTFAIL_DOWN_myprocess:" the name of the histogram for myprocess in \verb"/path/to/filedown_myprocess.root" for -1$\sigma$ uncertainty in the fail distribution (string)
+                    \item \verb"SCALE: " a scale value which allows the user to change the normalization of the shape (float)
                 \end{itemize}
             \end{itemize}
             This scheme obviously relies on the user's ability to be somewhat organized. If for example, you have your +1$\sigma$ shape based uncertainty in file\textunderscore up.root with histogram name "SystUp" and -1$\sigma$ shape based uncertainty in file\textunderscore down.root with histogram name "SystDown" then there's no applicable code for you to use. 

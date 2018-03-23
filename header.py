@@ -60,7 +60,6 @@ def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHi
             # print '\t Setting content ' + str(newBinContent)
             histCopy.SetBinContent(newBinX,binY,newBinContent)
 
-
     return histCopy
 
 
@@ -69,8 +68,48 @@ def makeRDH(myTH2,RAL_vars):
     thisRDH = RooDataHist(name,name,RAL_vars,myTH2)
     return thisRDH
 
-def makeRooHistPdf(myTH2,RAL_vars):
-    thisRDH = makeRDH(myTH2,RAL_vars)
-    name = myTH2.GetName()
-    thisRHP = RooHistPdf(name,name,RAL_vars,thisRDH)
+
+def makeRHP(myRDH,RAL_vars):
+    name = myRDH.GetName()
+    thisRAS = RooArgSet(RAL_vars)
+    thisRHP = RooHistPdf(name,name,thisRAS,myRDH)
+    return thisRHP
+
+
+def colliMate(myString,width=18):
+    sub_strings = myString.split(' ')
+    new_string = ''
+    for i,sub_string in enumerate(sub_strings):
+        string_length = len(sub_string)
+        n_spaces = width - string_length
+        if i != len(sub_strings)-1:
+            if n_spaces <= 0:
+                n_spaces = 2
+            new_string += sub_string + ' '*n_spaces
+        else:
+            new_string += sub_string
+    return new_string
+
+def dictStructureCopy(inDict):
+    newDict = {}
+    for k1,v1 in inDict.items():
+        if type(v1) == dict:
+            newDict[k1] = dictStructureCopy(v1)
+        else:
+            newDict[k1] = 0
+    return newDict
+
+def dictCopy(inDict):
+    newDict = {}
+    for k1,v1 in inDict.items():
+        if type(v1) == dict:
+            newDict[k1] = dictStructureCopy(v1)
+        else:
+            newDict[k1] = v1
+    return newDict
+
+def printWorkspace(myfile,myworkspace):
+	myf = TFile.Open(myfile)
+	myw = myf.Get(myworkspace)
+	myw.Print()
 
