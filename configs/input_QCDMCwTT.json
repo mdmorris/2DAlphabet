@@ -7,7 +7,7 @@
     "PROCESS": {
         "HELP": "FILE is both the file path relative to the running directory. SYSTEMATICS is a list with all applicable systematic uncertainties listed with names that match those defined in SYSTEMATC. CODE can be 0 (signal), 1 (data), 2 (unchanged MC), 3 (MC to be renormalized)",
         "data_obs": {
-            "FILE": "fakeData_QCDMC_plus_TTMC.root",
+            "FILE": "fakeData/fakeData_QCDMC_plus_TTMC.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SYSTEMATICS":[],

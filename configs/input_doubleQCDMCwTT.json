@@ -7,11 +7,18 @@
     "PROCESS": {
         "HELP": "FILE is both the file path relative to the running directory. SYSTEMATICS is a list with all applicable systematic uncertainties listed with names that match those defined in SYSTEMATC. CODE can be 0 (signal), 1 (data), 2 (unchanged MC), 3 (MC to be renormalized)",
         "data_obs": {
-            "FILE": "path/TW2DalphabetQCD_Trigger_nominal_none_PSET_default.root",
+            "FILE": "fakeData/fakeData_doubleQCDMC_plus_TTMC.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SYSTEMATICS":[],
             "CODE": 1
+        },
+        "ttbar": {
+            "FILE":"path/TW2Dalphabetweightedttbar_Trigger_nominal_none_PSET_default.root",
+            "HISTPASS":"MtwvMtPass",
+            "HISTFAIL":"MtwvMtFail",
+            "SYSTEMATICS":["Tpt","lumi"],
+            "CODE": 3
         },
         "signalRH1200": {
             "FILE": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_PSET_default.root",
@@ -48,10 +55,10 @@
             "CODE": 3,
             "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_pileup_up_PSET_default.root",
             "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_pileup_down_PSET_default.root",
-            "HISTPASS_UP": "MtwvMtPass",
-            "HISTFAIL_UP": "MtwvMtFail",
-            "HISTPASS_DOWN": "MtwvMtPass",
-            "HISTFAIL_DOWN": "MtwvMtFail",
+            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pileup_up_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pileup_down_PSET_default.root",
+            "HISTPASS": "MtwvMtPass",
+            "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0
         }
     },
@@ -65,6 +72,7 @@
             "NBINS": 15,
             "SIGSTART": 150,
             "SIGEND": 190
+
         },
         "Y": {
             "NAME": "resmass",

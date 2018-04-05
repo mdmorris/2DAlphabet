@@ -29,16 +29,19 @@ def main(dictTH2s,inputConfig,blinded,tag):
     ################################
     # Establish our axis variables #
     ################################
-    x_var,x_var_low,x_var_high,y_var = getRRVs(inputConfig) # only have to do this once (make sure this TH2 has correct axis names!)
-    var_list = RooArgList(x_var,y_var)
-    low_var_list = RooArgList(x_var_low,y_var)
-    high_var_list = RooArgList(x_var_high,y_var)
+    if blinded:
+        x_var,x_var_low,x_var_high,y_var = getRRVs(inputConfig,blinded) # only have to do this once (make sure this TH2 has correct axis names!)
+        var_list = RooArgList(x_var,y_var)
+        low_var_list = RooArgList(x_var_low,y_var)
+        high_var_list = RooArgList(x_var_high,y_var)
+        allVars.extend([x_var_low,x_var_high,low_var_list,high_var_list])
 
-    allVars.extend([x_var,x_var_low,x_var_high,y_var,var_list,low_var_list,high_var_list])
+    else:
+        x_var,y_var = getRRVs(inputConfig,blinded)
+        var_list = RooArgList(x_var,y_var)
 
-    signal_region_start = inputConfig['BINNING']['X']['SIGSTART']
-    signal_region_end   = inputConfig['BINNING']['X']['SIGEND']
-    x_nbins = inputConfig['BINNING']['X']['NBINS']
+    allVars.extend([x_var,y_var,var_list])
+
 
     #########################
     #   Make RooDataHists   #
@@ -58,6 +61,9 @@ def main(dictTH2s,inputConfig,blinded,tag):
 
     # For procees, cat, dict...
     for process in Roo_dict.keys():
+        # Make a normalization for CODE 3 process that floats between 0 and double
+        if inputConfig["PROCESS"][process]["CODE"] == 3:
+            Roo_dict[process]['NORM'] = RooRealVar(process+'_norm',process+'_norm',1.0,0.0,2.0)
         for cat in catagories:
             for dist in Roo_dict[process][cat].keys():
 
@@ -74,23 +80,20 @@ def main(dictTH2s,inputConfig,blinded,tag):
                     Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],this_var_list)
 
 
-                elif inputConfig["PROCESS"][process]["CODE"] == 3:         # Allowing normalization of this process to float
-                    # Need to renormalize the TH2 to 1 so the norm can dictate the PDF normalization (1*norm=norm)
-                    # Normalization will come from rateParam in card
-                    dictTH2s[process][cat][dist+'_unitNorm'] =  dictTH2s[process][cat][dist].Clone()
-                    dictTH2s[process][cat][dist+'_unitNorm'].Scale(1/dictTH2s[process][cat][dist+'_unitNorm'].Integral())
-
+                elif inputConfig["PROCESS"][process]["CODE"] == 3:         
                     Roo_dict[process][cat][dist] = {}
-                    Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist+'_unitNorm'],this_var_list) # Has to be made and saved because the RHP references it
+                    Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],this_var_list) 
+                    Roo_dict[process][cat][dist]['RDH'].SetName(dictTH2s[process][cat][dist].GetName()+'_RDH') 
                     Roo_dict[process][cat][dist]['RHP'] = makeRHP(Roo_dict[process][cat][dist]['RDH'],this_var_list)
+                    Roo_dict[process][cat][dist]['RHP'].SetName(dictTH2s[process][cat][dist].GetName().replace('_RDH',''))
 
-                    # Make line for the card
-                    norm_name = Roo_dict[process][cat][dist]['RHP'].GetName()
-                    norm_start = dictTH2s[process][cat][dist].Integral()
-                    norm_low = 0.0
-                    norm_high = 2.0 * norm_start
+                    # Make normalization
+                    norm_name = Roo_dict[process][cat][dist]['RHP'].GetName() + '_norm'
+                    norm_start = RooConstVar(norm_name+'_start',norm_name+'_start',float(dictTH2s[process][cat][dist].Integral()))
+                    allVars.append(norm_start)
 
-                    rateParam_lines.append(norm_name + ' rateParam * ' + process + ' ' + str(norm_start) + ' [0,' + str(norm_high)+ ']')
+                    norm = RooProduct(norm_name,norm_name,RooArgList(Roo_dict[process]['NORM'],norm_start))
+                    Roo_dict[process][cat][dist]['NORM'] = norm
 
 
 #############################################################################################
@@ -134,7 +137,7 @@ def main(dictTH2s,inputConfig,blinded,tag):
     if blinded:
         listToEnumerate = [dictTH2s['data_obs']['failLow']['nominal'],dictTH2s['data_obs']['failHigh']['nominal']]
     else:
-        listToEnumerate = dictTH2s['data_obs']['fail']['nominal']
+        listToEnumerate = [dictTH2s['data_obs']['fail']['nominal']]
 
     Roo_dict['qcd'] = {}
 
@@ -164,10 +167,10 @@ def main(dictTH2s,inputConfig,blinded,tag):
 
                 # Initialize contents
                 binContent = TH2_data_fail.GetBinContent(xbin,ybin)
-                binErrUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)
-                binErrDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)
+                binErrUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)*10
+                binErrDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)*10
                 
-                # Now subtract away the parts that we don't want - namely backgrounds of CODE 2,3
+                # Now subtract away the parts that we don't want that don't need renormalization
                 for process in dictTH2s.keys():
                     thisTH2 = dictTH2s[process]['fail'+sband]['nominal']
 
@@ -180,14 +183,41 @@ def main(dictTH2s,inputConfig,blinded,tag):
                         binContent  = binContent    - thisTH2.GetBinContent(xbin,ybin)
                         binErrUp    = binErrUp      - thisTH2.GetBinContent(xbin,ybin) + thisTH2.GetBinErrorUp(xbin,ybin)              # Just propagator errors normally
                         binErrDown  = binErrDown    - thisTH2.GetBinContent(xbin,ybin) - thisTH2.GetBinErrorLow(xbin,ybin)
-                    elif inputConfig['PROCESS'][process]['CODE'] == 3: # MC to be renormalized
-                        binContent  = binContent    - thisTH2.GetBinContent(xbin,ybin)
-                        binErrUp    = binErrUp                                                  # If CODE 3 MC was normalized to 0              - this will dominated so ignoring
-                        binErrDown  = binErrDown    - 2*thisTH2.GetBinContent(xbin,ybin)        # If CODE 3 MC was doubled                        bin errors from these CODE 3 MCs
-                
+                    elif inputConfig['PROCESS'][process]['CODE'] == 3: # renorm MC
+                        binErrUp    = binContent                                               # Err up is no MC subtraction
+                        binErrDown  = binContent    - 2.0 * thisTH2.GetBinContent(xbin,ybin)   # Err down is double MC subtraction
+                        binContent  = binContent    - thisTH2.GetBinContent(xbin,ybin)         # Nominal is nominal MC subtraction
+
 
                 binRRV = RooRealVar(name, name, binContent, max(binErrDown,0), max(binErrUp,0))
+
+                # partialBinRRV = RooRealVar(name, name, binContent, max(binErrDown,0), max(binErrUp,0))  # Still needs renormalized backgrounds subtracted
+                # allVars.append(partialBinRRV)
+
+                # # Now subtract away the floating RooRealVar
+                # renormFlag = False
+                # for process in dictTH2s.keys():
+                #     if inputConfig['PROCESS'][process]['CODE'] == 3: # MC to be renormalized
+
+                #         content_to_sub = -1*dictTH2s[process]['fail'+sband]['nominal'].GetBinContent(xbin,ybin)
+                #         var_to_sub_no_norm = RooRealVar(name+'_'+process+'_no_norm',name+'_'+process+'_no_norm',content_to_sub)
+                #         prod_list = RooArgList(Roo_dict[process]['NORM'],var_to_sub_no_norm)
+                #         var_to_sub = RooProduct(name+'_'+process,name+'_'+process,prod_list)
+
+                #         addition_list = RooArgList(partialBinRRV, var_to_sub)
+                #         partialBinRRV = RooAddition(name+'_minus_'+process,name+'_minus_'+process,addition_list)
+
+                #         allVars.extend([var_to_sub_no_norm,prod_list,var_to_sub,partialBinRRV])
+
+                #         renormFlag = True
                 
+                # if renormFlag:
+                #     binRRV = partialBinRRV.Clone()
+                #     binRRV.SetName(name+'_final')
+                #     binRRV.SetTitle(name+'_final')
+                # else:
+
+
                 # Store the bin
                 binListFail.add(binRRV)
                 allVars.append(binRRV)
@@ -246,22 +276,27 @@ def main(dictTH2s,inputConfig,blinded,tag):
     myWorkspace = RooWorkspace("w_2D")
     for process in Roo_dict.keys():
         for cat in [k for k in Roo_dict[process].keys() if k.find('file') == -1]:
-            for dist in Roo_dict[process][cat].keys():
-                rooObj = Roo_dict[process][cat][dist]
-                try: 
-                    print "Importing " + rooObj.GetName() + ' from ' + process + ', ' + cat + ', ' + dist
-                    getattr(myWorkspace,'import')(rooObj,RooFit.RecycleConflictNodes())
-                except:
-                    for itemkey in rooObj.keys():
-                        print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat + ', ' + dist + ', ' + itemkey
-                        getattr(myWorkspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes())
-                
+            if cat == 'NORM':
+                # continue
+                print "Importing " + Roo_dict[process][cat].GetName() + ' from ' + process + ', ' + cat + ', ' + dist
+                getattr(myWorkspace,'import')(Roo_dict[process][cat],RooFit.RecycleConflictNodes(),RooFit.Silence())
+            else:
+                for dist in Roo_dict[process][cat].keys():
+                    rooObj = Roo_dict[process][cat][dist]
+                    try: 
+                        print "Importing " + rooObj.GetName() + ' from ' + process + ', ' + cat + ', ' + dist
+                        getattr(myWorkspace,'import')(rooObj,RooFit.RecycleConflictNodes(),RooFit.Silence())
+                    except:
+                        for itemkey in rooObj.keys():
+                            print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat + ', ' + dist + ', ' + itemkey
+                            getattr(myWorkspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes(),RooFit.Silence())
+                    
 
 
     # Now save out the RooDataHists
     myWorkspace.writeToFile('base_'+tag+'.root',True)  
 
-    return myWorkspace, rateParam_lines
+    return myWorkspace#, rateParam_lines
 
 
 

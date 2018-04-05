@@ -10,7 +10,7 @@
 import header
 from header import colliMate
 
-def main(inputConfig, rateParam_lines, blinded, tag):
+def main(inputConfig, blinded, tag):
     # Recreate file
     card_new = open('card_'+tag+'.txt','w')
     
@@ -155,15 +155,16 @@ def main(inputConfig, rateParam_lines, blinded, tag):
 
     ###########################################
     # Mark floating values as flatParams      # 
-    # (each fail bin and poly parameter)      #
-    # and add rateParams for CODE 3 processes #
+    # (each fail bin and poly parameter and   #
+    # CODE 3 process normalizations           #
     ###########################################
     for coeff in [key for key in inputConfig['FIT'].keys() if key != 'HELP']:
         lower_coeff = coeff.lower()
         card_new.write(colliMate('polyCoeff_'+lower_coeff+' flatParam\n',22))
 
-    for r in rateParam_lines:
-        card_new.write(colliMate(r + '\n',22))
+    for process in inputConfig['PROCESS']:
+        if process != 'HELP' and inputConfig['PROCESS'][process]['CODE'] == 3:
+            card_new.write(colliMate(process + '_norm flatParam\n',22))
 
     # Clearer code if I grab all of this
     xbins_low = inputConfig['BINNING']['X']['LOW']
@@ -173,6 +174,8 @@ def main(inputConfig, rateParam_lines, blinded, tag):
 
     ybins_n = inputConfig['BINNING']['Y']['NBINS']
 
+
+    # Now float the failing bins
     for ybin in range(1,ybins_n+1):
         # If blinded
         if blinded:

@@ -4,11 +4,11 @@ import os
 
 
 # Function stolen from https://stackoverflow.com/questions/9590382/forcing-python-json-module-to-work-with-ascii
-def ascii_encode_dict(data):	
+def ascii_encode_dict(data):    
     ascii_encode = lambda x: x.encode('ascii') if isinstance(x, unicode) else x 
     return dict(map(ascii_encode, pair) for pair in data.items())
 
-def getRRVs(inputConfig):
+def getRRVs(inputConfig, blinded):
     xname = inputConfig['BINNING']['X']['NAME']
     xlowname = xname + '_Low'
     xhighname = xname + '_High'
@@ -16,18 +16,23 @@ def getRRVs(inputConfig):
 
     xlow = inputConfig['BINNING']['X']['LOW']
     xhigh = inputConfig['BINNING']['X']['HIGH']
-    xSigStart = inputConfig['BINNING']['X']['SIGSTART']
-    xSigEnd = inputConfig['BINNING']['X']['SIGEND']
 
     ylow = inputConfig['BINNING']['Y']['LOW']
     yhigh = inputConfig['BINNING']['Y']['HIGH']
 
     xRRV = RooRealVar(xname,xname,xlow,xhigh)
-    xLowRRV = RooRealVar(xlowname,xlowname,xlow,xSigStart)
-    xHighRRV = RooRealVar(xhighname,xhighname,xSigEnd,xhigh)
     yRRV = RooRealVar(yname,yname,ylow,yhigh)
 
-    return xRRV,xLowRRV,xHighRRV,yRRV
+    if blinded:
+        xSigStart = inputConfig['BINNING']['X']['SIGSTART']
+        xSigEnd = inputConfig['BINNING']['X']['SIGEND']
+        xLowRRV = RooRealVar(xlowname,xlowname,xlow,xSigStart)
+        xHighRRV = RooRealVar(xhighname,xhighname,xSigEnd,xhigh)
+
+        return xRRV,xLowRRV,xHighRRV,yRRV
+    
+    else:
+        return xRRV,yRRV
 
 def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHigh):
     # Make a copy with the same Y bins but new X bins
@@ -42,7 +47,6 @@ def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHi
 
 
     # Loop through the old bins
-    # ASSUMES nOldBinsX > nNewBinsX
     for binY in range(1,nBinsY+1):
         # print 'Bin y: ' + str(binY)
         for newBinX in range(1,nNewBinsX+1):
@@ -109,7 +113,32 @@ def dictCopy(inDict):
     return newDict
 
 def printWorkspace(myfile,myworkspace):
-	myf = TFile.Open(myfile)
-	myw = myf.Get(myworkspace)
-	myw.Print()
+    myf = TFile.Open(myfile)
+    myw = myf.Get(myworkspace)
+    myw.Print()
+
+
+def make4x4Can(name,h1,h2,h3,h4):
+    my4x4Can = TCanvas(name,name,1200,1000)
+    my4x4Can.Divide(2,2)
+
+    my4x4Can.cd(1)
+    h1.Draw('lego')
+    my4x4Can.cd(2)
+    h2.Draw('lego')
+    my4x4Can.cd(3)
+    h3.Draw('lego')
+    my4x4Can.cd(4)
+    h4.Draw('lego')
+
+    my4x4Can.Print('plots/'+name+'.pdf','pdf')
+
+def make1x1Can(name,h1):
+    my1x1Can = TCanvas(name,name,800,700)
+    my1x1Can.cd()
+    h1.Draw('lego')
+    my1x1Can.Print('plots/'+name+'.pdf','pdf')
+
+
+
 
