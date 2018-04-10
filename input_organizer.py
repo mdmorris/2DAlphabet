@@ -9,7 +9,7 @@
 import ROOT
 from ROOT import *
 import header
-from header import copyHistWithNewXbounds
+from header import copyHistWithNewXbounds, makeBlindedHist
 import pprint
 pp = pprint.PrettyPrinter(indent = 2)
 
@@ -36,12 +36,6 @@ def main(inputConfig, blinded):
             'pass': {},
             'fail': {}
         }
-       
-        if blinded:
-            dictHists[process]['passLow'] = {}
-            dictHists[process]['passHigh'] = {}
-            dictHists[process]['failLow'] = {}
-            dictHists[process]['failHigh'] = {}
             
 
         # Grab nominal pass and fail distributions
@@ -53,11 +47,6 @@ def main(inputConfig, blinded):
         dictHists[process]['pass']['nominal'] = hist_pass
         dictHists[process]['fail']['nominal'] = hist_fail
 
-        if blinded:
-            dictHists[process]['passLow']['nominal'] = hist_pass
-            dictHists[process]['failLow']['nominal'] = hist_fail
-            dictHists[process]['passHigh']['nominal'] = hist_pass
-            dictHists[process]['failHigh']['nominal'] = hist_fail
 
         # If there are systematics
         if len(thisProcessDict['SYSTEMATICS']) == 0:
@@ -144,6 +133,7 @@ def main(inputConfig, blinded):
     newXmax = inputConfig['BINNING']['X']['HIGH']
     newXnbins = inputConfig['BINNING']['X']['NBINS']
     newXwidth = float(newXmax-newXmin)/float(newXnbins)
+
     if blinded:
         sigStart = inputConfig['BINNING']['X']['SIGSTART']
         sigEnd = inputConfig['BINNING']['X']['SIGEND']
@@ -191,17 +181,14 @@ def main(inputConfig, blinded):
                     low_histname = process + '_' + cat + 'Low'
                     high_histname = process + '_' + cat + 'High'
                     if dist != 'nominal':                           # if not nominal dist
-                        low_histname = low_histname + '_' + dist
-                        high_histname = high_histname + '_' + dist
+                        low_histname = low_histname + '_' + dist + 'Low'
+                        high_histname = high_histname + '_' + dist + 'High'
 
                     # Create the split histograms (do the naming for them in this step)
                     hist_to_split = dictHists[process][cat][dist]
                     low_hist = copyHistWithNewXbounds(hist_to_split,low_histname,newXwidth,newXmin,sigStart)
                     high_hist = copyHistWithNewXbounds(hist_to_split,high_histname,newXwidth,sigEnd,newXmax)
-
-                    # Save them
-                    dictHists[process][cat+'Low'][dist] = low_hist
-                    dictHists[process][cat+'High'][dist] = high_hist
+                    dictHists[process][cat][dist] = makeBlindedHist(hist_to_split,low_hist,high_hist)
 
 
     return dictHists

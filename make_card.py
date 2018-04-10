@@ -17,12 +17,8 @@ def main(inputConfig, blinded, tag):
     #######################################################
     # imax (bins), jmax (backgrounds), kmax (systematics) #
     #######################################################
-    if blinded:
-        imax = '4'                      # passLow, passHigh, failLow, failHigh
-        channels = ['passLow', 'passHigh', 'failLow', 'failHigh']
-    else:
-        imax = '2'                      # pass, fail
-        channels = ['pass', 'fail']
+    imax = '2'                      # pass, fail
+    channels = ['pass', 'fail']
 
     # Get the length of the list of all process that have CODE 2 or 3 (and ignore "HELP" key) and add 1 for qcd (which won't be in the inputConfig)
     jmax = str(len([proc for proc in inputConfig['PROCESS'].keys() if proc != 'HELP' and inputConfig['PROCESS'][proc]['CODE'] >= 2]) + 1)
@@ -187,10 +183,10 @@ def main(inputConfig, blinded, tag):
 
             # For x low
             for xbin in range(1,int(xbins_n_low+1)):
-                card_new.write(colliMate('FailLow_bin_'+str(xbin)+'-'+str(ybin)+' flatParam\n',22))
+                card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+' flatParam\n',22))
             # For x high
-            for xbin in range(1,int(xbins_n_high+1)):
-                card_new.write(colliMate('FailHigh_bin_'+str(xbin)+'-'+str(ybin)+' flatParam\n',22))
+            for xbin in range(int(xbins_n-xbins_n_high+1),int(xbins_n+1)):
+                card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+' flatParam\n',22))
 
         # If NOT blinded
         else:

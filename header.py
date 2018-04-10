@@ -66,6 +66,32 @@ def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHi
 
     return histCopy
 
+def makeBlindedHist(nomHist,lowHist,highHist):
+    # Grab stuff to make it easier to read
+    xlow = nomHist.GetXaxis().GetXmin()
+    xhigh = nomHist.GetXaxis().GetXmax()
+    xnbins = nomHist.GetNbinsX()
+    ylow = nomHist.GetYaxis().GetXmin()
+    yhigh = nomHist.GetYaxis().GetXmax()
+    ynbins = nomHist.GetNbinsY()
+    blindName = nomHist.GetName()
+
+    # Need to change nominal hist name or we'll get a memory leak
+    nomHist.SetName(blindName+'_unblinded')
+
+    blindedHist = TH2F(blindName,blindName,xnbins,xlow,xhigh,ynbins,ylow,yhigh)
+
+    for binY in range(1,ynbins+1):
+        # First fill with the lowHist bins since this is easy
+        for binX in range(1,lowHist.GetNbinsX()+1):
+            blindedHist.SetBinContent(binX,binY,lowHist.GetBinContent(binX,binY))
+       
+        # Now figure out how many bins we have to jump to get to highHist
+        bins2jump = xnbins - highHist.GetNbinsX()
+        for binX in range(1,highHist.GetNbinsX()+1):
+            blindedHist.SetBinContent(binX+bins2jump,binY,highHist.GetBinContent(binX,binY))
+
+    return blindedHist
 
 def makeRDH(myTH2,RAL_vars):
     name = myTH2.GetName()

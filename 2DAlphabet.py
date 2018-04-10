@@ -135,33 +135,31 @@ print 'Organizing histograms into single file...'
 organized_dict = input_organizer.main(input_config,blinded)
 print 'Done'
 
+#########################################################
+#             Make the workspace for Combine            #
+#########################################################
+# Make the RooWorkspace - creates workspace name 'w_2D' in base.root
+workspace = build_workspace.main(organized_dict,input_config,blinded,tag)
 
-# #########################################################
-# #             Make the workspace for Combine            #
-# #########################################################
-# # Make the RooWorkspace - creates workspace name 'w_2D' in base.root
-# workspace = build_workspace.main(organized_dict,input_config,blinded,tag)
+#########################################################
+#             Make the data card for Combine            #
+#########################################################
+# Make the data card - makes a text file named card_2D.txt, return 0
+print 'Making Combine card...'
+make_card.main(input_config, blinded, tag)
+print 'Done'
 
-# #########################################################
-# #             Make the data card for Combine            #
-# #########################################################
-# # Make the data card - makes a text file named card_2D.txt, return 0
-# print 'Making Combine card...'
-# make_card.main(input_config, blinded, tag)
-# print 'Done'
+# Run Combine
+subprocess.call(['combine -M MaxLikelihoodFit card_'+tag+'.txt --saveWithUncertainties --saveWorkspace -v 2 --rMin -50 --rMax 50'], shell=True)
 
+# Test that Combine ran successfully 
+if not os.path.isfile('MaxLikelihoodFitResult.root'):
+    print "Combine failed and never made MaxLikelihoodFitResult.root. Quitting..."
+    quit()
 
-# # Run Combine
-# subprocess.call(['combine -M MaxLikelihoodFit card_'+tag+'.txt --saveWithUncertainties --saveWorkspace -v 2 --rMin -50 --rMax 50'], shell=True)
-
-# # Test that Combine ran successfully 
-# if not os.path.isfile('MaxLikelihoodFitResult.root'):
-#     print "Combine failed and never made MaxLikelihoodFitResult.root. Quitting..."
-#     quit()
-
-# if options.move:
-#     subprocess.call(['mv base_'+tag+'.root ' + tag + '/'], shell=True)
-#     subprocess.call(['mv card_'+tag+'.txt ' + tag + '/'], shell=True)
+if options.move:
+    subprocess.call(['mv base_'+tag+'.root ' + tag + '/'], shell=True)
+    subprocess.call(['mv card_'+tag+'.txt ' + tag + '/'], shell=True)
 
 # Plot
 plot_fit_results.main(input_config,organized_dict,blinded,tag)

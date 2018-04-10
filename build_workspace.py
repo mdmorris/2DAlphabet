@@ -29,16 +29,8 @@ def main(dictTH2s,inputConfig,blinded,tag):
     ################################
     # Establish our axis variables #
     ################################
-    if blinded:
-        x_var,x_var_low,x_var_high,y_var = getRRVs(inputConfig,blinded) # only have to do this once (make sure this TH2 has correct axis names!)
-        var_list = RooArgList(x_var,y_var)
-        low_var_list = RooArgList(x_var_low,y_var)
-        high_var_list = RooArgList(x_var_high,y_var)
-        allVars.extend([x_var_low,x_var_high,low_var_list,high_var_list])
-
-    else:
-        x_var,y_var = getRRVs(inputConfig,blinded)
-        var_list = RooArgList(x_var,y_var)
+    x_var,y_var = getRRVs(inputConfig,False)
+    var_list = RooArgList(x_var,y_var)
 
     allVars.extend([x_var,y_var,var_list])
 
@@ -52,10 +44,6 @@ def main(dictTH2s,inputConfig,blinded,tag):
     # However, we will do one thing for convenience - copy it and replace the TH2s in the copy with RDHs
     # if the process has CODE 0,1,2 and a PDF with a normalization if the CODE is 3
 
-    catagories = ['pass','fail']
-    if blinded:
-        catagories.extend(['passLow','failLow','passHigh','failHigh'])
-
     Roo_dict = dictCopy(dictTH2s)
     rateParam_lines = []
 
@@ -64,27 +52,18 @@ def main(dictTH2s,inputConfig,blinded,tag):
         # Make a normalization for CODE 3 process that floats between 0 and double
         if inputConfig["PROCESS"][process]["CODE"] == 3:
             Roo_dict[process]['NORM'] = RooRealVar(process+'_norm',process+'_norm',1.0,0.0,2.0)
-        for cat in catagories:
+        for cat in ['pass','fail']:
             for dist in Roo_dict[process][cat].keys():
-
-                if cat.find('Low') != -1:
-                    this_var_list = low_var_list
-                elif cat.find('High') != -1:
-                    this_var_list = high_var_list
-                else:
-                    this_var_list = var_list
-
 
                 if inputConfig["PROCESS"][process]["CODE"] != 3:
                     Roo_dict[process][cat][dist] = {}
-                    Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],this_var_list)
-
+                    Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],var_list)
 
                 elif inputConfig["PROCESS"][process]["CODE"] == 3:         
                     Roo_dict[process][cat][dist] = {}
-                    Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],this_var_list) 
+                    Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],var_list) 
                     Roo_dict[process][cat][dist]['RDH'].SetName(dictTH2s[process][cat][dist].GetName()+'_RDH') 
-                    Roo_dict[process][cat][dist]['RHP'] = makeRHP(Roo_dict[process][cat][dist]['RDH'],this_var_list)
+                    Roo_dict[process][cat][dist]['RHP'] = makeRHP(Roo_dict[process][cat][dist]['RDH'],var_list)
                     Roo_dict[process][cat][dist]['RHP'].SetName(dictTH2s[process][cat][dist].GetName().replace('_RDH',''))
 
                     # Make normalization
@@ -115,6 +94,7 @@ def main(dictTH2s,inputConfig,blinded,tag):
         if tempYorder > polYO:
             polYO = tempYorder
 
+
     PolyCoeffs = {}
     for yi in range(polYO+1):
         for xi in range(polXO+1):
@@ -132,47 +112,45 @@ def main(dictTH2s,inputConfig,blinded,tag):
     ######################################
     # Build the RooParametricHist2D bins #
     ######################################
-    
-    # If we are doing a blinded search, need to split this up into two parts (low and high x-axis regions) and loop over
-    if blinded:
-        listToEnumerate = [dictTH2s['data_obs']['failLow']['nominal'],dictTH2s['data_obs']['failHigh']['nominal']]
-    else:
-        listToEnumerate = [dictTH2s['data_obs']['fail']['nominal']]
+
+    # Start by copying the failing distribution of data
+    TH2_data_fail = dictTH2s['data_obs']['fail']['nominal']
 
     Roo_dict['qcd'] = {}
 
-    # Loop over Low and High categories if blinded
-    for iband, TH2_data_fail in enumerate(listToEnumerate):
-        if len(listToEnumerate) == 1:       # Not blinded
-            sband = ''
-            x_var_band = x_var
-        else:                               # Blinded
-            if iband == 0:   
-                sband = 'Low'
-                x_var_band = x_var_low
-            elif iband == 1:
-                sband = 'High'
-                x_var_band = x_var_high
+    binListFail = RooArgList()
+    binListPass = RooArgList()
 
-        binListFail = RooArgList()
-        binListPass = RooArgList()
+    # Get each bin
+    for ybin in range(1,TH2_data_fail.GetNbinsY()+1):
+        for xbin in range(1,TH2_data_fail.GetNbinsX()+1):
+            # Now that we're in a specific bin, we need to process it
+            
+            # Now that we know we aren't in the blinded region, make a name for the bin RRV
+            name = 'Fail_bin_'+str(xbin)+'-'+str(ybin)
 
-        # Get each bin
-        for ybin in range(1,TH2_data_fail.GetNbinsY()+1):
-            for xbin in range(1,TH2_data_fail.GetNbinsX()+1):
-                # Now that we're in a specific bin, we need to process it
-                
-                # First make a name for the bin RRV
-                name = 'Fail'+sband+'_bin_'+str(xbin)+'-'+str(ybin)
+            # First let's check if we are in a blinded region
+            upperEdge_in_sig = TH2_data_fail.GetXaxis().GetBinUpEdge(xbin) > inputConfig['BINNING']['X']['SIGSTART'] and TH2_data_fail.GetXaxis().GetBinUpEdge(xbin) <= inputConfig['BINNING']['X']['SIGEND']
+            lowerEdge_in_sig = TH2_data_fail.GetXaxis().GetBinLowEdge(xbin) >= inputConfig['BINNING']['X']['SIGSTART'] and TH2_data_fail.GetXaxis().GetBinLowEdge(xbin) < inputConfig['BINNING']['X']['SIGEND']
+            if blinded and (upperEdge_in_sig or lowerEdge_in_sig):
+                binRRV = RooConstVar(name, name, 0)
+                binListFail.add(binRRV)
+                allVars.append(binRRV)
 
+                thisBinPass = RooConstVar(name, name, 0)
+                binListPass.add(thisBinPass)
+                allVars.append(thisBinPass)
+
+            # Otherwise
+            else:
                 # Initialize contents
                 binContent = TH2_data_fail.GetBinContent(xbin,ybin)
                 binErrUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)*10
                 binErrDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)*10
                 
-                # Now subtract away the parts that we don't want that don't need renormalization
+                # Now subtract away the parts that we don't want
                 for process in dictTH2s.keys():
-                    thisTH2 = dictTH2s[process]['fail'+sband]['nominal']
+                    thisTH2 = dictTH2s[process]['fail']['nominal']
 
                     # Check the code and change bin content and errors accordingly
                     if inputConfig['PROCESS'][process]['CODE'] == 0: # signal
@@ -199,7 +177,7 @@ def main(dictTH2s,inputConfig,blinded,tag):
                 # for process in dictTH2s.keys():
                 #     if inputConfig['PROCESS'][process]['CODE'] == 3: # MC to be renormalized
 
-                #         content_to_sub = -1*dictTH2s[process]['fail'+sband]['nominal'].GetBinContent(xbin,ybin)
+                #         content_to_sub = -1*dictTH2s[process]['fail']['nominal'].GetBinContent(xbin,ybin)
                 #         var_to_sub_no_norm = RooRealVar(name+'_'+process+'_no_norm',name+'_'+process+'_no_norm',content_to_sub)
                 #         prod_list = RooArgList(Roo_dict[process]['NORM'],var_to_sub_no_norm)
                 #         var_to_sub = RooProduct(name+'_'+process,name+'_'+process,prod_list)
@@ -226,8 +204,8 @@ def main(dictTH2s,inputConfig,blinded,tag):
                 xCenter = TH2_data_fail.GetXaxis().GetBinCenter(xbin)
                 yCenter = TH2_data_fail.GetYaxis().GetBinCenter(ybin)
 
-                xConst = RooConstVar("ConstVar"+sband+"_x_"+str(xbin)+'_'+str(ybin),"ConstVar"+sband+"_x_"+str(xbin)+'_'+str(ybin),xCenter)
-                yConst = RooConstVar("ConstVar"+sband+"_y_"+str(xbin)+'_'+str(ybin),"ConstVar"+sband+"_y_"+str(xbin)+'_'+str(ybin),yCenter)
+                xConst = RooConstVar("ConstVar_x_"+str(xbin)+'_'+str(ybin),"ConstVar_x_"+str(xbin)+'_'+str(ybin),xCenter)
+                yConst = RooConstVar("ConstVar_y_"+str(xbin)+'_'+str(ybin),"ConstVar_y_"+str(xbin)+'_'+str(ybin),yCenter)
 
                 allVars.append(xConst)
                 allVars.append(yConst)
@@ -242,13 +220,13 @@ def main(dictTH2s,inputConfig,blinded,tag):
                         xCoeffList.add(PolyCoeffs['x'+str(xCoeff)+'y'+str(yCoeff)])
 
                     # Make the polynomial and save it to the list of x polynomials
-                    thisXPolyVarLabel = "xPol"+sband+"_y_"+str(yCoeff)+"_Bin_"+str(int(xbin))+"_"+str(int(ybin))
+                    thisXPolyVarLabel = "xPol_y_"+str(yCoeff)+"_Bin_"+str(int(xbin))+"_"+str(int(ybin))
                     xPolyVar = RooPolyVar(thisXPolyVarLabel,thisXPolyVarLabel,xConst,xCoeffList)
                     xPolyList.add(xPolyVar)
                     allVars.append(xPolyVar)
 
                 # Now make a polynomial out of the x polynomials
-                thisYPolyVarLabel = "FullPol"+sband+"_Bin_"+str(int(xbin))+"_"+str(int(ybin))
+                thisYPolyVarLabel = "FullPol_Bin_"+str(int(xbin))+"_"+str(int(ybin))
                 thisFullPolyVar = RooPolyVar(thisYPolyVarLabel,thisYPolyVarLabel,yConst,xPolyList)
 
                 allVars.append(thisFullPolyVar)
@@ -256,20 +234,19 @@ def main(dictTH2s,inputConfig,blinded,tag):
 
                 # Finally make the pass distribution
                 formulaArgList = RooArgList(binRRV,thisFullPolyVar)
-                thisBinPass = RooFormulaVar('Pass'+sband+'_bin_'+str(xbin)+'-'+str(ybin),'Pass'+sband+'_bin_'+str(xbin)+'-'+str(ybin),"@0*@1",formulaArgList)
+                thisBinPass = RooFormulaVar('Pass_bin_'+str(xbin)+'-'+str(ybin),'Pass_bin_'+str(xbin)+'-'+str(ybin),"@0*@1",formulaArgList)
                 binListPass.add(thisBinPass)
                 allVars.append(thisBinPass)
 
 
-        print "Making RPH2Ds"
-        Roo_dict['qcd']['fail'+sband] = {}
-        Roo_dict['qcd']['pass'+sband] = {}
+    print "Making RPH2Ds"
+    Roo_dict['qcd']['fail'] = {}
+    Roo_dict['qcd']['pass'] = {}
 
-        Roo_dict['qcd']['fail'+sband]['RPH2D'] = RooParametricHist2D('qcd_fail'+sband,'qcd_fail'+sband,x_var_band, y_var, binListFail, TH2_data_fail)
-        Roo_dict['qcd']['fail'+sband]['norm']  = RooAddition('qcd_fail'+sband+'_norm','qcd_fail'+sband+'_norm',binListFail)
-        Roo_dict['qcd']['pass'+sband]['RPH2D'] = RooParametricHist2D('qcd_pass'+sband,'qcd_pass'+sband,x_var_band, y_var, binListPass, TH2_data_fail)
-        Roo_dict['qcd']['pass'+sband]['norm']  = RooAddition('qcd_pass'+sband+'_norm','qcd_pass'+sband+'_norm',binListPass)
-
+    Roo_dict['qcd']['fail']['RPH2D'] = RooParametricHist2D('qcd_fail','qcd_fail',x_var, y_var, binListFail, TH2_data_fail)
+    Roo_dict['qcd']['fail']['norm']  = RooAddition('qcd_fail_norm','qcd_fail_norm',binListFail)
+    Roo_dict['qcd']['pass']['RPH2D'] = RooParametricHist2D('qcd_pass','qcd_pass',x_var, y_var, binListPass, TH2_data_fail)
+    Roo_dict['qcd']['pass']['norm']  = RooAddition('qcd_pass_norm','qcd_pass_norm',binListPass)
 
     print "Making workspace..."
     # Make workspace to save in
@@ -279,17 +256,17 @@ def main(dictTH2s,inputConfig,blinded,tag):
             if cat == 'NORM':
                 # continue
                 print "Importing " + Roo_dict[process][cat].GetName() + ' from ' + process + ', ' + cat + ', ' + dist
-                getattr(myWorkspace,'import')(Roo_dict[process][cat],RooFit.RecycleConflictNodes(),RooFit.Silence())
+                getattr(myWorkspace,'import')(Roo_dict[process][cat],RooFit.RecycleConflictNodes())#,RooFit.Silence())
             else:
                 for dist in Roo_dict[process][cat].keys():
                     rooObj = Roo_dict[process][cat][dist]
                     try: 
                         print "Importing " + rooObj.GetName() + ' from ' + process + ', ' + cat + ', ' + dist
-                        getattr(myWorkspace,'import')(rooObj,RooFit.RecycleConflictNodes(),RooFit.Silence())
+                        getattr(myWorkspace,'import')(rooObj,RooFit.RecycleConflictNodes())#,RooFit.Silence())
                     except:
                         for itemkey in rooObj.keys():
                             print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat + ', ' + dist + ', ' + itemkey
-                            getattr(myWorkspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes(),RooFit.Silence())
+                            getattr(myWorkspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes())#,RooFit.Silence())
                     
 
 
