@@ -148,9 +148,7 @@ def main(dictTH2s,inputConfig,blinded,tag):
                 binErrUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)*10
                 binErrDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)*10
                 
-                renorm_MC_procs = []
-
-                # Now subtract away the non-renormalized MC bkgs
+                # Now subtract away the parts that we don't want
                 for process in dictTH2s.keys():
                     thisTH2 = dictTH2s[process]['fail']['nominal']
 
@@ -161,41 +159,42 @@ def main(dictTH2s,inputConfig,blinded,tag):
                         continue
                     elif inputConfig['PROCESS'][process]['CODE'] == 2: # unchanged MC
                         binContent  = binContent    - thisTH2.GetBinContent(xbin,ybin)
-                        binErrUp    = binErrUp      - thisTH2.GetBinContent(xbin,ybin) + thisTH2.GetBinErrorUp(xbin,ybin)*5              # Just propagator errors normally
-                        binErrDown  = binErrDown    - thisTH2.GetBinContent(xbin,ybin) - thisTH2.GetBinErrorLow(xbin,ybin)*5
+                        binErrUp    = binErrUp      - thisTH2.GetBinContent(xbin,ybin) + thisTH2.GetBinErrorUp(xbin,ybin)              # Just propagator errors normally
+                        binErrDown  = binErrDown    - thisTH2.GetBinContent(xbin,ybin) - thisTH2.GetBinErrorLow(xbin,ybin)
                     elif inputConfig['PROCESS'][process]['CODE'] == 3: # renorm MC
-                        renorm_MC_procs.append(process)
+                        binErrUp    = binContent                                               # Err up is no MC subtraction
+                        binErrDown  = binContent    - 2.0 * thisTH2.GetBinContent(xbin,ybin)   # Err down is double MC subtraction
+                        binContent  = binContent    - thisTH2.GetBinContent(xbin,ybin)         # Nominal is nominal MC subtraction
 
-                # For the process that need to be renormalized...
-                # Make a final RRV that we can start with and loop over - this is replaced every time
-                # we loop though. The idea is that the variable name is changed but the RooFit objects
-                # can still be stored in memory (we just won't be accessing them again)
-                bin_final = RooRealVar(name+'_init', name+'_init', binContent, max(binErrDown,0), max(binErrUp,0))
-                allVars.append(bin_final)
-                sub_name = name
-                for process in renorm_MC_procs:
-                    sub_name = sub_name + '_minus_' + process 
 
-                    # Grab the nominal hist for this process and get the bin value and error (these should be negative)
-                    thisTH2 = dictTH2s[process]['fail']['nominal']
-                    sub_amount_content = -1.0*thisTH2.GetBinContent(xbin,ybin)
-                    sub_amount_low = sub_amount_content - thisTH2.GetBinErrorUp(xbin,ybin)
-                    sub_amount_high = sub_amount_content + thisTH2.GetBinErrorLow(xbin,ybin)
+                binRRV = RooRealVar(name, name, binContent, max(binErrDown,0), max(binErrUp,0))
 
-                    # Make a RRV of the nominal amount we want to subtract
-                    this_MC_nominal = RooConstVar(name + '_' + process+'_nominal', name + '_' + process+'_nominal', sub_amount_content)
-                    allVars.append(this_MC_nominal) 
+                # partialBinRRV = RooRealVar(name, name, binContent, max(binErrDown,0), max(binErrUp,0))  # Still needs renormalized backgrounds subtracted
+                # allVars.append(partialBinRRV)
 
-                    # Multiply the nominal value by the new normalization
-                    this_MC_renorm = RooProduct(name + '_' + process+'_renorm', name + '_' + process+'_renorm', RooArgList(this_MC_nominal,Roo_dict[process]['NORM']))
-                    allVars.append(this_MC_renorm)
+                # # Now subtract away the floating RooRealVar
+                # renormFlag = False
+                # for process in dictTH2s.keys():
+                #     if inputConfig['PROCESS'][process]['CODE'] == 3: # MC to be renormalized
 
-                    # Now subtract this "renormalized" value from the bin content (final_bin)
-                    bin_final = RooAddition(sub_name, sub_name, RooArgList(bin_final,this_MC_renorm))
-                    allVars.append(bin_final)
+                #         content_to_sub = -1*dictTH2s[process]['fail']['nominal'].GetBinContent(xbin,ybin)
+                #         var_to_sub_no_norm = RooRealVar(name+'_'+process+'_no_norm',name+'_'+process+'_no_norm',content_to_sub)
+                #         prod_list = RooArgList(Roo_dict[process]['NORM'],var_to_sub_no_norm)
+                #         var_to_sub = RooProduct(name+'_'+process,name+'_'+process,prod_list)
 
-                # Clone bin_final to get a RRV with the proper name
-                binRRV = bin_final.Clone(name)
+                #         addition_list = RooArgList(partialBinRRV, var_to_sub)
+                #         partialBinRRV = RooAddition(name+'_minus_'+process,name+'_minus_'+process,addition_list)
+
+                #         allVars.extend([var_to_sub_no_norm,prod_list,var_to_sub,partialBinRRV])
+
+                #         renormFlag = True
+                
+                # if renormFlag:
+                #     binRRV = partialBinRRV.Clone()
+                #     binRRV.SetName(name+'_final')
+                #     binRRV.SetTitle(name+'_final')
+                # else:
+
 
                 # Store the bin
                 binListFail.add(binRRV)
@@ -232,6 +231,7 @@ def main(dictTH2s,inputConfig,blinded,tag):
 
                 allVars.append(thisFullPolyVar)
 
+
                 # Finally make the pass distribution
                 formulaArgList = RooArgList(binRRV,thisFullPolyVar)
                 thisBinPass = RooFormulaVar('Pass_bin_'+str(xbin)+'-'+str(ybin),'Pass_bin_'+str(xbin)+'-'+str(ybin),"@0*@1",formulaArgList)
@@ -256,18 +256,19 @@ def main(dictTH2s,inputConfig,blinded,tag):
             if cat == 'NORM':
                 # continue
                 print "Importing " + Roo_dict[process][cat].GetName() + ' from ' + process + ', ' + cat + ', ' + dist
-                getattr(myWorkspace,'import')(Roo_dict[process][cat],RooFit.RecycleConflictNodes(),RooFit.Silence())
+                getattr(myWorkspace,'import')(Roo_dict[process][cat],RooFit.RecycleConflictNodes())#,RooFit.Silence())
             else:
                 for dist in Roo_dict[process][cat].keys():
                     rooObj = Roo_dict[process][cat][dist]
                     try: 
                         print "Importing " + rooObj.GetName() + ' from ' + process + ', ' + cat + ', ' + dist
-                        getattr(myWorkspace,'import')(rooObj,RooFit.RecycleConflictNodes(),RooFit.Silence())
+                        getattr(myWorkspace,'import')(rooObj,RooFit.RecycleConflictNodes())#,RooFit.Silence())
                     except:
                         for itemkey in rooObj.keys():
                             print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat + ', ' + dist + ', ' + itemkey
-                            getattr(myWorkspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes(),RooFit.Silence())
+                            getattr(myWorkspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes())#,RooFit.Silence())
                     
+
 
     # Now save out the RooDataHists
     myWorkspace.writeToFile('base_'+tag+'.root',True)  
