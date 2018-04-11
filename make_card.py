@@ -149,18 +149,31 @@ def main(inputConfig, blinded, tag):
         card_new.write(colliMate(syst_lines[line_key]+'\n'))
 
 
-    ###########################################
-    # Mark floating values as flatParams      # 
-    # (each fail bin and poly parameter and   #
-    # CODE 3 process normalizations           #
-    ###########################################
+    #################################################
+    # Mark floating values as flatParams            # 
+    # In general we float                           #
+    # - polyCoeff_*                                 #
+    #                                               #
+    # If there's a renormalized process we float    #
+    # - process_norm                                #
+    # - Fail_bin_x-y_process_nominal                #
+    # - Fail_bin_x-y_init                           #
+    #                                               #
+    # Otherwise we float                            #
+    # - Fail_bin_x-y                                #
+    #################################################
     for coeff in [key for key in inputConfig['FIT'].keys() if key != 'HELP']:
         lower_coeff = coeff.lower()
         card_new.write(colliMate('polyCoeff_'+lower_coeff+' flatParam\n',22))
 
+    # Check if we have any renormalized MCs, store which processes, and declare the _norm as a flatParam
+    renormFlag = False
+    renormProcesses = []
     for process in inputConfig['PROCESS']:
         if process != 'HELP' and inputConfig['PROCESS'][process]['CODE'] == 3:
             card_new.write(colliMate(process + '_norm flatParam\n',22))
+            renormProcesses.append(process)
+            renormFlag = True
 
     # Clearer code if I grab all of this
     xbins_low = inputConfig['BINNING']['X']['LOW']
@@ -173,25 +186,27 @@ def main(inputConfig, blinded, tag):
 
     # Now float the failing bins
     for ybin in range(1,ybins_n+1):
-        # If blinded
+        # Setup xbins with flatParams needed based on if blinded or not
         if blinded:
             # Calculate the number of bins in low and high x
             xbins_sigstart = inputConfig['BINNING']['X']['SIGSTART']
             xbins_sigend = inputConfig['BINNING']['X']['SIGEND']
             xbins_n_low = float(xbins_sigstart - xbins_low)/xbins_width
             xbins_n_high = float(xbins_high - xbins_sigend)/xbins_width
-
-            # For x low
-            for xbin in range(1,int(xbins_n_low+1)):
-                card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+' flatParam\n',22))
-            # For x high
-            for xbin in range(int(xbins_n-xbins_n_high+1),int(xbins_n+1)):
-                card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+' flatParam\n',22))
-
-        # If NOT blinded
+            #       Low                           High
+            xbins = range(1,int(xbins_n_low+1)) + range(int(xbins_n-xbins_n_high+1),int(xbins_n+1))
         else:
-            for xbin in range(1,xbins_n+1):
-                card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+' flatParam\n',22))
+            xbins = range(1,xbins_n+1)
 
+        # Write the flatParams
+        for xbin in xbins:
+            if renormFlag:
+                card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_init flatParam\n',22))
+                # for process in renormProcesses:
+                #     card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_'+process+'_nominal flatParam\n',22))
+            else:
+                card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+' flatParam\n',22))
+            
+       
     card_new.close()
 

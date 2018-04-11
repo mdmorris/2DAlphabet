@@ -140,6 +140,7 @@ print 'Done'
 #########################################################
 # Make the RooWorkspace - creates workspace name 'w_2D' in base.root
 workspace = build_workspace.main(organized_dict,input_config,blinded,tag)
+print 'Workspace built'
 
 #########################################################
 #             Make the data card for Combine            #
@@ -150,6 +151,7 @@ make_card.main(input_config, blinded, tag)
 print 'Done'
 
 # Run Combine
+print 'Executing combine -M MaxLikelihoodFit card_'+tag+'.txt --saveWithUncertainties --saveWorkspace -v 2 --rMin -50 --rMax 50' 
 subprocess.call(['combine -M MaxLikelihoodFit card_'+tag+'.txt --saveWithUncertainties --saveWorkspace -v 2 --rMin -50 --rMax 50'], shell=True)
 
 # Test that Combine ran successfully 
