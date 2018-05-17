@@ -163,8 +163,9 @@ def main(inputConfig, blinded, tag):
     # - Fail_bin_x-y                                #
     #################################################
     for coeff in [key for key in inputConfig['FIT'].keys() if key != 'HELP']:
-        lower_coeff = coeff.lower()
-        card_new.write(colliMate('polyCoeff_'+lower_coeff+' flatParam\n',22))
+        if 'LOW' in inputConfig['FIT'][coeff].keys() and 'HIGH' in inputConfig['FIT'][coeff].keys():
+            lower_coeff = coeff.lower()
+            card_new.write(colliMate('polyCoeff_'+lower_coeff+' flatParam\n',22))
 
     # Check if we have any renormalized MCs, store which processes, and declare the _norm as a flatParam
     renormFlag = False
@@ -200,12 +201,12 @@ def main(inputConfig, blinded, tag):
 
         # Write the flatParams
         for xbin in xbins:
-            if renormFlag:
-                card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_init flatParam\n',22))
-                # for process in renormProcesses:
-                #     card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_'+process+'_nominal flatParam\n',22))
-            else:
-                card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+' flatParam\n',22))
+            # if renormFlag:
+            #     card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_init flatParam\n',22))
+            #     # for process in renormProcesses:
+            #     #     card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_'+process+'_nominal flatParam\n',22))
+            # else:
+            card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+' flatParam\n',22))
             
        
     card_new.close()

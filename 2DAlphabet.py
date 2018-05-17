@@ -17,12 +17,17 @@ import pprint
 pp = pprint.PrettyPrinter(indent = 2)
 
 import make_card
+import get_fit_guesses
 import input_organizer
 import build_workspace
 import plot_fit_results
 import header
 from header import ascii_encode_dict
 
+import ROOT
+from ROOT import *
+
+gStyle.SetOptStat(0)
 
 #########################################################
 #                       Options                         #
@@ -34,12 +39,26 @@ parser.add_option('-i', '--input', metavar='FILE', type='string', action='store'
                   dest      =   'input',
                   help      =   'JSON file to be imported. Name should be "input_<tag>.json" where tag will be used to organize outputs')
 parser.add_option('-m', '--move', action="store_true",
-                  default   =   False,
+                  default   =   True,
                   dest      =   'move',
                   help      =   'Moves files to folder <tag> if True')
-
+parser.add_option('-f', '--fitguess', action="store_true",
+                  default   =   False,
+                  dest      =   'fitguess',
+                  help      =   'Recalculate the fit guesses')
+parser.add_option('-p', '--plotOnly', action="store_true",
+                  default   =   False,
+                  dest      =   'plotOnly',
+                  help      =   'Only plots if True')
+parser.add_option('-d', '--draw', action="store_true",
+                  default   =   False,
+                  dest      =   'draw',
+                  help      =   'Draws canvases live')
 
 (options, args) = parser.parse_args()
+
+if options.draw == False:
+    gROOT.SetBatch(kTRUE)
 
 #########################################################
 #                     JSON Processing                   #
@@ -61,6 +80,7 @@ tag = options.input[options.input.find('_')+1:options.input.find('.')]
 if options.move:
     try:
         subprocess.call(['mkdir ' + tag], shell=True)
+        subprocess.call(['mkdir ' + tag + '/plots'], shell=True)
     except:
         print 'dir ' + tag + '/ already exists'
 
@@ -116,16 +136,31 @@ print 'Done'
 
 
 # A quick flag to check for blinding
-if 'SIGSTART' in input_config['BINNING']['X'] and 'SIGEND' in input_config['BINNING']['X']:
+if input_config['BINNING']['X']['BLINDED'] == True:
+    print 'Background estimate is blinded'
     blinded = True
-elif 'SIGSTART' in input_config['BINNING']['X'] and 'SIGEND' not in input_config['BINNING']['X']:
-    print 'Error! SIGSTART is defined but SIGEND is not. Quitting.'
-    quit()
-elif 'SIGSTART' not in input_config['BINNING']['X'] and 'SIGEND' in input_config['BINNING']['X']:
-    print 'Error! SIGEND is defined but SIGSTART is not. Quitting.'
-    quit()
 else:
+    print 'Background estimate is NOT blinded'
     blinded = False
+
+# if 'SIGSTART' in input_config['BINNING']['X'] and 'SIGEND' in input_config['BINNING']['X']:
+#     blinded = True
+# elif 'SIGSTART' in input_config['BINNING']['X'] and 'SIGEND' not in input_config['BINNING']['X']:
+#     print 'Error! SIGSTART is defined but SIGEND is not. Quitting.'
+#     quit()
+# elif 'SIGSTART' not in input_config['BINNING']['X'] and 'SIGEND' in input_config['BINNING']['X']:
+#     print 'Error! SIGEND is defined but SIGSTART is not. Quitting.'
+#     quit()
+# else:
+#     blinded = False
+
+
+#########################################################
+#             Get new fit parameter guesses             #
+#########################################################
+if options.fitguess == True:
+    get_fit_guesses.main(input_config,blinded,tag)
+
 
 #########################################################
 #               Organize input histograms               #
@@ -135,33 +170,45 @@ print 'Organizing histograms into single file...'
 organized_dict = input_organizer.main(input_config,blinded)
 print 'Done'
 
-#########################################################
-#             Make the workspace for Combine            #
-#########################################################
-# Make the RooWorkspace - creates workspace name 'w_2D' in base.root
-workspace = build_workspace.main(organized_dict,input_config,blinded,tag)
-print 'Workspace built'
+if options.plotOnly == False:
+    #########################################################
+    #             Make the workspace for Combine            #
+    #########################################################
+    # Make the RooWorkspace - creates workspace name 'w_2D' in base.root
+    workspace = build_workspace.main(organized_dict,input_config,blinded,tag)
+    print 'Workspace built'
 
-#########################################################
-#             Make the data card for Combine            #
-#########################################################
-# Make the data card - makes a text file named card_2D.txt, return 0
-print 'Making Combine card...'
-make_card.main(input_config, blinded, tag)
-print 'Done'
+    #########################################################
+    #             Make the data card for Combine            #
+    #########################################################
+    # Make the data card - makes a text file named card_2D.txt, return 0
+    print 'Making Combine card...'
+    make_card.main(input_config, blinded, tag)
+    print 'Done'
 
-# Run Combine
-print 'Executing combine -M MaxLikelihoodFit card_'+tag+'.txt --saveWithUncertainties --saveWorkspace -v 2 --rMin -50 --rMax 50' 
-subprocess.call(['combine -M MaxLikelihoodFit card_'+tag+'.txt --saveWithUncertainties --saveWorkspace -v 2 --rMin -50 --rMax 50'], shell=True)
+    syst_option = ''
+    # Check if signal has systematics
+    for proc in input_config['PROCESS'].keys():
+        if type(input_config['PROCESS'][proc]) == dict:
+            if input_config['PROCESS'][proc]['CODE'] == 0:
+                if len(input_config['PROCESS'][proc]['SYSTEMATICS']) == 0:
+                    syst_option = ' -S 0 '
 
-# Test that Combine ran successfully 
-if not os.path.isfile('MaxLikelihoodFitResult.root'):
-    print "Combine failed and never made MaxLikelihoodFitResult.root. Quitting..."
-    quit()
+    # Run Combine
+    print 'Executing combine -M MaxLikelihoodFit card_'+tag+'.txt --saveWithUncertainties --saveWorkspace --rMin -50 --rMax 50' + syst_option 
+    subprocess.call(['combine -M MaxLikelihoodFit card_'+tag+'.txt --saveWithUncertainties --saveWorkspace --rMin -50 --rMax 50' + syst_option], shell=True)
 
-if options.move:
-    subprocess.call(['mv base_'+tag+'.root ' + tag + '/'], shell=True)
-    subprocess.call(['mv card_'+tag+'.txt ' + tag + '/'], shell=True)
+    # Test that Combine ran successfully 
+    if not os.path.isfile('MaxLikelihoodFitResult.root'):
+        print "Combine failed and never made MaxLikelihoodFitResult.root. Quitting..."
+        quit()
+
+    if options.move:
+        subprocess.call(['mv MaxLikelihoodFitResult.root ' + tag + '/'], shell=True)
+        subprocess.call(['mv higgsCombineTest.MaxLikelihoodFit.mH120.root ' + tag + '/'], shell=True)
+        subprocess.call(['mv mlfit.root ' + tag + '/'], shell=True)
+        subprocess.call(['mv base_'+tag+'.root ' + tag + '/'], shell=True)
+        subprocess.call(['mv card_'+tag+'.txt ' + tag + '/'], shell=True)
 
 # Plot
 plot_fit_results.main(input_config,organized_dict,blinded,tag)

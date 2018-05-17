@@ -17,14 +17,17 @@
             "FILE":"path/TW2Dalphabetweightedttbar_Trigger_nominal_none_PSET_default.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["Tpt","lumi"],
-            "CODE": 3
+            "SYSTEMATICS":["lumi","Tpt","ttbar_xsec","topsf","Trig","Pileup","pdf","jer","jes","jmr","jms"],
+
+            "CODE": 2
         },
+
         "signalRH1200": {
             "FILE": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
-            "SYSTEMATICS":["Tpt","lumi"],
+            "SYSTEMATICS":[],
+
             "CODE": 0
         }
     },
@@ -33,7 +36,33 @@
         "HELP": "All systematics should be configured here. The info for them will be pulled for each process that calls each systematic. These are classified by codes 0 (symmetric, lnN), 1 (asymmetric, lnN), 2 (shape and in same file as nominal), 3 (shape and NOT in same file as nominal)",
         "lumi": {
             "CODE": 0,
-            "VAL": 1.02
+            "VAL": 1.026
+        },
+        "ttbar_xsec": {
+            "CODE": 1,
+            "VALUP": 1.024,
+            "VALDOWN": 1.035
+        },
+        "topsf":{
+            "CODE": 1,
+            "VALUP": 1.14,
+            "VALDOWN": 1.056
+        },
+        "wtagsf":{
+            "CODE": 2,
+            "HISTPASS_UP": "MtwvMtPassWup",
+            "HISTFAIL_UP": "MtwvMtFailWup",
+            "HISTPASS_DOWN": "MtwvMtPassWdown",
+            "HISTFAIL_DOWN": "MtwvMtFailWdown",
+            "SCALE": 1.0
+        },
+        "Extrap":{
+            "CODE": 2,
+            "HISTPASS_UP": "MtwvMtPassExtrapUp",
+            "HISTFAIL_UP": "MtwvMtFailExtrapUp",
+            "HISTPASS_DOWN": "MtwvMtPassExtrapDown",
+            "HISTFAIL_DOWN": "MtwvMtFailExtrapDown",
+            "SCALE": 1.0
         },
         "Tpt": {
             "CODE": 2,
@@ -57,6 +86,56 @@
             "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_pileup_down_PSET_default.root",
             "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pileup_up_PSET_default.root",
             "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pileup_down_PSET_default.root",
+            "HISTPASS": "MtwvMtPass",
+            "HISTFAIL": "MtwvMtFail",
+            "SCALE": 1.0
+        },
+        "pdf": {
+            "CODE": 3,
+            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_pdf_up_PSET_default.root",
+            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_pdf_down_PSET_default.root",
+            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pdf_up_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pdf_down_PSET_default.root",
+            "HISTPASS": "MtwvMtPass",
+            "HISTFAIL": "MtwvMtFail",
+            "SCALE": 1.0
+        },
+        "jer": {
+            "CODE": 3,
+            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JER_up_PSET_default.root",
+            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JER_down_PSET_default.root",
+            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JER_up_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JER_down_PSET_default.root",
+            "HISTPASS": "MtwvMtPass",
+            "HISTFAIL": "MtwvMtFail",
+            "SCALE": 1.0
+        },
+        "jes": {
+            "CODE": 3,
+            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JES_up_PSET_default.root",
+            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JES_down_PSET_default.root",
+            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JES_up_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JES_down_PSET_default.root",
+            "HISTPASS": "MtwvMtPass",
+            "HISTFAIL": "MtwvMtFail",
+            "SCALE": 1.0
+        },
+        "jmr": {
+            "CODE": 3,
+            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JMR_up_PSET_default.root",
+            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JMR_down_PSET_default.root",
+            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JMR_up_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JMR_down_PSET_default.root",
+            "HISTPASS": "MtwvMtPass",
+            "HISTFAIL": "MtwvMtFail",
+            "SCALE": 1.0
+        },
+        "jms": {
+            "CODE": 3,
+            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JMS_up_PSET_default.root",
+            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JMS_down_PSET_default.root",
+            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JMS_up_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JMS_down_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0

@@ -43,11 +43,18 @@ def main(inputConfig, blinded):
         hist_pass = file_nominal.Get(thisProcessDict['HISTPASS'])
         hist_fail = file_nominal.Get(thisProcessDict['HISTFAIL'])
 
+        this_proc_scale = 1.0
+        if "SCALE" in thisProcessDict.keys():
+            this_proc_scale = thisProcessDict["SCALE"]
+
+        hist_pass.Scale(this_proc_scale)
+        hist_fail.Scale(this_proc_scale)
+
         dictHists[process]['file'] = file_nominal
         dictHists[process]['pass']['nominal'] = hist_pass
         dictHists[process]['fail']['nominal'] = hist_fail
 
-
+        
         # If there are systematics
         if len(thisProcessDict['SYSTEMATICS']) == 0:
             print 'No systematics for process ' + process
@@ -177,6 +184,7 @@ def main(inputConfig, blinded):
                 thisProcessCatDict[dist].SetTitle(histname)
 
 
+                # Now we blind the hist if needed
                 if blinded:
                     low_histname = process + '_' + cat + 'Low'
                     high_histname = process + '_' + cat + 'High'
@@ -186,6 +194,7 @@ def main(inputConfig, blinded):
 
                     # Create the split histograms (do the naming for them in this step)
                     hist_to_split = dictHists[process][cat][dist]
+                    dictHists[process][cat][dist+'_unblinded'] = hist_to_split   # Backing up the unblinded hist
                     low_hist = copyHistWithNewXbounds(hist_to_split,low_histname,newXwidth,newXmin,sigStart)
                     high_hist = copyHistWithNewXbounds(hist_to_split,high_histname,newXwidth,sigEnd,newXmax)
                     dictHists[process][cat][dist] = makeBlindedHist(hist_to_split,low_hist,high_hist)
