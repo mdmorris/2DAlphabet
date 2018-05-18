@@ -84,39 +84,44 @@ def main(dictTH2s,inputConfig,blinded,tag):
     ####################################################
     # Get the fit information and store as RooRealVars #
     ####################################################
-    # Polynomial Order
-    polXO = 0
-    polYO = 0
-    for param_name in [key for key in inputConfig['FIT'].keys() if key != 'HELP']:
-        # Assuming poly order is a single digit (pretty reasonable I think...)
-        tempXorder = int(param_name[param_name.find('X')+1])
-        tempYorder = int(param_name[param_name.find('Y')+1])
-        if tempXorder > polXO:
-            polXO = tempXorder
-        if tempYorder > polYO:
-            polYO = tempYorder
+    xFitForm = inputConfig['FIT']['XFORM']    
+    yFitForm = inputConfig['FIT']['YFORM']
+
+    # Do some quick checks to make sure these are formatted correctly
+    checkFitForm(xFitForm,yFitForm)
 
 
-    PolyCoeffs = {}
-    for yi in range(polYO+1):
-        for xi in range(polXO+1):
+    nxparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('X') != -1 ])
+    nyparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('Y') != -1 ])
+    print 'Total number of x fit parameters is ' + str(nxparams)
+    print 'Total number of y fit parameters is ' + str(nyparams)
 
-            input_param_vals = inputConfig['FIT']['X'+str(xi)+'Y'+str(yi)]
+    fitParamRRVs = {}
+
+    # Make and store RRVs for each param
+    for nparams in [nxparams, nyparams]:
+        if nparams == nxparams:
+            thisVar = 'X'
+        else:
+            thisVar = 'Y'
+        for ip in range(nparams+1):
+            input_param_vals = inputConfig['FIT'][str(ip)]
             thisNom = input_param_vals['NOMINAL']
-            
-            name = 'polyCoeff_'+'x'+str(xi)+'y'+str(yi)
+
+            name = 'fitParam'+thisVar+'_'+str(ip)
 
             if 'LOW' in input_param_vals.keys() and 'HIGH' in input_param_vals.keys():
                 thisLow = input_param_vals['LOW']
                 thisHigh = input_param_vals['HIGH']
-                PolyCoeffs['x'+str(xi)+'y'+str(yi)] = RooRealVar(name,name,thisNom,thisLow,thisHigh)
+                fitParamRRVs['fitParam'+thisVar+'_'+str(ip)] = RooRealVar(name,name,thisNom,thisLow,thisHigh)
             else:
-                input_break = raw_input('WARNING: Upper and lower bounds on fit parameter ' + 'x'+str(xi)+'y'+str(yi) + ' not defined. Please type "N" if you would like to quit or enter if you would like to treat the parameter as constant')
+                input_break = raw_input('WARNING: Upper and lower bounds on global fit parameter ' +str(input_param_vals['GLOBALPARAM']) + ' not defined. Please type "N" if you would like to quit or enter if you would like to treat the parameter as constant')
                 if input_break == 'N':
                     quit()
                 else:
-                    PolyCoeffs['x'+str(xi)+'y'+str(yi)] = RooConstVar(name,name,thisNom)
-            allVars.append(PolyCoeffs['x'+str(xi)+'y'+str(yi)])
+                    fitParamRRVs['fitParam'+thisVar+'_'+str(ip)] = RooConstVar(name,name,thisNom)
+
+            allVars.append(fitParamRRVs['fitParam'+thisVar+'_'+str(ip)])
 
 
     ######################################
@@ -197,33 +202,6 @@ def main(dictTH2s,inputConfig,blinded,tag):
                 else:
                     binRRV = RooRealVar(name, name, binContent, max(binErrDown,0), max(binErrUp,0))
 
-                    # partialBinRRV = RooRealVar(name, name, binContent, max(binErrDown,0), max(binErrUp,0))  # Still needs renormalized backgrounds subtracted
-                    # allVars.append(partialBinRRV)
-
-                    # # Now subtract away the floating RooRealVar
-                    # renormFlag = False
-                    # for process in dictTH2s.keys():
-                    #     if inputConfig['PROCESS'][process]['CODE'] == 3: # MC to be renormalized
-
-                    #         content_to_sub = -1*dictTH2s[process]['fail']['nominal'].GetBinContent(xbin,ybin)
-                    #         var_to_sub_no_norm = RooRealVar(name+'_'+process+'_no_norm',name+'_'+process+'_no_norm',content_to_sub)
-                    #         prod_list = RooArgList(Roo_dict[process]['NORM'],var_to_sub_no_norm)
-                    #         var_to_sub = RooProduct(name+'_'+process,name+'_'+process,prod_list)
-
-                    #         addition_list = RooArgList(partialBinRRV, var_to_sub)
-                    #         partialBinRRV = RooAddition(name+'_minus_'+process,name+'_minus_'+process,addition_list)
-
-                    #         allVars.extend([var_to_sub_no_norm,prod_list,var_to_sub,partialBinRRV])
-
-                    #         renormFlag = True
-                    
-                    # if renormFlag:
-                    #     binRRV = partialBinRRV.Clone()
-                    #     binRRV.SetName(name+'_final')
-                    #     binRRV.SetTitle(name+'_final')
-                    # else:
-
-
                     # Store the bin
                     binListFail.add(binRRV)
                     allVars.append(binRRV)
@@ -238,30 +216,31 @@ def main(dictTH2s,inputConfig,blinded,tag):
                     allVars.append(xConst)
                     allVars.append(yConst)
 
-                    # And now make a polynomial for this bin
-                    xPolyList = RooArgList()
-                    for yCoeff in range(polYO+1):
-                        xCoeffList = RooArgList()
+                    # And now make an Rpf function for this bin 
 
-                        # Get each x coefficient for this y
-                        for xCoeff in range(polXO+1):                    
-                            xCoeffList.add(PolyCoeffs['x'+str(xCoeff)+'y'+str(yCoeff)])
+                    # X                 
+                    xParamList = RooArgList(xConst)
+                    for xParam in range(nxparams+1):                    
+                        xParamList.add(fitParamRRVs['fitParamX_'+str(xParam)])
+                    xFormulaName = 'xFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))
+                    xFormulaVar = RooFormulaVar(xFormulaName,xFormulaName,xFitForm.replace('x','@0'),xParamList)
+                    allVars.extend([xFormulaVar,xParamList])
 
-                        # Make the polynomial and save it to the list of x polynomials
-                        thisXPolyVarLabel = "xPol_y_"+str(yCoeff)+"_Bin_"+str(int(xbin))+"_"+str(int(ybin))
-                        xPolyVar = RooPolyVar(thisXPolyVarLabel,thisXPolyVarLabel,xConst,xCoeffList)
-                        xPolyList.add(xPolyVar)
-                        allVars.append(xPolyVar)
+                    # Y                 
+                    yParamList = RooArgList(yConst)
+                    for yParam in range(nyparams+1):                    
+                        yParamList.add(fitParamRRVs['fitParamY_'+str(yParam)])
+                    yFormulaName = 'yFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))
+                    yFormulaVar = RooFormulaVar(yFormulaName,yFormulaName,yFitForm.replace('y','@0'),yParamList)
+                    allVars.extend([yFormulaVar,yParamList])
 
-                    # Now make a polynomial out of the x polynomials
-                    thisYPolyVarLabel = "FullPol_Bin_"+str(int(xbin))+"_"+str(int(ybin))
-                    thisFullPolyVar = RooPolyVar(thisYPolyVarLabel,thisYPolyVarLabel,yConst,xPolyList)
-
-                    allVars.append(thisFullPolyVar)
-
+                    # X*Y
+                    fullFormulaName = 'FullFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))
+                    fullFormulaVar = RooProduct(fullFormulaName,fullFormulaName,RooArgList(xFormulaVar,yFormulaVar))
+                    allVars.append(fullFormulaVar)
 
                     # Finally make the pass distribution
-                    formulaArgList = RooArgList(binRRV,thisFullPolyVar)
+                    formulaArgList = RooArgList(binRRV,fullFormulaVar)
                     thisBinPass = RooFormulaVar('Pass_bin_'+str(xbin)+'-'+str(ybin),'Pass_bin_'+str(xbin)+'-'+str(ybin),"@0*@1",formulaArgList)
                     binListPass.add(thisBinPass)
                     allVars.append(thisBinPass)

@@ -152,7 +152,7 @@ def main(inputConfig, blinded, tag):
     #################################################
     # Mark floating values as flatParams            # 
     # In general we float                           #
-    # - polyCoeff_*                                 #
+    # - fitParam*_*                                 #
     #                                               #
     # If there's a renormalized process we float    #
     # - process_norm                                #
@@ -162,10 +162,17 @@ def main(inputConfig, blinded, tag):
     # Otherwise we float                            #
     # - Fail_bin_x-y                                #
     #################################################
-    for coeff in [key for key in inputConfig['FIT'].keys() if key != 'HELP']:
-        if 'LOW' in inputConfig['FIT'][coeff].keys() and 'HIGH' in inputConfig['FIT'][coeff].keys():
-            lower_coeff = coeff.lower()
-            card_new.write(colliMate('polyCoeff_'+lower_coeff+' flatParam\n',22))
+    nxparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('X') != -1 ])
+    nyparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('Y') != -1 ])
+
+    for nparams in [nxparams, nyparams]:
+        if nparams == nxparams:
+            thisVar = 'X'
+        else:
+            thisVar = 'Y'
+        for ip in range(nparams+1):
+            card_new.write(colliMate('fitParam'+thisVar+'_'+str(ip)+' flatParam\n',22))
+
 
     # Check if we have any renormalized MCs, store which processes, and declare the _norm as a flatParam
     renormFlag = False

@@ -383,3 +383,70 @@ def Make_up_down(hist):
 
     return hist_up,hist_down
 
+
+def checkFitForm(xFitForm,yFitForm):
+    if '@0' in xFitForm:
+        print 'ERROR: @0 in XFORM. This is reserved for the variable x. Please either replace it with x or start your parameter naming with @1. Quitting...'
+        quit()
+    if '@0' in yFitForm:
+        print 'ERROR: @0 in YFORM. This is reserved for the variable y. Please either replace it with y or start your parameter naming with @1. Quitting...'
+        quit()
+    if 'x' in yFitForm:
+        print 'ERROR: x in YFORM. Did you mean to write "y"? Quitting...'
+        quit()
+    if 'x' in yFitForm:
+        print 'ERROR: y in XFORM. Did you mean to write "x"? Quitting...'
+        quit()
+
+
+# Right after I wrote this I realized it's obsolete... It's cool parentheses parsing though so I'm keeping it
+def separateXandYfromFitString(fitForm):
+    # Look for all opening and closing parentheses
+    openIndexes = []
+    closedIndexes = []
+    for index,char in enumerate(fitForm):
+        if char == '(': # start looking for ")" after this "("
+            openIndexes.append(index)
+        if char == ')':
+            closedIndexes.append(index)
+
+
+    # Now pair them by looking at the first in closedIndexes and finding the closest opening one (to the left)
+    # Remove the pair from the index lists and repeat
+    innerContent = []
+    for iclose in closedIndexes:
+        diff = len(fitForm)     # max length to start because we want to minimize
+        for iopen in openIndexes:
+            if iclose > iopen:
+                this_diff = iclose - iopen
+                if this_diff < diff:
+                    diff = this_diff
+                    candidateOpen = iopen
+        openIndexes.remove(candidateOpen)
+        innerContent.append(fitForm[iclose-diff+1:iclose])
+
+
+    outerContent = []
+    for c in innerContent:
+        keep_c = True
+        for d in innerContent:
+            if '('+c+')' in d and c != d:
+                keep_c = False
+                break
+        if keep_c:
+            outerContent.append(c)
+
+    if len(outerContent) != 2:
+        print 'ERROR: Form of the fit did not factorize correctly. Please make sure it is in (x part)(y part) form. Quitting...'
+        quit()
+    else:
+        for c in outerContent:
+            if 'x' in c and 'y' not in c:
+                xPart = c
+            elif 'x' not in c and 'y' in c:
+                yPart = c
+            else:
+                print 'ERROR: Form of the fit did not factorize correctly. Please make sure it is in (x part)(y part) form. Quitting...'
+                quit()
+
+    return xPart,yPart
