@@ -18,23 +18,46 @@
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
             "SYSTEMATICS":["lumi","ttbar_xsec","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
-
+            "COLOR": 2,
             "CODE": 2
         },
-        "singletop": {
-            "FILE":"path/TW2Dalphabetweightedsingletop_Trigger_nominal_none_PSET_default.root",
+        "singletop_t": {
+            "FILE":"path/TW2Dalphabetweightedsingletop_t_Trigger_nominal_none_PSET_default.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","topsf","Tpt","wtagsf","Extrap","Tpt","Trig","jer","jes","jmr","jms"],
-
+            "SYSTEMATICS":["lumi","st_t_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
+            "COLOR": 6,
+            "CODE": 2
+        },
+        "singletop_tB": {
+            "FILE":"path/TW2Dalphabetweightedsingletop_tB_Trigger_nominal_none_PSET_default.root",
+            "HISTPASS":"MtwvMtPass",
+            "HISTFAIL":"MtwvMtFail",
+            "SYSTEMATICS":["lumi","st_tB_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
+            "COLOR": 6,
+            "CODE": 2
+        },
+        "singletop_tW": {
+            "FILE":"path/TW2Dalphabetweightedsingletop_tW_Trigger_nominal_none_PSET_default.root",
+            "HISTPASS":"MtwvMtPass",
+            "HISTFAIL":"MtwvMtFail",
+            "SYSTEMATICS":["lumi","st_tW_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
+            "COLOR": 6,
+            "CODE": 2
+        },
+        "singletop_tWB": {
+            "FILE":"path/TW2Dalphabetweightedsingletop_tWB_Trigger_nominal_none_PSET_default.root",
+            "HISTPASS":"MtwvMtPass",
+            "HISTFAIL":"MtwvMtFail",
+            "SYSTEMATICS":["lumi","st_tWB_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
+            "COLOR": 6,
             "CODE": 2
         },
         "signalRH1200": {
             "FILE": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
-            "SYSTEMATICS":[],
-
+            "SYSTEMATICS":["lumi","topsf","wtagsf","Extrap","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
             "CODE": 0
         }
     },
@@ -49,6 +72,24 @@
             "CODE": 1,
             "VALUP": 1.024,
             "VALDOWN": 1.035
+        },
+        "st_t_xsec": {
+            "CODE": 1,
+            "VALUP":1.040,
+            "VALDOWN":1.034
+        },
+        "st_tB_xsec": {
+            "CODE": 1,
+            "VALUP":1.050,
+            "VALDOWN":1.045
+        },
+        "st_tW_xsec": {
+            "CODE": 0,
+            "VAL":1.0385
+        },
+        "st_tWB_xsec": {
+            "CODE": 0,
+            "VAL":1.0385
         },
         "topsf":{
             "CODE": 1,
@@ -89,72 +130,48 @@
         },
         "Pileup": {
             "CODE": 3,
-            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_pileup_up_PSET_default.root",
-            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_pileup_down_PSET_default.root",
-            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pileup_up_PSET_default.root",
-            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pileup_down_PSET_default.root",
-            "FILE_UP_singletop": "path/TW2Dalphabetweightedsingletop_Trigger_nominal_none_pileup_up_PSET_default.root",
-            "FILE_DOWN_singletop": "path/TW2Dalphabetweightedsingletop_Trigger_nominal_none_pileup_down_PSET_default.root",
+            "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_none_pileup_up_PSET_default.root",
+            "FILE_DOWN_*": "path/TW2Dalphabetweighted*_Trigger_nominal_none_pileup_down_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0
         },
         "pdf": {
             "CODE": 3,
-            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_pdf_up_PSET_default.root",
-            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_pdf_down_PSET_default.root",
-            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pdf_up_PSET_default.root",
-            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pdf_down_PSET_default.root",
-            "FILE_UP_singletop": "path/TW2Dalphabetweightedsingletop_Trigger_nominal_none_pdf_up_PSET_default.root",
-            "FILE_DOWN_singletop": "path/TW2Dalphabetweightedsingletop_Trigger_nominal_none_pdf_down_PSET_default.root",
+            "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_none_pdf_up_PSET_default.root",
+            "FILE_DOWN_*": "path/TW2Dalphabetweighted*_Trigger_nominal_none_pdf_down_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0
         },
         "jer": {
             "CODE": 3,
-            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JER_up_PSET_default.root",
-            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JER_down_PSET_default.root",
-            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JER_up_PSET_default.root",
-            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JER_down_PSET_default.root",
-            "FILE_UP_singletop": "path/TW2Dalphabetweightedsingletop_Trigger_nominal_JER_up_PSET_default.root",
-            "FILE_DOWN_singletop": "path/TW2Dalphabetweightedsingletop_Trigger_nominal_JER_down_PSET_default.root",
+            "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JER_up_PSET_default.root",
+            "FILE_DOWN_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JER_down_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0
         },
         "jes": {
             "CODE": 3,
-            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JES_up_PSET_default.root",
-            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JES_down_PSET_default.root",
-            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JES_up_PSET_default.root",
-            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JES_down_PSET_default.root",
-            "FILE_UP_singletop": "path/TW2Dalphabetweightedsingletop_Trigger_nominal_JES_up_PSET_default.root",
-            "FILE_DOWN_singletop": "path/TW2Dalphabetweightedsingletop_Trigger_nominal_JES_down_PSET_default.root",
+            "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JES_up_PSET_default.root",
+            "FILE_DOWN_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JES_down_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0
         },
         "jmr": {
             "CODE": 3,
-            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JMR_up_PSET_default.root",
-            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JMR_down_PSET_default.root",
-            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JMR_up_PSET_default.root",
-            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JMR_down_PSET_default.root",
-            "FILE_UP_singletop": "path/TW2Dalphabetweightedsingletop_Trigger_nominal_JMR_up_PSET_default.root",
-            "FILE_DOWN_singletop": "path/TW2Dalphabetweightedsingletop_Trigger_nominal_JMR_down_PSET_default.root",
+            "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JMR_up_PSET_default.root",
+            "FILE_DOWN_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JMR_down_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0
         },
         "jms": {
             "CODE": 3,
-            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JMS_up_PSET_default.root",
-            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JMS_down_PSET_default.root",
-            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JMS_up_PSET_default.root",
-            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JMS_down_PSET_default.root",
-            "FILE_UP_singletop": "path/TW2Dalphabetweightedsingletop_Trigger_nominal_JMS_up_PSET_default.root",
-            "FILE_DOWN_singletop": "path/TW2Dalphabetweightedsingletop_Trigger_nominal_JMS_down_PSET_default.root",
+            "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JMS_up_PSET_default.root",
+            "FILE_DOWN_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JMS_down_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0
@@ -169,47 +186,50 @@
             "HIGH": 350,
             "NBINS": 15,
             "SIGSTART": 150,
-            "SIGEND": 190
+            "SIGEND": 190,
+            "BLINDED": true
         },
         "Y": {
             "NAME": "resmass",
-            "LOW": 700,
+            "LOW": 800,
             "HIGH": 4000,
-            "NBINS": 33
+            "NBINS": 32
         }
     },
 
     "FIT": {
         "HELP": "The fit parameters of the 2D polynomial should be configured here. Note that parameters must be named x#y$ where # is the order of the parameter in the x and $ is the order of the parameter in the y.",
-        "X0Y0": {
-            "NOMINAL": -0.03309802536643336,
-            "LOW": -0.3750602104101073,
-            "HIGH": 0.30886415967724057
+        "XFORM":"(@1+@2*x+@3*x**2)",
+        "YFORM":"(@1+@2*y+@3*y**2)",
+        "X1": {
+            "NOMINAL": 2.87543256705e-16,
+            "LOW":0.0,
+            "HIGH":1e-10
         },
-        "X1Y0": {
-            "NOMINAL": 0.0002760059120786965,
-            "LOW": -0.005179833315732255,
-            "HIGH": 0.005731845139889648
+        "X2": {
+            "NOMINAL": 1.05941938999e-18,
+            "LOW":0.0,
+            "HIGH":1e-10
         },
-        "X2Y0": {
-            "NOMINAL": 4.245032518725995e-06,
-            "LOW": 0.0,
-            "HIGH": 2.6672467445552367e-05
+        "X3": {
+            "NOMINAL": 0.0074,
+            "LOW":0.0,
+            "HIGH":0.1
         },
-        "X0Y1": {
-            "NOMINAL": 8.07947253139843e-06,
-            "LOW": -0.0001665102946174586,
-            "HIGH": 0.00018266923968025546
+        "Y1": {
+            "NOMINAL": 0.0007847,
+            "LOW":0.0,
+            "HIGH":0.01
         },
-        "X1Y1": {
-            "NOMINAL": -5.621838794993773e-08,
-            "LOW": -2.694337298254479e-06,
-            "HIGH": 2.5819005223546038e-06
+        "Y2": {
+            "NOMINAL": -2.8379623401e-07,
+            "LOW":-1e-5,
+            "HIGH":0.0
         },
-        "X2Y1": {
-            "NOMINAL": -7.284772713640307e-10,
-            "LOW": -1.1901165956125242e-08,
-            "HIGH": 1.044421141339718e-08
+        "Y3": {
+            "NOMINAL": 4.39330921414e-11,
+            "LOW":0.0,
+            "HIGH":1e-5
         }
     }
 }

@@ -54,6 +54,10 @@ parser.add_option('-d', '--draw', action="store_true",
                   default   =   False,
                   dest      =   'draw',
                   help      =   'Draws canvases live')
+parser.add_option('-s', '--signalOff', action="store_true",
+                  default   =   False,
+                  dest      =   'signalOff',
+                  help      =   'Turns off signal by using --expectSignal=0 option in Combine')
 
 (options, args) = parser.parse_args()
 
@@ -76,6 +80,13 @@ with open(options.input) as fInput_config:
     #     quit()
 
 tag = options.input[options.input.find('_')+1:options.input.find('.')]
+
+sig_option = ''
+sig_tag = ''
+if options.signalOff:
+    sig_option = ' --expectSignal=0'
+    sig_tag = '_nosig'
+tag += sig_tag
 
 if options.move:
     try:
@@ -111,12 +122,17 @@ for glob_var in input_config['GLOBAL'].keys():
             if mainkey != 'GLOBAL':                                 # Mainkeys are all unchangeable (uppercase) so no check performed
                 
                 for subkey in input_config[mainkey].keys():         # For each subkey of main key dictionary
-                    if subkey.find(glob_var) != 1:                  # check subkey
+                    if subkey.find(glob_var) != -1:                  # check subkey
                         subkey = subkey.replace(glob_var,input_config['GLOBAL'][glob_var])   # replace it
 
-                    if subkey != 'HELP':                                        # If the subkey isn't HELP, the key value is a dict
+                    if subkey == 'HELP':                                        # If the subkey isn't HELP, the key value is a dict
+                        continue
+                    elif subkey.find('FORM') != -1:
+                        if subkey.find(glob_var) != -1:                  # check subkey
+                            subkey = subkey.replace(glob_var,input_config['GLOBAL'][glob_var])   # replace it
+                    else:
                         for subsubkey in input_config[mainkey][subkey].keys():  # so loop though subsubkeys
-                            if subsubkey.find(glob_var) != 1:                                   # check subsubkey
+                            if subsubkey.find(glob_var) != -1:                                   # check subsubkey
                                 subsubkey = subsubkey.replace(glob_var,input_config['GLOBAL'][glob_var])    # replace it
 
                             try:
@@ -159,7 +175,7 @@ else:
 #             Get new fit parameter guesses             #
 #########################################################
 if options.fitguess == True:
-    get_fit_guesses.main(input_config,blinded,tag)
+    input_config = get_fit_guesses.main(input_config,blinded,tag)
 
 
 #########################################################
@@ -192,11 +208,12 @@ if options.plotOnly == False:
         if type(input_config['PROCESS'][proc]) == dict:
             if input_config['PROCESS'][proc]['CODE'] == 0:
                 if len(input_config['PROCESS'][proc]['SYSTEMATICS']) == 0:
-                    syst_option = ' -S 0 '
+                    syst_option = ' -S 0'
+
 
     # Run Combine
-    print 'Executing combine -M MaxLikelihoodFit card_'+tag+'.txt --saveWithUncertainties --saveWorkspace --rMin -50 --rMax 50' + syst_option 
-    subprocess.call(['combine -M MaxLikelihoodFit card_'+tag+'.txt --saveWithUncertainties --saveWorkspace --rMin -50 --rMax 50' + syst_option], shell=True)
+    print 'Executing combine -M MaxLikelihoodFit card_'+tag+'.txt --saveWithUncertainties --saveWorkspace --rMin -50 --rMax 50' + syst_option + sig_option 
+    subprocess.call(['combine -M MaxLikelihoodFit card_'+tag+'.txt --saveWithUncertainties --saveWorkspace --rMin -50 --rMax 50' + syst_option + sig_option], shell=True)
 
     # Test that Combine ran successfully 
     if not os.path.isfile('MaxLikelihoodFitResult.root'):

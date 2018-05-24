@@ -85,11 +85,15 @@ def main(inputConfig, blinded):
                     # User will most likely have different file for each process but maybe not so check
                     if 'FILE_UP' in thisSystDict:
                         file_up = TFile.Open(thisSystDict['FILE_UP'])
+                    elif 'FILE_UP_*' in thisSystDict:
+                        file_up = TFile.Open(thisSystDict['FILE_UP_*'].replace('*',process))
                     else:
                         file_up = TFile.Open(thisSystDict['FILE_UP_'+process])
 
                     if 'FILE_DOWN' in thisSystDict:
                         file_down = TFile.Open(thisSystDict['FILE_DOWN'])
+                    elif 'FILE_DOWN_*' in thisSystDict:
+                        file_down = TFile.Open(thisSystDict['FILE_DOWN_*'].replace('*',process))
                     else:
                         file_down = TFile.Open(thisSystDict['FILE_DOWN_'+process])
 
@@ -124,6 +128,7 @@ def main(inputConfig, blinded):
                     else:
                         dictHists[process]['fail'][syst+'Down'] = file_down.Get(thisSystDict['HISTFAIL_DOWN_' + process])
 
+    
 
     #####################################################################
     # With dictionary made, we can split around the signal region and   #
@@ -160,10 +165,17 @@ def main(inputConfig, blinded):
                 oldXmax = thisProcessCatDict[dist].GetXaxis().GetXmax()
                 oldYmin = thisProcessCatDict[dist].GetYaxis().GetXmin()
                 oldYmax = thisProcessCatDict[dist].GetYaxis().GetXmax()
-                
+
                 # If the edges have changed, print an error and quit
                 if (oldXmin != newXmin) or (oldXmax != newXmax) or (oldYmin != newYmin) or (oldYmax != newYmax):
                     print "Error! Bin edges in input histogram " + histname+" are different than those in the input JSON. This is not currently supported. Exiting."
+                    thisProcessCatDict[dist].Print()
+                    print '       In hist    v    In json'
+                    print 'Xmin: ' + str(oldXmin) + ' v ' + str(newXmin)
+                    print 'Xmax: ' + str(oldXmax) + ' v ' + str(newXmax)
+                    print 'Ymin: ' + str(oldYmin) + ' v ' + str(newYmin)
+                    print 'Ymax: ' + str(oldYmax) + ' v ' + str(newYmax)
+
                     quit()
 
                 # If the number of bins have changed, rebin

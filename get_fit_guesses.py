@@ -21,13 +21,13 @@ import header
 from header import *
 
 
-def main(inputConfig,blinded,tag,nslices=8,sigma=1):
+def main(inputConfig,blinded,tag,nslices=6,sigma=1):
 
     # Grab everything
     file = TFile.Open(inputConfig['PROCESS']['data_obs']['FILE'])
     
-    thisPass = file.Get(inputConfig['PROCESS']['data_obs']['HISTPASS'])
-    thisFail = file.Get(inputConfig['PROCESS']['data_obs']['HISTFAIL'])
+    thisPass = file.Get(inputConfig['PROCESS']['data_obs']['HISTPASS']).Clone('qcd_pass')
+    thisFail = file.Get(inputConfig['PROCESS']['data_obs']['HISTFAIL']).Clone('qcd_fail')
     thisTotal = thisPass.Clone('thisTotal')     # Reconstruct pre-pass/fail amount for statistics reasons later
     thisTotal.Add(thisFail)
 
@@ -58,44 +58,16 @@ def main(inputConfig,blinded,tag,nslices=8,sigma=1):
                     this.SetBinContent(xbin,ybin,0)
 
 
-    
-
-
-    # Blind if necessary and calculate Rpf in 2D
-    if blinded:
-        sigstart = inputConfig['BINNING']['X']['SIGSTART']
-        sigend = inputConfig['BINNING']['X']['SIGEND']
-
-        rebinnedPass = copyHistWithNewXbounds(thisPass,'rebinnedPass',xBinWidth,xmin,xmax)
-        rebinnedFail = copyHistWithNewXbounds(thisFail,'rebinnedFail',xBinWidth,xmin,xmax)
-
-        lowPass = copyHistWithNewXbounds(rebinnedPass,'lowPass',xBinWidth,xmin,sigstart)
-        lowFail = copyHistWithNewXbounds(rebinnedFail,'lowFail',xBinWidth,xmin,sigstart)
-
-        highPass = copyHistWithNewXbounds(rebinnedPass,'highPass',xBinWidth,sigend,xmax)
-        highFail = copyHistWithNewXbounds(rebinnedFail,'highFail',xBinWidth,sigend,xmax)
-
-        blindedPass = makeBlindedHist(rebinnedPass,lowPass,highPass)
-        blindedFail = makeBlindedHist(rebinnedFail,lowFail,highFail)
-
-        thisTotal = blindedPass.Clone('thisTotal')  # Need to remake this if we've blinded
-        thisTotal.Add(blindedFail)
-
-        Rpf = blindedPass.Clone('Rpf')
-        Rpf.Divide(blindedFail)
-
-    # Otherwise just get the Rpf
-    else:
-        Rpf = thisPass.Clone('Rpf')
-        Rpf.Divide(thisFail)
-
-
-    # Now we need to figure out how to slice up the y-axis based on the total statistics
+    # Need to figure out how to slice up the y-axis based on the total statistics
     # (pass+fail) for each 2D bin
 
     # Get an average number of events per slice
     total_events = thisTotal.Integral()
     events_per_slice = total_events/float(nslices)
+
+    #############################
+    #   Derive the new y bins   #
+    #############################
 
     # Loop over ybins, get the number of events in that ybin, and check if less than events_per_slice
     ysum = 0            # ysum for after we've confirmed that the next bin does not lead to a number greater than events_per_slice
@@ -147,146 +119,180 @@ def main(inputConfig,blinded,tag,nslices=8,sigma=1):
     print new_y_bins
 
     new_y_bins_array = array('d',new_y_bins)
+    new_y_bins_array = array('d',[800.0, 1100.0, 1300.0, 1600.0, 2000.0, 2800.0, 4000.0])    
 
-    #################
-    # Rebin the Rpf #
-    #################
+    ##############################
+    #   Rebin the distributions  #
+    ##############################
 
-    rebinnedRpf = TH2F('rebinnedRpf','rebinnedRpf',Rpf.GetNbinsX(),xmin,xmax,len(new_y_bins_array)-1,new_y_bins_array)
-    rebinnedRpf.Sumw2()
+    # Blind if necessary and calculate Rpf in 2D
+    if blinded:
+        sigstart = inputConfig['BINNING']['X']['SIGSTART']
+        sigend = inputConfig['BINNING']['X']['SIGEND']
+
+        # X rebin and blind
+        rebinnedXPass = copyHistWithNewXbounds(thisPass,'rebinnedXPass',xBinWidth,xmin,xmax)
+        rebinnedXFail = copyHistWithNewXbounds(thisFail,'rebinnedXFail',xBinWidth,xmin,xmax)
+
+        lowPass = copyHistWithNewXbounds(rebinnedXPass,'lowPass',xBinWidth,xmin,sigstart)
+        lowFail = copyHistWithNewXbounds(rebinnedXFail,'lowFail',xBinWidth,xmin,sigstart)
+
+        highPass = copyHistWithNewXbounds(rebinnedXPass,'highPass',xBinWidth,sigend,xmax)
+        highFail = copyHistWithNewXbounds(rebinnedXFail,'highFail',xBinWidth,sigend,xmax)
+
+        blindedPass = makeBlindedHist(rebinnedXPass,lowPass,highPass)
+        blindedFail = makeBlindedHist(rebinnedXFail,lowFail,highFail)
 
 
-    for xbin in range(1,Rpf.GetNbinsX()+1):
-        newBinContent = 0
-        newBinErrorSq = 0
-        rebinHistYBin = 1
-        for ybin in range(1,Rpf.GetNbinsY()+1):
-            # If upper edge of old Rpf ybin is < upper edge of rebinHistYBin then add the Rpf bin to the count
-            if Rpf.GetYaxis().GetBinUpEdge(ybin) < rebinnedRpf.GetYaxis().GetBinUpEdge(rebinHistYBin):
-                newBinContent += Rpf.GetBinContent(xbin,ybin)
-                newBinErrorSq += Rpf.GetBinError(xbin,ybin)**2
-            # If ==, add to newBinContent, assign newBinContent to current rebinHistYBin, move to the next rebinHistYBin, and restart newBinContent at 0
-            elif Rpf.GetYaxis().GetBinUpEdge(ybin) == rebinnedRpf.GetYaxis().GetBinUpEdge(rebinHistYBin):
-                newBinContent += Rpf.GetBinContent(xbin,ybin)
-                newBinErrorSq += Rpf.GetBinError(xbin,ybin)**2
-                rebinnedRpf.SetBinContent(xbin, rebinHistYBin, newBinContent)
-                rebinnedRpf.SetBinError(xbin, rebinHistYBin, sqrt(newBinErrorSq))# NEED TO SET BIN ERRORS
-                rebinHistYBin += 1
-                newBinContent = 0
-                newBinErrorSq = 0
-            else:
-                print 'ERROR when doing psuedo-2D fit approximation. Slices do not line up on y bin edges'
-                quit()
+        # Rp/f before y rebin
+        thisTotal = blindedPass.Clone('thisTotal')  # Need to remake this if we've blinded
+        thisTotal.Add(blindedFail)
 
-    makeCan('rebinCompare',tag,[rebinnedRpf,Rpf])
+        Rpf = blindedPass.Clone('Rpf')
+        Rpf.Divide(blindedFail)
 
-    # Determine fit function (a polynomial) from the inputConfig
-    xFuncString = ''
-    nxcoeffs = 0
-    for xcoeff in inputConfig['FIT'].keys():
-        if xcoeff.find('X') != -1:                                           # For each X*Y0
-            if xcoeff.find('Y0') != -1:
-                powerIndex = xcoeff[xcoeff.find('X')+1]
-                xFuncString += '['+str(powerIndex)+']*x**'+str(powerIndex)+'+'
-                nxcoeffs += 1
-    # Will have a trailing '+' that needs to be removed
-    xFuncString = xFuncString[:-1]
+        # Rp/f after y rebin
+        rebinnedPass = rebinY(blindedPass,'rebinnedPass',tag,new_y_bins_array)
+        rebinnedFail = rebinY(blindedFail,'rebinnedFail',tag,new_y_bins_array)
 
-    print 'Will use ' + xFuncString + ' for the x axis fit'
+        rebinnedRpf = rebinnedPass.Clone('rebinnedRpf')
+        rebinnedRpf.Divide(rebinnedFail)
 
-    fitOutput = TFile('fitOutput.root',"RECREATE")
-    fitOutput.cd()
 
+    # Otherwise just get the Rpf
+    else:
+        # Rp/f before y rebin
+        rebinnedXPass = copyHistWithNewXbounds(thisPass,'rebinnedXPass',xBinWidth,xmin,xmax)
+        rebinnedXFail = copyHistWithNewXbounds(thisFail,'rebinnedXFail',xBinWidth,xmin,xmax)
+
+        Rpf = rebinnedXPass.Clone('Rpf')
+        Rpf.Divide(rebinnedXFail)
+
+        # Rp/f after y rebin
+        rebinnedPass = rebinY(rebinnedXPass,'rebinnedPass',tag,new_y_bins_array)
+        rebinnedFail = rebinY(rebinnedXFail,'rebinnedFail',tag,new_y_bins_array)
+
+        rebinnedRpf = rebinnedPass.Clone('rebinnedRpf')
+        rebinnedRpf.Divide(rebinnedFail)
+
+    # Plot comparisons out
+    # makeCan('rebinned_dists',tag,[rebinnedXPass,rebinnedXFail,rebinnedPass,rebinnedFail])
+    makeCan('Rpfs',tag,[Rpf,rebinnedRpf])
+
+    ###############################################
+    # Determine fit function from the inputConfig #
+    ###############################################
+    if 'XFORM' in inputConfig['FIT'].keys() and 'YFORM' in inputConfig['FIT'].keys():
+        # Do some quick checks to make sure these are formatted correctly
+        checkFitForm(inputConfig['FIT']['XFORM'],inputConfig['FIT']['YFORM'])
+        # Determine number of params in each direction
+        nxparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XFORM'])
+        nyparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YFORM'])
+        # Get the strings
+        xFuncString = RFVform2TF1(inputConfig['FIT']['XFORM'],-1)
+        yFuncString = RFVform2TF1(inputConfig['FIT']['YFORM'],-1)
+        yFuncString = yFuncString.replace('y','x')
+
+        # Make the fixed form of the formula
+        funcString = ''
+        paramIndex = 0
+        for xparam in range(nxparams):
+            for yparam in range(nyparams):
+                funcString += '['+str(paramIndex)+']*x**'+str(xparam)+'*y**'+str(yparam)+'+'
+                paramIndex += 1
+        funcString = funcString[:-1]
+
+
+    elif 'FORM' in inputConfig['FIT'].keys():
+        funcString = inputConfig['FIT']['FORM']
+        # Reconstruct x
+        xFuncString = ''
+        nxparams = 0
+        for xparam in inputConfig['FIT'].keys():
+            if xparam.find('X') != -1:                                           # For each X*Y0
+                if xparam.find('Y0') != -1:
+                    powerIndex = xparam[xparam.find('X')+1]
+                    xFuncString += '['+str(powerIndex)+']*x**'+str(powerIndex)+'+'
+                    nxparams += 1
+        xFuncString = xFuncString[:-1]
+
+        # Reconstruct y
+        yFuncString = ''
+        nyparams = 0
+        for yparam in inputConfig['FIT'].keys():
+            if yparam.find('X0Y') != -1:                                           # For each X0Y*
+                powerIndex = yparam[yparam.find('Y')+1]
+                yFuncString += '['+str(powerIndex)+']*x**'+str(powerIndex)+'+'
+                nyparams += 1
+        # Will have a trailing '+' that needs to be removed
+        yFuncString = yFuncString[:-1]
 
 
     ##################################
     # Now do the fit in the y slices #
     ##################################
-    xFunc = TF1('xFunc',xFuncString,xmin,xmax)
     fitResults = {}
 
     # Book TGraphs to store the fit results as a function of y bins
-    for xcoeff in range(nxcoeffs):
-        fitResults['xcoeff_'+str(xcoeff)+'_vs_y'] = TH1F('xcoeff_'+str(xcoeff)+'_vs_y','xcoeff_'+str(xcoeff)+'_vs_y',len(new_y_bins_array)-1,new_y_bins_array)
+    for xparam in range(nxparams):
+        fitResults['xparam_'+str(xparam)+'_vs_y'] = TH1F('xparam_'+str(xparam)+'_vs_y','xparam_'+str(xparam)+'_vs_y',len(new_y_bins_array)-1,new_y_bins_array)
 
     # Project each y-axis bin and fit along x - save out coefficients to booked tgraph
     for ybin in range(1,rebinnedRpf.GetNbinsY()+1):
         fitResults['fitSlice_'+str(ybin)] = TF1('fitSlice_'+str(ybin),xFuncString,xmin,xmax)
         projX = rebinnedRpf.ProjectionX('rebinnedRpf_sliceX_'+str(ybin),ybin,ybin,'e o')
         projX.Draw('p e')
-        binCenter = rebinnedRpf.GetYaxis().GetBinCenter(ybin)
-        binLowEdge = rebinnedRpf.GetYaxis().GetBinLowEdge(ybin)
-        binHighEdge = rebinnedRpf.GetYaxis().GetBinUpEdge(ybin)
-        projX.Fit(xFunc,'E')
+        # binCenter = rebinnedRpf.GetYaxis().GetBinCenter(ybin)
+        # binLowEdge = rebinnedRpf.GetYaxis().GetBinLowEdge(ybin)
+        # binHighEdge = rebinnedRpf.GetYaxis().GetBinUpEdge(ybin)
+        projX.Fit(fitResults['fitSlice_'+str(ybin)],'E')
         projX.Draw('p e')
-        for ix in range(nxcoeffs):
-            print 'y' + str(ybin)+ ' xcoeff'+str(ix)+': ' + str(xFunc.GetParameter(ix))
-            fitResults['xcoeff_'+str(ix)+'_vs_y'].SetBinContent(ybin,xFunc.GetParameter(ix))
-            fitResults['xcoeff_'+str(ix)+'_vs_y'].SetBinError(ybin,xFunc.GetParError(ix))
+        for ix in range(nxparams):
+            fitResults['xparam_'+str(ix)+'_vs_y'].SetBinContent(ybin,fitResults['fitSlice_'+str(ybin)].GetParameter(ix))
+            fitResults['xparam_'+str(ix)+'_vs_y'].SetBinError(ybin,fitResults['fitSlice_'+str(ybin)].GetParError(ix))
  
-    
-
-            # OLD - USES FitSlicesX
-                                            # fitResultsArray = TObjArray()
-                                            # rebinnedRpf.FitSlicesX(xFunc,0,-1,0,'',fitResultsArray)
-
-                                            # # Grab fit values from TObjArray
-                                            # iterator = fitResultsArray.MakeIterator()
-                                            # param = iterator.Next()
-                                            # coeffCount = 0
-                                            # while param:
-                                            #     print param
-                                            #     # Just grab the coeff (no ChiSquare, etc) which are the first ncoeff items in the TObjArray
-                                            #     if coeffCount <= nxcoeffs-1:
-                                            #         param.SetName('slice_X'+str(coeffCount))
-                                            #         fitResults['slice_X'+str(coeffCount)] = param
-                                            #         coeffCount += 1
-                                            #         param.Write()
-                                                
-                                            #     param = iterator.Next()
 
     ########################################################
     # And now fit these parameters as a function of y axis #
     ########################################################
-    # Build function string
-    yFuncString = ''
-    nycoeffs = 0
-    for ycoeff in inputConfig['FIT'].keys():
-        if ycoeff.find('X0Y') != -1:                                           # For each X0Y*
-            powerIndex = ycoeff[ycoeff.find('Y')+1]
-            yFuncString += '['+str(powerIndex)+']*x**'+str(powerIndex)+'+'
-            nycoeffs += 1
-    # Will have a trailing '+' that needs to be removed
-    yFuncString = yFuncString[:-1]
-    print 'Will use ' + yFuncString + ' for the y axis fit'
-
-    # yFunc = TF1('yFunc',yFuncString,ymin,ymax)
-    fitResults['xcoeff_0_vs_y'].SetMarkerStyle(8)
-    fitResults['xcoeff_0_vs_y'].Draw('p e')
 
     # Build fit for each parameter distribution along y-axis
     drawList = []
-    for xcoeff in range(nxcoeffs):
-        fitResults['fit_'+str(xcoeff)] = TF1('yFunc_'+str(xcoeff),yFuncString,ymin,ymax)
+    for xparam in range(nxparams):
+        fitResults['fitParam_'+str(xparam)] = TF1('yFunc_'+str(xparam),yFuncString,ymin,ymax)
         # Do the fit
-        fitResults['xcoeff_'+str(xcoeff)+'_vs_y'].Fit(fitResults['fit_'+str(xcoeff)],"E")
-        drawList.append(fitResults['xcoeff_'+str(xcoeff)+'_vs_y'])
+        fitResults['xparam_'+str(xparam)+'_vs_y'].Fit(fitResults['fitParam_'+str(xparam)],"E")
+        drawList.append(fitResults['xparam_'+str(xparam)+'_vs_y'])
         # Get and store parameters found
-        for iy in range(fitResults['fit_'+str(xcoeff)].GetNpar()):
-            fitResults['X'+str(xcoeff)+'Y'+str(iy)] = fitResults['fit_'+str(xcoeff)].GetParameter(iy)
-            fitResults['X'+str(xcoeff)+'Y'+str(iy)+'err'] = fitResults['fit_'+str(xcoeff)].GetParError(iy)
+        for iy in range(fitResults['fitParam_'+str(xparam)].GetNpar()):
+            fitResults['X'+str(xparam)+'Y'+str(iy)] = fitResults['fitParam_'+str(xparam)].GetParameter(iy)
+            fitResults['X'+str(xparam)+'Y'+str(iy)+'err'] = fitResults['fitParam_'+str(xparam)].GetParError(iy)
 
-    makeCan('xcoeff_v_y',tag,drawList)
+    makeCan('xparam_v_y',tag,drawList)
 
-    # Store new values in inputConfig
+    # Remove old fit values and store new ones in inputConfig
     print 'Resetting fit parameters in input config'
-    for key in inputConfig['FIT'].keys():
-        if key != 'HELP':
-            print 'Changing fit guesses for ' + key
-            print str(inputConfig['FIT'][key]['NOMINAL']) + ' -> ' + str(max(0,fitResults[key]))
-            print str(inputConfig['FIT'][key]['HIGH']) + ' -> ' + str(fitResults[key]+sigma*fitResults[key+'err'])
-            print str(inputConfig['FIT'][key]['LOW']) + ' -> ' + str(max(fitResults[key]-sigma*fitResults[key+'err'],0))
-            inputConfig['FIT'][key]['NOMINAL'] = max(0,fitResults[key])
-            inputConfig['FIT'][key]['HIGH'] = fitResults[key]+sigma*fitResults[key+'err']
-            inputConfig['FIT'][key]['LOW'] = max(fitResults[key]-sigma*fitResults[key+'err'],0)
+    inputConfig['FIT'] = {'FORM':funcString}
 
+    psuedo2D_Rpf = TF2('psuedo2D_Rpf',funcString,xmin,xmax,ymin,ymax)
+    paramIndex = 0
+    for ix in range(nxparams):
+        for iy in range(nyparams):
+            param = 'X'+str(ix)+'Y'+str(iy)
+            psuedo2D_Rpf.SetParameter(paramIndex,fitResults[param])
+            psuedo2D_Rpf.SetParError(paramIndex,fitResults[param+'err'])
+            inputConfig['FIT'][param] = {'NOMINAL':None,'LOW':None,'HIGH':None}
+            if fitResults[param] < 0:
+                inputConfig['FIT'][param]['NOMINAL'] = fitResults[param]
+                inputConfig['FIT'][param]['HIGH'] = min(fitResults[param]+sigma*fitResults[param+'err'],0)
+                inputConfig['FIT'][param]['LOW'] = fitResults[param]-sigma*fitResults[param+'err']
+            elif fitResults[param] > 0:
+                inputConfig['FIT'][param]['NOMINAL'] = fitResults[param]
+                inputConfig['FIT'][param]['HIGH'] = fitResults[param]+sigma*fitResults[param+'err']
+                inputConfig['FIT'][param]['LOW'] = max(fitResults[param]-sigma*fitResults[param+'err'],0)
+            paramIndex+=1
+
+    # Finally draw the surface
+    makeCan('psuedo2D_Rpf',tag,[psuedo2D_Rpf])
+
+    return inputConfig

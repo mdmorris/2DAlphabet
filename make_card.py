@@ -162,16 +162,22 @@ def main(inputConfig, blinded, tag):
     # Otherwise we float                            #
     # - Fail_bin_x-y                                #
     #################################################
-    nxparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('X') != -1 ])
-    nyparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('Y') != -1 ])
+    if 'XFORM' in inputConfig['FIT'].keys() and 'YFORM' in inputConfig['FIT'].keys():
+        nxparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XFORM'])
+        nyparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YFORM'])
 
-    for nparams in [nxparams, nyparams]:
-        if nparams == nxparams:
-            thisVar = 'X'
-        else:
-            thisVar = 'Y'
-        for ip in range(nparams+1):
-            card_new.write(colliMate('fitParam'+thisVar+'_'+str(ip)+' flatParam\n',22))
+        for nparams in [nxparams, nyparams]:
+            if nparams == nxparams:
+                thisVar = 'X'
+            else:
+                thisVar = 'Y'
+            for ip in range(1,nparams+1):
+                card_new.write(colliMate('fitParam'+thisVar+'_'+str(ip)+' flatParam\n',22))
+    elif 'FORM' in inputConfig['FIT'].keys():
+        for coeff in [key for key in inputConfig['FIT'].keys() if key != 'HELP' and key.find('FORM') == -1]:
+            if 'LOW' in inputConfig['FIT'][coeff].keys() and 'HIGH' in inputConfig['FIT'][coeff].keys():
+                lower_coeff = coeff.lower()
+                card_new.write(colliMate('polyCoeff_'+lower_coeff+' flatParam\n',22))
 
 
     # Check if we have any renormalized MCs, store which processes, and declare the _norm as a flatParam

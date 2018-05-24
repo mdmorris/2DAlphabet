@@ -1,7 +1,7 @@
 import ROOT
 from ROOT import *
 import header
-from header import getRRVs, dictStructureCopy, makeCan, copyHistWithNewXbounds, Make_up_down
+from header import getRRVs, dictStructureCopy, makeCan, copyHistWithNewXbounds, Make_up_down, RFVform2TF1
 import pprint
 pp = pprint.PrettyPrinter(indent = 2)
 
@@ -79,6 +79,7 @@ def main(inputConfig, organizedDict, blinded, tag):
                 if has_shape_uncert:
                     new_roo_dict[proc][cat]['PDF'] = new_w.pdf('shapeSig_'+cat+'_'+proc+'_morph')
                     new_roo_dict[proc][cat]['NORM'] = new_w.function('n_exp_final_bin'+cat+'_proc_'+proc)     # normalization
+                    new_roo_dict[proc][cat]['PDF'].Print()
                 else:
                     print "Attempting to grab shapeSig_"+proc+'_'+cat+'Pdf'
                     new_roo_dict[proc][cat]['PDF'] = new_w.pdf('shapeSig_'+proc+'_'+cat+'Pdf')
@@ -90,6 +91,7 @@ def main(inputConfig, organizedDict, blinded, tag):
 
             elif inputConfig['PROCESS'][proc]['CODE'] == 2:     # If unchanged MC bkg
                 if has_shape_uncert:
+                    print 'Attempting to grab shapeBkg_'+cat+'_'+proc+'_morph'
                     new_roo_dict[proc][cat]['PDF'] = new_w.pdf('shapeBkg_'+cat+'_'+proc+'_morph')
                     new_roo_dict[proc][cat]['NORM'] = new_w.function('n_exp_final_bin'+cat+'_proc_'+proc)
                 else:
@@ -113,79 +115,155 @@ def main(inputConfig, organizedDict, blinded, tag):
     # Get fit parameters - there's a trick here: if the params float then they're in new_w 
     #                      but if they're RooConstVars then the values need to be grabbed from inputConfig
 
-    # Build a dictionary to store coefficients based on the inputConfig
-    PolyCoeffs = {}
-    for coeffName in inputConfig['FIT'].keys():
-        if coeffName != 'HELP':
-            PolyCoeffs[coeffName.lower()] = 0
 
-    # Floating parameters of the fit (store them in python list immediately)
-    RAS_rpfParams = new_w.allVars().selectByName('polyCoeff_x*y*',True)
-    iter_params = RAS_rpfParams.createIterator()
-    RPV_par = iter_params.Next()
-    while RPV_par:
-        coeffName = RPV_par.GetName()[RPV_par.GetName().find('x'):] # returns "x#y#"
-        PolyCoeffs[coeffName] = RPV_par
-        # print coeffName + ': ',
-        RPV_par.Print()
-        allVars.append(RPV_par)
+    if 'XFORM' in inputConfig['FIT'].keys() and 'YFORM' in inputConfig['FIT'].keys():
+        nxparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XFORM'])
+        nyparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YFORM'])
+
+        xFuncForm = RFVform2TF1(inputConfig['FIT']['XFORM'],-1)
+        yFuncForm = RFVform2TF1(inputConfig['FIT']['YFORM'],-1+nxparams)   # shifts the params over so that there's no duplicating by accident
+        formula_string = xFuncForm + '*' + yFuncForm
+        print 'Using formula ' + formula_string
+
+
+        # Build a dictionary to store coefficients based on the inputConfig
+        fitParamRRVs = {}
+        for xparam in range(nxparams):
+            fitParamRRVs['fitParamX_'+str(xparam)] = 0
+        for yparam in range(nyparams):
+            fitParamRRVs['fitParamY_'+str(yparam)] = 0
+
+
+        # Floating parameters of the fit (store them in python list immediately)
+        for var in ['X','Y']:
+            RAS_rpfParams = new_w.allVars().selectByName('fitParam'+var+'_*',True)
+            iter_params = RAS_rpfParams.createIterator()
+            RPV_par = iter_params.Next()
+            while RPV_par:
+                paramNum = RPV_par.GetName()[RPV_par.GetName().find('_')+1:] # returns "x#y#"
+                fitParamRRVs['fitParam'+var+'_'+str(int(paramNum)-1)] = RPV_par
+                # print coeffName + ': ',
+                RPV_par.Print()
+                allVars.append(RPV_par)
+                RPV_par = iter_params.Next()
+
+
+        # Get remaining constant parameters from old_w
+        for paramName in fitParamRRVs.keys():
+            if fitParamRRVs[paramName] == 0:
+                num = str(int(paramName[paramName.find('_')+1:])+1)
+                if paramName.find('X') != -1:
+                    fitParamRRVs[paramName] = inputConfig['FIT']['X'+num]['NOMINAL']
+                elif paramName.find('Y') != -1:
+                    fitParamRRVs[paramName] = inputConfig['FIT']['Y'+num]['NOMINAL']
+
+        ####################################################################
+        #   Do some rebuilding of the polynomial and make a TF2 and histo  #
+        ####################################################################
+
+        ############
+        # Make TF2 #
+        ############
+        # Build a formula string for the TF2 - needs to be done in this order so that the params are in the right spots
+        TF2_rpf = TF2("TF2_rpf",formula_string,x_low,x_high,y_low,y_high)
+
+        # Set params and store in text file for later viewing
+        param_count = 0
+        param_out = open(tag+'/rpf_params.txt','w')
+        for thisVar in ['X','Y']:
+            if thisVar == 'X':
+                nparams = nxparams
+            else:
+                nparams = nyparams
+                
+            for ip in range(0,nparams):
+                thiskey = 'fitParam'+thisVar+'_'+str(ip)
+                if isinstance(fitParamRRVs[thiskey], (int, float)):        # For constant parameter
+                    TF2_rpf.SetParameter(param_count,fitParamRRVs[thiskey])
+                    TF2_rpf.SetParError(param_count,0)
+                    param_out.write(thisVar+str(ip)+': ' + str(fitParamRRVs[thiskey]) + ' +/- 0.0\n')
+                else:     # For floating parameter
+                    TF2_rpf.SetParameter(param_count,fitParamRRVs[thiskey].getValV())
+                    TF2_rpf.SetParError(param_count,fitParamRRVs[thiskey].getError())
+                    param_out.write(thisVar+str(ip)+': ' + str(fitParamRRVs[thiskey].getValV()) + ' +/- ' + str(fitParamRRVs[thiskey].getError())+'\n')
+                param_count += 1              
+
+        param_out.close()
+
+    elif 'FORM' in inputConfig['FIT'].keys():
+        # Build a dictionary to store coefficients based on the inputConfig
+        PolyCoeffs = {}
+        for coeffName in inputConfig['FIT'].keys():
+            if coeffName != 'HELP' and coeffName != 'FORM':
+                PolyCoeffs[coeffName.lower()] = 0
+
+        # Floating parameters of the fit (store them in python list immediately)
+        RAS_rpfParams = new_w.allVars().selectByName('polyCoeff_x*y*',True)
+        iter_params = RAS_rpfParams.createIterator()
         RPV_par = iter_params.Next()
+        while RPV_par:
+            coeffName = RPV_par.GetName()[RPV_par.GetName().find('x'):] # returns "x#y#"
+            PolyCoeffs[coeffName] = RPV_par
+            # print coeffName + ': ',
+            RPV_par.Print()
+            allVars.append(RPV_par)
+            RPV_par = iter_params.Next()
 
-    # Get remaining constant parameters from old_w
-    for coeffName in PolyCoeffs.keys():
-        if PolyCoeffs[coeffName] == 0:
-            PolyCoeffs[coeffName] = inputConfig['FIT'][coeffName.upper()]['NOMINAL']
+        # Get remaining constant parameters from old_w
+        for coeffName in PolyCoeffs.keys():
+            if PolyCoeffs[coeffName] == 0:
+                PolyCoeffs[coeffName] = inputConfig['FIT'][coeffName.upper()]['NOMINAL']
 
-    ####################################################################
-    #   Do some rebuilding of the polynomial and make a TF2 and histo  #
-    ####################################################################
+        ####################################################################
+        #   Do some rebuilding of the polynomial and make a TF2 and histo  #
+        ####################################################################
 
-    # Polynomial Order
-    polXO = 0
-    polYO = 0
-    for param_name in PolyCoeffs.keys():
-        # Assuming poly order is a single digit (pretty reasonable I think...)
-        tempXorder = int(param_name[param_name.find('x')+1])
-        tempYorder = int(param_name[param_name.find('y')+1])
-        if tempXorder > polXO:
-            polXO = tempXorder
-        if tempYorder > polYO:
-            polYO = tempYorder
+        # Polynomial Order
+        polXO = 0
+        polYO = 0
+        for param_name in PolyCoeffs.keys():
+            # Assuming poly order is a single digit (pretty reasonable I think...)
+            tempXorder = int(param_name[param_name.find('x')+1])
+            tempYorder = int(param_name[param_name.find('y')+1])
+            if tempXorder > polXO:
+                polXO = tempXorder
+            if tempYorder > polYO:
+                polYO = tempYorder
+
+        ############
+        # Make TF2 #
+        ############
+        # Build a formula string for the TF2 - needs to be done in this order so that the params are in the right spots
+        param_count = 0
+        formula_string = ''
+        for iy in range(polYO+1):
+            for ix in range(polXO+1):
+                formula_string += '['+str(param_count)+']*x**'+str(ix)+'*y**'+str(iy)+'+'
+                param_count += 1
+
+        # Remove trailing '+' and construct TF2
+        formula_string = formula_string[:-1]
+        TF2_rpf = TF2("TF2_rpf",formula_string,x_low,x_high,y_low,y_high)
+
+        # Set params and store in text file for later viewing
+        param_out = open(tag+'/rpf_params.txt','w')
+        param_count = 0
+        for iy in range(polYO+1):
+            for ix in range(polXO+1):
+                if isinstance(PolyCoeffs['x'+str(ix)+'y'+str(iy)], (int, float)):        # For constant parameter
+                    TF2_rpf.SetParameter(param_count,PolyCoeffs['x'+str(ix)+'y'+str(iy)])
+                    TF2_rpf.SetParError(param_count,0)
+                    param_out.write('x'+str(ix)+'y'+str(iy) + ': ' + str(PolyCoeffs['x'+str(ix)+'y'+str(iy)]) + ' +/- 0.0\n')
+                else:     # For floating parameter
+                    TF2_rpf.SetParameter(param_count,PolyCoeffs['x'+str(ix)+'y'+str(iy)].getValV())
+                    TF2_rpf.SetParError(param_count,PolyCoeffs['x'+str(ix)+'y'+str(iy)].getError())
+                    param_out.write('x'+str(ix)+'y'+str(iy) + ': ' + str(PolyCoeffs['x'+str(ix)+'y'+str(iy)].getValV()) + ' +/- ' + str(PolyCoeffs['x'+str(ix)+'y'+str(iy)].getError())+'\n')
+                param_count += 1              
+
+        param_out.close()
 
 
-    ############
-    # Make TF2 #
-    ############
-    # Build a formula string for the TF2 - needs to be done in this order so that the params are in the right spots
-    param_count = 0
-    formula_string = ''
-    for iy in range(polYO+1):
-        for ix in range(polXO+1):
-            formula_string += '['+str(param_count)+']*x**'+str(ix)+'*y**'+str(iy)+'+'
-            param_count += 1
-
-    # Remove trailing '+' and construct TF2
-    formula_string = formula_string[:-1]
-    TF2_rpf = TF2("TF2_rpf",formula_string,x_low,x_high,y_low,y_high)
-
-    # Set params and store in text file for later viewing
-    param_out = open(tag+'/rpf_params.txt','w')
-    param_count = 0
-    for iy in range(polYO+1):
-        for ix in range(polXO+1):
-            if isinstance(PolyCoeffs['x'+str(ix)+'y'+str(iy)], (int, float)):        # For constant parameter
-                TF2_rpf.SetParameter(param_count,PolyCoeffs['x'+str(ix)+'y'+str(iy)])
-                TF2_rpf.SetParError(param_count,0)
-                param_out.write('x'+str(ix)+'y'+str(iy) + ': ' + str(PolyCoeffs['x'+str(ix)+'y'+str(iy)]) + ' +/- 0.0\n')
-            else:     # For floating parameter
-                TF2_rpf.SetParameter(param_count,PolyCoeffs['x'+str(ix)+'y'+str(iy)].getValV())
-                TF2_rpf.SetParError(param_count,PolyCoeffs['x'+str(ix)+'y'+str(iy)].getError())
-                param_out.write('x'+str(ix)+'y'+str(iy) + ': ' + str(PolyCoeffs['x'+str(ix)+'y'+str(iy)].getValV()) + ' +/- ' + str(PolyCoeffs['x'+str(ix)+'y'+str(iy)].getError())+'\n')
-            param_count += 1              
-
-    param_out.close()
-
-    # Rp/f
+    # Derived Rp/f
     derived_rpf = TCanvas('derived_rpf','derived_rpf',800,700)
     derived_rpf.cd()
     TF2_rpf.SetTitle('Derived R_{P/F}')
@@ -247,7 +325,12 @@ def main(inputConfig, organizedDict, blinded, tag):
 
             # PDFs need to be scaled
             else:
-                thisDist['TH2'] = thisDist['PDF'].createHistogram(proc +'_'+cat,x_var,RooFit.Binning(x_nbins,x_low,x_high),RooFit.YVar(y_var,RooFit.Binning(y_nbins,y_low,y_high)))
+                try:
+                    thisDist['TH2'] = thisDist['PDF'].createHistogram(proc +'_'+cat,x_var,RooFit.Binning(x_nbins,x_low,x_high),RooFit.YVar(y_var,RooFit.Binning(y_nbins,y_low,y_high)))
+                except:
+                    print 'Could not convert ' + proc +'_'+cat +' to histogram'
+                    continue
+
                 makeCan(proc +'_'+cat,tag,[thisDist['TH2']])
                 if abs(1.0-thisDist['TH2'].Integral()) > 0.001:
                     print 'ERROR: Double check PDF ' + thisDist['PDF'].GetName() + '. It integrated to ' + str(thisDist['TH2'].Integral()) + ' instead of 1'
@@ -304,8 +387,10 @@ def main(inputConfig, organizedDict, blinded, tag):
 
     # Multiply by the qcd fail bins to make the pass estimate
     qcd_estimate_pass_signal = qcd_estimate_fail_signal.Clone('qcd_pass_signalRegion')
+    print 'Doing sumw2'
+    qcd_estimate_pass_signal.Sumw2()
     qcd_estimate_pass_signal.Multiply(TF2_rpf)
-    qcd_estimate_pass_signal.Draw('p e')
+    print 'sumw2 done'
 
     final_hists['qcd']['fail']['signal'] = qcd_estimate_fail_signal
     final_hists['qcd']['pass']['signal'] = qcd_estimate_pass_signal
@@ -367,18 +452,24 @@ def main(inputConfig, organizedDict, blinded, tag):
         # For each bkg, create pass and fail y projections
         bkgs_fail_1D = []
         bkgs_pass_1D = []
+        colors = []
         for bkg in [bkg for bkg in inputConfig['PROCESS'] if bkg != 'HELP' and (inputConfig['PROCESS'][bkg]['CODE'] == 3 or inputConfig['PROCESS'][bkg]['CODE'] == 2)]+['qcd']:
             bkgs_fail_1D.append(final_hists[bkg]['fail'][test].ProjectionY())
             bkgs_pass_1D.append(final_hists[bkg]['pass'][test].ProjectionY())
+            if bkg != 'qcd':
+                if "COLOR" in inputConfig['PROCESS'][bkg]:
+                    colors.append(inputConfig['PROCESS'][bkg]["COLOR"])
+            else:
+                colors.append(None)
 
 
         # Plot comparisons in 1D
         makeCan('full_comparison_'+test+'_1D',tag,
                 [data_pass_1D, data_fail_1D],
-                [bkgs_pass_1D, bkgs_fail_1D])
+                [bkgs_pass_1D, bkgs_fail_1D],colors)
         makeCan('full_comparison_'+test+'_1D',tag,
                 [data_pass_1D, data_fail_1D],
-                [bkgs_pass_1D, bkgs_fail_1D],
+                [bkgs_pass_1D, bkgs_fail_1D],colors,
                 True)       # True = semilog y
         makeCan('bkg_comparison_'+test+'_1D',tag, 
                 [data_minus_nonqcd_pass_1D, data_minus_nonqcd_fail_1D],

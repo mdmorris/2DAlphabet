@@ -12,7 +12,7 @@ import os
 import pickle
 from optparse import OptionParser
 import header
-from header import getRRVs,makeRDH,dictCopy,makeRHP
+from header import getRRVs,makeRDH,dictCopy,makeRHP,checkFitForm
 import pprint
 pp = pprint.PrettyPrinter(indent = 2)
 
@@ -84,45 +84,78 @@ def main(dictTH2s,inputConfig,blinded,tag):
     ####################################################
     # Get the fit information and store as RooRealVars #
     ####################################################
-    xFitForm = inputConfig['FIT']['XFORM']    
-    yFitForm = inputConfig['FIT']['YFORM']
+    if 'XFORM' in inputConfig['FIT'].keys() and 'YFORM' in inputConfig['FIT'].keys():
+        xFitForm = inputConfig['FIT']['XFORM']    
+        yFitForm = inputConfig['FIT']['YFORM']
 
-    # Do some quick checks to make sure these are formatted correctly
-    checkFitForm(xFitForm,yFitForm)
+        # Do some quick checks to make sure these are formatted correctly
+        checkFitForm(xFitForm,yFitForm)
 
+        nxparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XFORM'])
+        nyparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YFORM'])
+        print 'Total number of x fit parameters is ' + str(nxparams)
+        print 'Total number of y fit parameters is ' + str(nyparams)
 
-    nxparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('X') != -1 ])
-    nyparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('Y') != -1 ])
-    print 'Total number of x fit parameters is ' + str(nxparams)
-    print 'Total number of y fit parameters is ' + str(nyparams)
+        fitParamRRVs = {}
 
-    fitParamRRVs = {}
+        # Make and store RRVs for each param
+        for thisVar in {'X':nxparams, 'Y':nyparams}.keys():
+            nparams = {'X':nxparams, 'Y':nyparams}[thisVar]
+            for ip in range(1,nparams+1):
+                input_param_vals = inputConfig['FIT'][thisVar+str(ip)]
+                thisNom = input_param_vals['NOMINAL']
 
-    # Make and store RRVs for each param
-    for nparams in [nxparams, nyparams]:
-        if nparams == nxparams:
-            thisVar = 'X'
-        else:
-            thisVar = 'Y'
-        for ip in range(nparams+1):
-            input_param_vals = inputConfig['FIT'][str(ip)]
-            thisNom = input_param_vals['NOMINAL']
+                name = 'fitParam'+thisVar+'_'+str(ip)
 
-            name = 'fitParam'+thisVar+'_'+str(ip)
-
-            if 'LOW' in input_param_vals.keys() and 'HIGH' in input_param_vals.keys():
-                thisLow = input_param_vals['LOW']
-                thisHigh = input_param_vals['HIGH']
-                fitParamRRVs['fitParam'+thisVar+'_'+str(ip)] = RooRealVar(name,name,thisNom,thisLow,thisHigh)
-            else:
-                input_break = raw_input('WARNING: Upper and lower bounds on global fit parameter ' +str(input_param_vals['GLOBALPARAM']) + ' not defined. Please type "N" if you would like to quit or enter if you would like to treat the parameter as constant')
-                if input_break == 'N':
-                    quit()
+                if 'LOW' in input_param_vals.keys() and 'HIGH' in input_param_vals.keys():
+                    thisLow = input_param_vals['LOW']
+                    thisHigh = input_param_vals['HIGH']
+                    print name
+                    fitParamRRVs['fitParam'+thisVar+'_'+str(ip)] = RooRealVar(name,name,thisNom,thisLow,thisHigh)
                 else:
-                    fitParamRRVs['fitParam'+thisVar+'_'+str(ip)] = RooConstVar(name,name,thisNom)
+                    input_break = raw_input('WARNING: Upper and lower bounds on global fit parameter ' +thisVar+str(ip) + ' not defined. Please type "N" if you would like to quit or enter if you would like to treat the parameter as constant')
+                    if input_break == 'N':
+                        quit()
+                    else:
+                        fitParamRRVs['fitParam'+thisVar+'_'+str(ip)] = RooConstVar(name,name,thisNom)
 
-            allVars.append(fitParamRRVs['fitParam'+thisVar+'_'+str(ip)])
+                allVars.append(fitParamRRVs['fitParam'+thisVar+'_'+str(ip)])
 
+    elif 'FORM' in inputConfig['FIT'].keys():
+        # WARNING: THIS ONLY WORKS FOR A POLYNOMIAL
+        # Polynomial Order
+        polXO = 0
+        polYO = 0
+        for param_name in [key for key in inputConfig['FIT'].keys() if key != 'HELP' and key != 'FORM']:
+            # Assuming poly order is a single digit (pretty reasonable I think...)
+            tempXorder = int(param_name[param_name.find('X')+1])
+            tempYorder = int(param_name[param_name.find('Y')+1])
+            if tempXorder > polXO:
+                polXO = tempXorder
+            if tempYorder > polYO:
+                polYO = tempYorder
+
+
+        PolyCoeffs = {}
+        for yi in range(polYO+1):
+            for xi in range(polXO+1):
+
+                input_param_vals = inputConfig['FIT']['X'+str(xi)+'Y'+str(yi)]
+                thisNom = input_param_vals['NOMINAL']
+                
+                name = 'polyCoeff_'+'x'+str(xi)+'y'+str(yi)
+
+                if 'LOW' in input_param_vals.keys() and 'HIGH' in input_param_vals.keys():
+                    thisLow = input_param_vals['LOW']
+                    thisHigh = input_param_vals['HIGH']
+                    PolyCoeffs['x'+str(xi)+'y'+str(yi)] = RooRealVar(name,name,thisNom,thisLow,thisHigh)
+                else:
+                    input_break = raw_input('WARNING: Upper and lower bounds on fit parameter ' + 'x'+str(xi)+'y'+str(yi) + ' not defined. Please type "N" if you would like to quit or enter if you would like to treat the parameter as constant')
+                    if input_break == 'N':
+                        quit()
+                    else:
+                        PolyCoeffs['x'+str(xi)+'y'+str(yi)] = RooConstVar(name,name,thisNom)
+                allVars.append(PolyCoeffs['x'+str(xi)+'y'+str(yi)])
 
     ######################################
     # Build the RooParametricHist2D bins #
@@ -182,8 +215,8 @@ def main(dictTH2s,inputConfig,blinded,tag):
                         continue
                     elif inputConfig['PROCESS'][process]['CODE'] == 2: # unchanged MC
                         binContent  = binContent    - thisTH2.GetBinContent(xbin,ybin)
-                        binErrUp    = binErrUp      - thisTH2.GetBinContent(xbin,ybin) + thisTH2.GetBinErrorUp(xbin,ybin)              # Just propagator errors normally
-                        binErrDown  = binErrDown    - thisTH2.GetBinContent(xbin,ybin) - thisTH2.GetBinErrorLow(xbin,ybin)
+                        binErrUp    = binErrUp      - thisTH2.GetBinContent(xbin,ybin) + thisTH2.GetBinErrorUp(xbin,ybin)*2              # Just propagator errors normally
+                        binErrDown  = binErrDown    - thisTH2.GetBinContent(xbin,ybin) - thisTH2.GetBinErrorLow(xbin,ybin)*2
                     elif inputConfig['PROCESS'][process]['CODE'] == 3: # renorm MC
                         binErrUp    = binContent                                               # Err up is no MC subtraction
                         binErrDown  = binContent    - 2.0 * thisTH2.GetBinContent(xbin,ybin)   # Err down is double MC subtraction
@@ -217,34 +250,59 @@ def main(dictTH2s,inputConfig,blinded,tag):
                     allVars.append(yConst)
 
                     # And now make an Rpf function for this bin 
+                    if 'XFORM' in inputConfig['FIT'].keys() and 'YFORM' in inputConfig['FIT'].keys():
+                        # X                 
+                        xParamList = RooArgList(xConst)
+                        for xParam in range(1,nxparams+1):                    
+                            xParamList.add(fitParamRRVs['fitParamX_'+str(xParam)])
+                        xFormulaName = 'xFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))
+                        xFormulaVar = RooFormulaVar(xFormulaName,xFormulaName,xFitForm.replace('x','@0'),xParamList)
+                        allVars.extend([xFormulaVar,xParamList])
 
-                    # X                 
-                    xParamList = RooArgList(xConst)
-                    for xParam in range(nxparams+1):                    
-                        xParamList.add(fitParamRRVs['fitParamX_'+str(xParam)])
-                    xFormulaName = 'xFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))
-                    xFormulaVar = RooFormulaVar(xFormulaName,xFormulaName,xFitForm.replace('x','@0'),xParamList)
-                    allVars.extend([xFormulaVar,xParamList])
+                        # Y                 
+                        yParamList = RooArgList(yConst)
+                        for yParam in range(1,nyparams+1):                    
+                            yParamList.add(fitParamRRVs['fitParamY_'+str(yParam)])
+                        yFormulaName = 'yFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))
+                        yFormulaVar = RooFormulaVar(yFormulaName,yFormulaName,yFitForm.replace('y','@0'),yParamList)
+                        allVars.extend([yFormulaVar,yParamList])
 
-                    # Y                 
-                    yParamList = RooArgList(yConst)
-                    for yParam in range(nyparams+1):                    
-                        yParamList.add(fitParamRRVs['fitParamY_'+str(yParam)])
-                    yFormulaName = 'yFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))
-                    yFormulaVar = RooFormulaVar(yFormulaName,yFormulaName,yFitForm.replace('y','@0'),yParamList)
-                    allVars.extend([yFormulaVar,yParamList])
+                        # X*Y
+                        fullFormulaName = 'FullFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))
+                        fullFormulaVar = RooProduct(fullFormulaName,fullFormulaName,RooArgList(xFormulaVar,yFormulaVar))
+                        allVars.append(fullFormulaVar)
 
-                    # X*Y
-                    fullFormulaName = 'FullFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))
-                    fullFormulaVar = RooProduct(fullFormulaName,fullFormulaName,RooArgList(xFormulaVar,yFormulaVar))
-                    allVars.append(fullFormulaVar)
+                        # Finally make the pass distribution
+                        formulaArgList = RooArgList(binRRV,fullFormulaVar)
+                        thisBinPass = RooFormulaVar('Pass_bin_'+str(xbin)+'-'+str(ybin),'Pass_bin_'+str(xbin)+'-'+str(ybin),"@0*@1",formulaArgList)
+                        binListPass.add(thisBinPass)
+                        allVars.append(thisBinPass)
 
-                    # Finally make the pass distribution
-                    formulaArgList = RooArgList(binRRV,fullFormulaVar)
-                    thisBinPass = RooFormulaVar('Pass_bin_'+str(xbin)+'-'+str(ybin),'Pass_bin_'+str(xbin)+'-'+str(ybin),"@0*@1",formulaArgList)
-                    binListPass.add(thisBinPass)
-                    allVars.append(thisBinPass)
+                    elif 'FORM' in inputConfig['FIT'].keys():
+                        xPolyList = RooArgList()
+                        for yCoeff in range(polYO+1):
+                            xCoeffList = RooArgList()
 
+                            # Get each x coefficient for this y
+                            for xCoeff in range(polXO+1):                    
+                                xCoeffList.add(PolyCoeffs['x'+str(xCoeff)+'y'+str(yCoeff)])
+
+                            # Make the polynomial and save it to the list of x polynomials
+                            thisXPolyVarLabel = "xPol_y_"+str(yCoeff)+"_Bin_"+str(int(xbin))+"_"+str(int(ybin))
+                            xPolyVar = RooPolyVar(thisXPolyVarLabel,thisXPolyVarLabel,xConst,xCoeffList)
+                            xPolyList.add(xPolyVar)
+                            allVars.append(xPolyVar)
+
+                        # Now make a polynomial out of the x polynomials
+                        thisYPolyVarLabel = "FullPol_Bin_"+str(int(xbin))+"_"+str(int(ybin))
+                        thisFullPolyVar = RooPolyVar(thisYPolyVarLabel,thisYPolyVarLabel,yConst,xPolyList)
+
+                        allVars.append(thisFullPolyVar)
+
+                        formulaArgList = RooArgList(binRRV,thisFullPolyVar)
+                        thisBinPass = RooFormulaVar('Pass_bin_'+str(xbin)+'-'+str(ybin),'Pass_bin_'+str(xbin)+'-'+str(ybin),"@0*@1",formulaArgList)
+                        binListPass.add(thisBinPass)
+                        allVars.append(thisBinPass)
 
     print "Making RPH2Ds"
     Roo_dict['qcd']['fail'] = {}

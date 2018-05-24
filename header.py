@@ -72,6 +72,39 @@ def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHi
 
     return histCopy
 
+def rebinY(thisHist,name,tag,new_y_bins_array):
+    xnbins = thisHist.GetNbinsX()
+    xmin = thisHist.GetXaxis().GetXmin()
+    xmax = thisHist.GetXaxis().GetXmax()
+
+    rebinned = TH2F(name,name,xnbins,xmin,xmax,len(new_y_bins_array)-1,new_y_bins_array)
+    rebinned.Sumw2()
+
+    for xbin in range(1,xnbins+1):
+        newBinContent = 0
+        newBinErrorSq = 0
+        rebinHistYBin = 1
+        for ybin in range(1,thisHist.GetNbinsY()+1):
+            # If upper edge of old Rpf ybin is < upper edge of rebinHistYBin then add the Rpf bin to the count
+            if thisHist.GetYaxis().GetBinUpEdge(ybin) < rebinned.GetYaxis().GetBinUpEdge(rebinHistYBin):
+                newBinContent += thisHist.GetBinContent(xbin,ybin)
+                newBinErrorSq += thisHist.GetBinError(xbin,ybin)**2
+            # If ==, add to newBinContent, assign newBinContent to current rebinHistYBin, move to the next rebinHistYBin, and restart newBinContent at 0
+            elif thisHist.GetYaxis().GetBinUpEdge(ybin) == rebinned.GetYaxis().GetBinUpEdge(rebinHistYBin):
+                newBinContent += thisHist.GetBinContent(xbin,ybin)
+                newBinErrorSq += thisHist.GetBinError(xbin,ybin)**2
+                rebinned.SetBinContent(xbin, rebinHistYBin, newBinContent)
+                rebinned.SetBinError(xbin, rebinHistYBin, sqrt(newBinErrorSq))# NEED TO SET BIN ERRORS
+                rebinHistYBin += 1
+                newBinContent = 0
+                newBinErrorSq = 0
+            else:
+                print 'ERROR when doing psuedo-2D fit approximation. Slices do not line up on y bin edges'
+                quit()
+
+    makeCan(name+'_rebin_compare',tag,[rebinned,thisHist])
+    return rebinned
+
 def makeBlindedHist(nomHist,lowHist,highHist):
     # Grab stuff to make it easier to read
     xlow = nomHist.GetXaxis().GetXmin()
@@ -170,7 +203,7 @@ def printWorkspace(myfile,myworkspace):
 #     h1.Draw('lego')
 #     my1x1Can.Print('plots/'+name+'.pdf','pdf')
 
-def makeCan(name, tag, histlist, bkglist=[],logy=False):  
+def makeCan(name, tag, histlist, bkglist=[],colors=[],logy=False,root=False):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -212,7 +245,9 @@ def makeCan(name, tag, histlist, bkglist=[],logy=False):
     myCan.Divide(padx,pady)
 
     # Just some colors that I think work well together and a bunch of empty lists for storage if needed
-    colors = [kRed,kMagenta,kGreen,kCyan]
+    default_colors = [kRed,kMagenta,kGreen,kCyan,kBlue]
+    if len(colors) == 0:   
+        colors = default_colors
     stacks = []
     tot_hists = []
     legends = []
@@ -282,7 +317,10 @@ def makeCan(name, tag, histlist, bkglist=[],logy=False):
                         bkg.SetFillColor(kYellow)
 
                     else:
-                        bkg.SetFillColor(colors[bkg_index])
+                        if colors[bkg_index] != None:
+                            bkg.SetFillColor(colors[bkg_index])
+                        else:
+                            bkg.SetFillColor(default_colors[bkg_index])
 
                     stacks[hist_index].Add(bkg)
 
@@ -338,7 +376,10 @@ def makeCan(name, tag, histlist, bkglist=[],logy=False):
                 pulls[hist_index].GetXaxis().SetTitleSize(LS)
                 pulls[hist_index].Draw('hist')
 
-    myCan.Print(tag+'/plots/'+name+logString+'.pdf','pdf')
+    if root:
+        myCan.Print(tag+'/plots/'+name+logString+'.root','root')
+    else:
+        myCan.Print(tag+'/plots/'+name+logString+'.pdf','pdf')
 
 # Not yet integrated/used
 def Make_Pull_plot( DATA,BKG):
@@ -391,12 +432,33 @@ def checkFitForm(xFitForm,yFitForm):
     if '@0' in yFitForm:
         print 'ERROR: @0 in YFORM. This is reserved for the variable y. Please either replace it with y or start your parameter naming with @1. Quitting...'
         quit()
-    if 'x' in yFitForm:
+    if 'x' in yFitForm and 'exp' not in yFitForm:
         print 'ERROR: x in YFORM. Did you mean to write "y"? Quitting...'
         quit()
-    if 'x' in yFitForm:
+    if 'y' in xFitForm:
         print 'ERROR: y in XFORM. Did you mean to write "x"? Quitting...'
         quit()
+
+
+def RFVform2TF1(RFVform,shift=0):
+    TF1form = ''
+    lookingForDigit = False
+    for index,char in enumerate(RFVform):
+        # print str(index) + ' ' + char
+        if char == '@':
+            TF1form+='['
+            lookingForDigit = True
+        elif lookingForDigit:
+            if char.isdigit():
+                if RFVform[index+1].isdigit() == False:     # if this is the last digit
+                    TF1form+=str(int(char)+shift)
+            else:
+                TF1form+=']'+char
+                lookingForDigit = False
+        else:
+            TF1form+=char
+
+    return TF1form
 
 
 # Right after I wrote this I realized it's obsolete... It's cool parentheses parsing though so I'm keeping it
