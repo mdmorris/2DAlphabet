@@ -1,5 +1,5 @@
 #####################################################################################################
-# build_workspace.py - written by Lucas Corcodilos, 3/13/18                                         #
+# build_fit_workspace.py - written by Lucas Corcodilos, 3/13/18                                     #
 # ---------------------------------------------------------                                         #
 # This script builds the RooWorkspace with all of the RooFit objects that Combine needs to run the  #
 # fit. Most of the TH2s are just converted to RooDataHists (RDH) but we also build the QCD          #
@@ -189,11 +189,11 @@ def main(dictTH2s,inputConfig,blinded,tag):
             # 1) Have a negligible number of events but NOT zero (will break Combine)
             # 2) Have no dependence on the Rp/f (otherwise they will influence the Rp/f shape)
             if blinded and (upperEdge_in_sig or lowerEdge_in_sig):
-                binRRV = RooRealVar(name, name, 0.001,0.0,0.01)
+                binRRV = RooConstVar(name, name, 0.0001)
                 binListFail.add(binRRV)
                 allVars.append(binRRV)
 
-                thisBinPass = RooRealVar('Pass_bin_'+str(xbin)+'-'+str(ybin), 'Pass_bin_'+str(xbin)+'-'+str(ybin), 0.001,0.0,0.01)
+                thisBinPass = RooConstVar('Pass_bin_'+str(xbin)+'-'+str(ybin), 'Pass_bin_'+str(xbin)+'-'+str(ybin), 0.0001)
                 binListPass.add(thisBinPass)
                 allVars.append(thisBinPass)
 
@@ -224,11 +224,11 @@ def main(dictTH2s,inputConfig,blinded,tag):
 
                 # If bin content is <= 0, treat this bin as a RooConstVar at 0
                 if binContent <= 0:
-                    binRRV = RooRealVar(name, name, 0.001,0.0,0.01)
+                    binRRV = RooConstVar(name, name, 0.0001)
                     binListFail.add(binRRV)
                     allVars.append(binRRV)
 
-                    thisBinPass = RooRealVar('Pass_bin_'+str(xbin)+'-'+str(ybin), 'Pass_bin_'+str(xbin)+'-'+str(ybin), 0.001,0.0,0.01)
+                    thisBinPass = RooConstVar('Pass_bin_'+str(xbin)+'-'+str(ybin), 'Pass_bin_'+str(xbin)+'-'+str(ybin), 0.0001)
                     binListPass.add(thisBinPass)
                     allVars.append(thisBinPass)
 

@@ -27,7 +27,7 @@
 \section{Introduction to the method}
     As one might expect, the 2D Alphabet background estimation method is a two dimensional version of the Alphabet method. The 1D Alphabet method derives a background estimate in the jet mass signal region by interpolating a pass-to-fail ratio, $R_{P/F}$, from the calculated values in the jet mass sidebands and multiplying the failing distribution in the signal region by this $R_{P/F}$. 
 
-    This method has been used successfully in the past. However, if the signal region is wide and the statistics in the high jet mass sideband are low, the background estimate is susceptible to shifts that do not accurately describe the behavior of the background being estimated. The 2D Alphabet method attempts to remedy this by constraining the shape of the $R_{P/F}$ with a second dimension.
+    This method has been used successfully in the past. However, if the signal region is wide and the statistics in the high jet mass sideband are low, the background estimate is susceptible to shifts that do not accurately describe the behavior of the background being estimated. Additionally, if the $R_{P/F}$ has a strong dependence on the measurement variable (for example, resonance mass), 1D Alphabet will not be able to accurately predict the background in this variable. The 2D Alphabet method attempts to remedy both of these issues by constraining the shape of the $R_{P/F}$ with the measurement variable as the second dimension.
 
     Since the 1D Alphabet method requires a fit of the sideband values to interpolate the signal region, the 2D Alphabet method must do the same but in two dimensions. The statistical tool of choice to accomplish this is the Higgs Analysis Combine Tool. The documentation for the tool can be found \href{https://cms-hcomb.gitbooks.io/combine/content/}{here}. 
 
@@ -40,27 +40,34 @@
         \item \verb"cd CMSSW_7_4_7_patch2/src"
         \item \verb"cmsenv"
         \item \verb"scram b -j 10"
-        \item \verb"git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit"
+        \item \verb"git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git" \verb"HiggsAnalysis/CombinedLimit"
         \begin{itemize}
             \item Your target directory MUST be HiggsAnalysis/CombinedLimit or the package won't compile
+            \item There is a git bug that started in the Spring of 2018 that will not allow you to clone using CMSSW\textunderscore 7\textunderscore 4\textunderscore 7\textunderscore patch2. Since it's difficult to get Combine to compile in a different CMSSW release, the workaround is to clone in a newer version of CMSSW and then copy the HiggsAnalysis folder over to CMSSW\textunderscore 7\textunderscore 4\textunderscore 7\textunderscore patch2.
         \end{itemize}
         \item \verb"cd HiggsAnalysis/CombinedLimit"
         \item \verb"git checkout -b <new_branch> origin/74x-root6"
         \item \verb"cat env_standalone.sh | sed 's/=/ /g' | sed 's/export/setenv/g' > env_standalone.csh"
+        \item \verb"source env_standalone.csh"
         \item \verb"make -j 8; make"
         \item \verb"scram b -j 10"
         \item \verb"cmsenv"
     \end{itemize}
 
+    If the command \verb"combine --help" returns the help menu then you've successfully setup root.
+
 \section{Installation}
     \textit{PLEASE NOTE THAT THE SOFTWARE IS NOT CURRENTLY READY TO BE INSTALLED AND USED. THIS SECTION IS BEING DEVELOPED ALONG WITH THE SOFTWARE.}
 
-    Once a CMSSW environment with Combine is setup, one can install the 2D Alphabet software. There are two main steps. The first is to clone the master release from \url{https://github.com/lcorcodilos/2DAlphabet}. The second is to copy several files to your Combine directory and re-compile Combine so it can use a new class - RooParametricHist2D.
+    Once a CMSSW environment with Combine is setup, one can install the 2D Alphabet software. There are two main steps. The first is to clone the master release from \url{https://github.com/lcorcodilos/2DAlphabet}. This can be done using the command \verb"git clone https://github.com/lcorcodilos/2DAlphabet". The second step is to copy several files to your Combine directory and re-compile Combine so it can use a new class - RooParametricHist2D. You can grab these using the following commands
+    \begin{itemize}
+        \item \verb"..."
+    \end{itemize}
 
     ...
 
 \section{How To Run}
-    The 2D Alphabet is designed to run by calling a single script (\verb"2DAlphabet.py") with a JSON configuration file as input via the command line option \verb"-i". There are several other options that will be discussed later but they are truly "optional" whereas the configuration file is not - so I will discuss that first.
+    The 2D Alphabet framework is designed to run by calling a single script (\verb"2DAlphabet.py") with a JSON configuration file as input via the command line option \verb"-i". There are several other options that will be discussed later but they are truly "optional" whereas the configuration file is not - so I will discuss that first.
 
     \subsection{JSON Configuration}
         While I've tried to keep the format of the JSON configuration file obvious, it's not fair to assume that everyone else will feel the same way. I've included "HELP" keys in dictionaries where I felt I could easily explain the formatting. This section is a necessary supplement to those. Please note that I may use phrases like, "The key 'HELP' is defined inside 'PROCESS'." I'm aware this is not correct since "PROCESS" is a key for a dictionary which has a key "HELP" and so "HELP" can't be "inside" "PROCESS" but it simplifies the explanation so I'm going to roll with it.  
@@ -68,7 +75,7 @@
         The goal of the JSON is to have an easily configurable input that allows the 2D Alphabet software to read and organize analysis files and histograms to its liking while also giving the user the ability to easily configure values like bin sizes and ranges. This means that while the user is encouraged to add what they need, there are some keys and values that must stay the same. \textbf{These static strings are always in capital letters to make them easy to distinguish.} I'll now describe what each of the five static sections is designed for.
 
         \subsubsection{PROCESS}
-            In this section, the user can define as many processes as they need to account for. This includes data and MC. This section is NOT used to define the background to be estimated via the transfer function. That background is naturally defined by the difference between data and the other backgrounds defined here.
+            In this section, the user can define as many processes as they need to account for. This includes data and MC. This section is NOT used to define the background to be estimated via the transfer function (typicall QCD). That background is naturally defined by the difference between data and the other backgrounds defined here.
 
             Each key in \verb"PROCESS" is the name of each process of interest. Please name your data as "data\textunderscore obs." This is a Combine convention that I'd like to maintain. Each process name is a key for a sub-dictionary that specifies
             \begin{itemize}
@@ -107,8 +114,11 @@
 
                 \end{itemize}
                 \item Shape based uncertainty, in different file as nominal histogram. This is the more flexible but also more complicated option. 
-                The user can specify files two different ways. The first is by using \verb"FILEUP:" and \verb"FILEDOWN:" to pick a file that \textit{every} process can pull the shape uncertainty histograms from. The second (and more likely to be used) way is to use keys of the form \verb"FILEUP_myprocess:" where \verb"myprocess" matches the name of a process that is defined in the \verb"PROCESS" dictionary and has this shape uncertainty associated with it. This allows each systematic and process to come from a separate file. 
-                The user can also specify histogram names in three different ways. The first is \verb"HISTPASS" and \verb"HISTFAIL" which allows the user to specify only two histogram names if they don't change between "up" and "down" shapes. The second is if the "up" and "down" shapes \textit{do} have different histogram names and uses the form \verb"HISTPASS_UP" and \verb"HISTFAIL_UP". Finally, the totally generic way allows the user to use the form \verb"HISTPASS_UP_myprocess" where (again) \verb"myprocess" matches the name of a process that is defined in the \verb"PROCESS" dictionary and has this shape uncertainty associated with it. Below is the totally generic way (which hopefully gets no use).
+                The user can specify files three different ways. The first is by using \verb"FILEUP:" and \verb"FILEDOWN:" to pick a file that \textit{every} process can pull the shape uncertainty histograms from. The second way is to use keys of the form \verb"FILEUP_myprocess:" where \verb"myprocess" matches the name of a process that is defined in the \verb"PROCESS" dictionary and has this shape uncertainty associated with it. This allows each systematic and process to come from a separate file. The third way is to use keys of the form \verb"FILEUP_*:" where the * acts as a wild card for the process and must also exist in the file name where the process would normally be written.
+
+                For example, if my ttbar distributions with +1$\sigma$ uncertainty are stored in \verb"ttbar_pileup_up.root" and the corresponding signal distribtutions are in \verb"signal_pileup_up.root", I can use the key value pair \verb"'FILE_UP_*':'*_pileup_up.root'".
+
+                The user can also specify histogram names in four different ways. The first is \verb"HISTPASS" and \verb"HISTFAIL" which allows the user to specify only two histogram names if they don't change between "up" and "down" shapes. The second is if the "up" and "down" shapes \textit{do} have different histogram names and uses the form \verb"HISTPASS_UP" and \verb"HISTFAIL_UP". Third, the totally generic way allows the user to use the form \verb"HISTPASS_UP_myprocess" where (again) \verb"myprocess" matches the name of a process that is defined in the \verb"PROCESS" dictionary and has this shape uncertainty associated with it. Finally, the "*" wildcard can be used in place of \verb"myprocess" just as with the file keys. Below is an example of the totally generic way.
                 \begin{itemize}
                     \item \verb"CODE: 3" (int)
                     \item \verb"FILEUP_myprocess:" \verb"/path/to/fileup_myprocess.root" which contains the +1$\sigma$ uncertainty histogram for myprocess (string)
@@ -120,12 +130,10 @@
                     \item \verb"SCALE: " a scale value which allows the user to change the normalization of the shape (float)
                 \end{itemize}
             \end{itemize}
-            This scheme obviously relies on the user's ability to be somewhat organized. If for example, you have your +1$\sigma$ shape based uncertainty in file\textunderscore up.root with histogram name "SystUp" and -1$\sigma$ shape based uncertainty in file\textunderscore down.root with histogram name "SystDown" then there's no applicable code for you to use. 
-
-            I designed the scheme this way because 2 and 3 are the only applicable classifications to my analysis approach and so I ask the user to be at least as organized as I am so that this scheme works for them.
+            This scheme is quite flexible. However, the more organized you are, the easier it is to write a configuration file.
 
         \subsubsection{BINNING}
-            One set of important user defined values is the 2D binning of the space being analyzed. This dictionary is the opportunity to define the axes binning that the user's input histograms already have. Note that while the \verb"LOW" and \verb"HIGH" bin edges defined here and in the user's input histograms \textit{must} be consistent, the number of bins and signal bounds do not. The binning values are split into x and y axis definitions where the x-axis describes the variable whose signal region is blinded.
+            One set of important user defined values is the 2D binning of the space being analyzed. This dictionary is the opportunity to define the axes binning of user's space. The binning values are split into x and y axis definitions where the x-axis describes the variable whose signal region is blinded. Note that the \verb"LOW" and \verb"HIGH" bin edges for the \verb"Y" axis that are defined here \textit{must} be consistent with the user's input histograms. Additionally, the \verb"X" axis binning cannot be beyond the range of the input histogram (hopefully, this is obvious) but it can be a subset of the input range. The number of bins are restricted to be equal to or less than the input number of bins (in both the \verb"X" and \verb"Y" axes) and the signal bounds only apply to the \verb"X" axis and must exist within the \verb"X" axis range defined in the configuration file. Finally, the user must specify if they want to fit their 2D space by blinding the signal region via the \verb"BLINDED" key which can take only boolean \verb"false" and \verb"true".
             \begin{itemize}
                 \item \verb"X"
                 \begin{itemize}
@@ -135,6 +143,7 @@
                     \item \verb"NBINS:" number of x bins from LOW to HIGH (int)
                     \item \verb"SIGSTART:" lower bound of signal region of x-axis (int)
                     \item \verb"SIGEND:" upper bound of signal region of x-axis (int)
+                    \item \verb"BLINDED:" blinds or unblinds the signal region during the $R_{P/F}$ fit (bool)
                 \end{itemize}
                 \item \verb"Y"
                 \begin{itemize}
@@ -148,8 +157,15 @@
         \subsubsection{FIT}
             The other set of important user defined values is the fit parameters for the transfer function from the fail sideband to the passing (or pass-fail ratio). The 2D fit of the transfer function assumes a polynomial in both directions. The order of the polynomials are up to the user (technically they are capped at order 10) as long as each parameter is defined. For example, if the highest order parameter defined is 2 in x and 1 in y, the user needs to define six parameters here.
 
-            The naming for the parameters must follow the form \verb"X#Y&" where \verb"#" and \verb"&" are the polynomial orders
+            Expanding the number of functions available to the user is currently in development. Because of this, the user is required to write a string for their functional form. The user has the opportunity to use either \verb"FORM" or \verb"XFORM" and \verb"YFORM" to write the formula. \verb"FORM" is used if the $x$ and $y$ terms are mixed. For example, one could use \verb"@1+@2*x+@3*y+@4*x*y" where \verb"@1, @2, @3, @4" would correspond to \verb"X0Y0", \verb"X1Y0", \verb"X0Y1", and \verb"X1Y1" in the configuration file. \verb"XFORM" and \verb"YFORM" are used if the user would like to isolate the behaviors in the $x$ and $y$ variables. For example, the previously formula could instead be written as \verb"(@1+@*2x)" for the \verb"XFORM" and \verb"(@1+@2*y)" for the \verb"YFORM" where \verb"@1, @2" in the \verb"XFORM" would correspond to \verb"X1" and \verb"X2" in the configuration file and \verb"@1, @2" in the \verb"YFORM" would correspond to \verb"Y1" and \verb"Y2" in the configuration file.
+
+            There are two conventions here that are important. The first is that the numbering of the parameters in \verb"XFORM" and \verb"YFORM" must start at 1 - not 0. The 0 is reserved for the corresponding variable. This is not the case if \verb"FORM" is used (in fact, fir now the contents of \verb"FORM" are not used). The second convention is that the separate \verb"X" and \verb"Y" parameters start at 1 to match the values in \verb"XFORM" and \verb"YFORM". However, the parameter number when \verb"FORM" is used starts at 0 (see example below). 
+
+            Finally, for each parameter, the user must specify \verb"NOMINAL", \verb"LOW", and \verb"HIGH" values that correspond to a guess and range for the parameter while it floats in the fit.
+
+            An example is given below.
             \begin{itemize}
+                \item \verb"FORM:" (@1+@2*x+@3*y+@4*x*y)
                 \item \verb"X0Y0"
                 \begin{itemize}
                     \item \verb"NOMINAL:" nominal value (float)
@@ -182,15 +198,27 @@
 
         	This works by searching all strings in the JSON for instances of each key in \verb"GLOBAL" and replacing the key with its corresponding dictionary value.
 
-        	Thus, the user must be careful they don't accidentally replace strings in the JSON that are identical to keys in \verb"GLOBAL" but that should be unchanged. This means keys in \verb"GLOBAL" should be descriptive (single character keys would be a bad idea). 
-
+        	Thus, the user must be careful they don't accidentally use strings in the JSON that are identical to keys in \verb"GLOBAL" but that should be unchanged. This means keys in \verb"GLOBAL" should be descriptive (single character keys would be a bad idea). 
 
 
     \subsection{Command line options}
+        There are several command line options that are currently implemented for use when running 2DAlphabet.py. The most important (and required) is \verb"-i" (\verb"--input") which points to the configuration file which should be named as \verb"input_<tag>.json" where \verb"<tag>" will be the name of the folder where all outputs are saved to keep the user organized.
+
+        The remaining options are listed below.
+
+        \begin{itemize} 
+            \item \verb'-i', \verb'--input', JSON file to be imported. Name should be "input\textunderscore <tag>.json" where tag will be used to organize outputs')
+            \item \verb'-s', \verb'--pseudo2D' Recalculate the fit guesses using pseudo2D method (1D Alphabet in slices)
+            \item \verb'-p', \verb'--plotOnly', Only runs the part of the script that is necessary to plot. If you used a command like \verb'-f' when running the full script, that should also be used.
+            \item \verb'-d', \verb'--draw', Draws canvases live - for debugging
+            \item \verb'-s', \verb'--signalOff', Turns off signal by setting \verb'rMin' and \verb'rMax' options to 0 in Combine
+            \item \verb'-f', \verb'--runFit', Runs Combine max likelihood fit and plots outputs
+            \item \verb'-l', \verb'--runLimits', Runs Combine limits and plots outputs
+        \end{itemize}
 
 \section{Plotting}
-The 2D Alphabet software already makes some basic plots for the user including the shape of the transfer function and several 2D distributions. If you'd like to make more plots from the output of Combine, you'll have to access the RooWorkspaces manually. Most of the time, the workspace that is output by Combine, \verb"MaxLikelihoodFitResult.root", has the distribution of interest. However, Combine only saves what it deemed useful in its calculations meaning that some things (like distributions in your signal region which Combine is blind to) are not in \verb"MaxLikelihoodFitResult.root". You can either grab these yourself from the input files referrenced in your JSON or access \verb"base.root" which contains the RooWorkspace input to Combine by the 2D Alphabet software.
+    The 2D Alphabet software already makes some basic plots for the user including the shape of the transfer function, several 2D distributions, and the 1D projections onto the y-axis along with the stacked background comparison to data and a pull plot. If you'd like to make more plots from the output of Combine, you'll have to access the RooWorkspaces manually. Most of the time, the workspace that is output by Combine, \verb"MaxLikelihoodFitResult.root", has the distribution of interest. However, Combine only saves what it deemed useful in its calculations meaning that some things (like distributions in your signal region which Combine is blind to) are not in \verb"MaxLikelihoodFitResult.root". You can either grab these yourself from the input files referrenced in your JSON or access \verb"base.root" which contains the RooWorkspace input to Combine by the 2D Alphabet software.
 
-To get a better idea of how to do all of this, please take a look at \verb"plot_fit_results.py".
+    To get a better idea of how to do all of this, please take a look at \verb"plot_fit_results.py".
 
 \end{document}

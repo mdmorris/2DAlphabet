@@ -125,24 +125,24 @@
         "X": {
             "NAME": "jetmass",
             "LOW": 50,
-            "HIGH": 350,
-            "NBINS": 15,
+            "HIGH": 330,
+            "NBINS": 14,
             "SIGSTART": 150,
             "SIGEND": 190,
             "BLINDED": true
         },
         "Y": {
             "NAME": "resmass",
-            "LOW": 700,
+            "LOW": 800,
             "HIGH": 4000,
-            "NBINS": 33
+            "NBINS": 32
         }
     },
 
     "FIT": {
         "HELP": "The fit parameters of the 2D polynomial should be configured here. Note that parameters must be named x#y$ where # is the order of the parameter in the x and $ is the order of the parameter in the y.",
         "XFORM":"(@1+@2*x+@3*x**2)",
-        "YFORM":"(@1+@2*y)",
+        "YFORM":"(@1+@2*y+@3*y**2)",
         "X1": {
             "NOMINAL": 0.1,
             "LOW": 0.0,
@@ -164,6 +164,11 @@
             "HIGH": 10
         },
         "Y2": {
+            "NOMINAL": -0.000002,
+            "LOW": -0.1,
+            "HIGH": 0.0
+        },
+        "Y3": {
             "NOMINAL": -0.000002,
             "LOW": -0.1,
             "HIGH": 0.0

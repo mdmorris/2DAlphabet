@@ -203,7 +203,7 @@ def printWorkspace(myfile,myworkspace):
 #     h1.Draw('lego')
 #     my1x1Can.Print('plots/'+name+'.pdf','pdf')
 
-def makeCan(name, tag, histlist, bkglist=[],colors=[],logy=False,root=False):  
+def makeCan(name, tag, histlist, bkglist=[],colors=[],logy=False,root=False,xtitle='',ytitle=''):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -271,6 +271,7 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],logy=False,root=False):
             if logy == True:
                 gPad.SetLogy()
                 logString = '_semilog'
+            hist.GetXaxis().SetTitle(xtitle)
             hist.Draw('lego')
             if len(bkglist) > 0:
                 print 'ERROR: It seems you are trying to plot backgrounds with data on a 2D plot. This is not supported since there is no good way to view this type of distribution.'
@@ -282,6 +283,8 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],logy=False,root=False):
             
             # If there are no backgrounds, only plot the data (semilog if desired)
             if len(bkglist) == 0:
+                hist.GetXaxis().SetTitle(xtitle)
+                hist.GetYaxis().SetTitle(ytitle)
                 hist.Draw('p e')
             
             # Otherwise...
@@ -374,12 +377,15 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],logy=False,root=False):
                 pulls[hist_index].GetYaxis().SetNdivisions(306)
                 pulls[hist_index].GetXaxis().SetLabelSize(LS)
                 pulls[hist_index].GetXaxis().SetTitleSize(LS)
+
+                pulls[hist_index].GetXaxis().SetTitle(xtitle)
+                pulls[hist_index].GetYaxis().SetTitle(ytitle)
                 pulls[hist_index].Draw('hist')
 
     if root:
-        myCan.Print(tag+'/plots/'+name+logString+'.root','root')
+        myCan.Print(tag+'plots/'+name+logString+'.root','root')
     else:
-        myCan.Print(tag+'/plots/'+name+logString+'.pdf','pdf')
+        myCan.Print(tag+'plots/'+name+logString+'.pdf','pdf')
 
 # Not yet integrated/used
 def Make_Pull_plot( DATA,BKG):
@@ -460,6 +466,71 @@ def RFVform2TF1(RFVform,shift=0):
 
     return TF1form
 
+
+# Taken from Kevin's limit_plot_shape.py
+def make_smooth_graph(h2,h3):
+    h2 = TGraph(h2)
+    h3 = TGraph(h3)
+    npoints = h3.GetN()
+    h3.Set(2*npoints+2)
+    for b in range(npoints+2):
+        x1, y1 = (ROOT.Double(), ROOT.Double())
+        if b == 0:
+            h3.GetPoint(npoints-1, x1, y1)
+        elif b == 1:
+            h2.GetPoint(npoints-b, x1, y1)
+        else:
+            h2.GetPoint(npoints-b+1, x1, y1)
+        h3.SetPoint(npoints+b, x1, y1)
+    return h3
+
+# Built to wait for condor jobs to finish and then check that they didn't fail
+# The script that calls this function will quit if there are any job failures
+# listOfJobs input should be whatever comes before '.listOfJobs' for the set of jobs you submitted
+def WaitForJobs( listOfJobs ):
+    # Runs grep to count the number of jobs - output will have non-digit characters b/c of wc
+    preNumberOfJobs = subprocess.check_output('grep "python" '+listOfJobs+' | wc -l', shell=True)
+    commentedNumberOfJobs = subprocess.check_output('grep "# python" '+listOfJobs+'.listOfJobs | wc -l', shell=True)
+
+    # Get rid of non-digits and convert to an int
+    preNumberOfJobs = int(filter(lambda x: x.isdigit(), preNumberOfJobs))
+    commentedNumberOfJobs = int(filter(lambda x: x.isdigit(), commentedNumberOfJobs))
+    numberOfJobs = preNumberOfJobs - commentedNumberOfJobs
+
+    finishedJobs = 0
+    # Rudementary progress bar
+    while finishedJobs < numberOfJobs:
+        # Count how many output files there are to see how many jobs finished
+        # the `2> null.txt` writes the stderr to null.txt instead of printing it which means
+        # you don't have to look at `ls: output_*.log: No such file or directory`
+        finishedJobs = subprocess.check_output('ls output_*.log 2> null.txt | wc -l', shell=True)
+        finishedJobs = int(filter(lambda x: x.isdigit(), finishedJobs))
+        sys.stdout.write('\rProcessing ' + str(listOfJobs) + ' - ')
+        # Print the count out as a 'progress bar' that refreshes (via \r)
+        sys.stdout.write("%i / %i of jobs finished..." % (finishedJobs,numberOfJobs))
+        # Clear the buffer
+        sys.stdout.flush()
+        # Sleep for one second
+        time.sleep(1)
+
+
+    print 'Jobs completed. Checking for errors...'
+    numberOfTracebacks = subprocess.check_output('grep -i "Traceback" output*.log | wc -l', shell=True)
+    numberOfSyntax = subprocess.check_output('grep -i "Syntax" output*.log | wc -l', shell=True)
+
+    numberOfTracebacks = int(filter(lambda x: x.isdigit(), numberOfTracebacks))
+    numberOfSyntax = int(filter(lambda x: x.isdigit(), numberOfSyntax))
+
+    # Check there are no syntax or traceback errors
+    # Future idea - check output file sizes
+    if numberOfTracebacks > 0:
+        print str(numberOfTracebacks) + ' job(s) failed with traceback error'
+        quit()
+    elif numberOfSyntax > 0:
+        print str(numberOfSyntax) + ' job(s) failed with syntax error'
+        quit()
+    else:
+        print 'No errors!'
 
 # Right after I wrote this I realized it's obsolete... It's cool parentheses parsing though so I'm keeping it
 def separateXandYfromFitString(fitForm):

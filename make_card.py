@@ -9,8 +9,10 @@
 
 import header
 from header import colliMate
+import subprocess
 
-def main(inputConfig, blinded, tag):
+
+def main(inputConfig, blinded, tag, globalDir):
     # Recreate file
     card_new = open('card_'+tag+'.txt','w')
     
@@ -38,9 +40,9 @@ def main(inputConfig, blinded, tag):
     procs_without_systs.append('qcd')   # Again, qcd not in the input JSON but needs to be in the combine card!
 
     for proc in procs_without_systs:
-        card_new.write(colliMate('shapes  '+proc+' * base_'+tag+'.root w_2D:'+proc+'_$CHANNEL\n'))
+        card_new.write(colliMate('shapes  '+proc+' * '+globalDir+'base_'+tag+'.root w_2D:'+proc+'_$CHANNEL\n'))
     for proc in procs_with_systs:
-        card_new.write(colliMate('shapes  '+proc+' * base_'+tag+'.root w_2D:'+proc+'_$CHANNEL w_2D:'+proc+'_$CHANNEL_$SYSTEMATIC\n'))
+        card_new.write(colliMate('shapes  '+proc+' * '+globalDir+'base_'+tag+'.root w_2D:'+proc+'_$CHANNEL w_2D:'+proc+'_$CHANNEL_$SYSTEMATIC\n'))
 
     card_new.write('-'*120+'\n')
 
@@ -223,4 +225,5 @@ def main(inputConfig, blinded, tag):
             
        
     card_new.close()
+    subprocess.call(['mv card_'+tag+'.txt ' + globalDir + '/'], shell=True)
 

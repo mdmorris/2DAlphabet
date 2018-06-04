@@ -3,7 +3,7 @@
 # --------------------------------------------------------                                          #
 # This script uses the input JSON as a map to all of the relevant histograms to the analysis.       #
 # It grabs each of the histograms, stores them in nested dictionaries, and then renames them and    #
-# writes them out to a single rootfile and sends dict to build_workspace.py.                        #
+# writes them out to a single rootfile and sends dict to build_fit_workspace.py.                    #
 #####################################################################################################
 
 import ROOT
@@ -104,6 +104,8 @@ def main(inputConfig, blinded):
                         dictHists[process]['pass'][syst+'Up'] = file_up.Get(thisSystDict['HISTPASS_UP'])            # try to grab hist name from SYSTEMATIC dictionary
                     elif 'HISTPASS' in thisSystDict:
                         dictHists[process]['pass'][syst+'Up'] = file_up.Get(thisSystDict['HISTPASS'])               # else use the same one as nominal distribution
+                    elif 'HISTPASS_UP_*' in thisSystDict:
+                        dictHists[process]['pass'][syst+'Up'] = file_up.Get(thisSystDict['HISTPASS_UP_*'].replace('*',process))
                     else: 
                         dictHists[process]['pass'][syst+'Up'] = file_up.Get(thisSystDict['HISTPASS_UP_'+process])   # or use process specific name
 
@@ -111,6 +113,8 @@ def main(inputConfig, blinded):
                         dictHists[process]['pass'][syst+'Down'] = file_down.Get(thisSystDict['HISTPASS_DOWN'])
                     elif 'HISTPASS' in thisSystDict:
                         dictHists[process]['pass'][syst+'Down'] = file_down.Get(thisSystDict['HISTPASS'])
+                    elif 'HISTPASS_DOWN_*' in thisSystDict:
+                        dictHists[process]['pass'][syst+'Down'] = file_up.Get(thisSystDict['HISTPASS_DOWN_*'].replace('*',process))
                     else:
                         dictHists[process]['pass'][syst+'Down'] = file_down.Get(thisSystDict['HISTPASS_DOWN_' + process])
 
@@ -118,6 +122,8 @@ def main(inputConfig, blinded):
                         dictHists[process]['fail'][syst+'Up'] = file_up.Get(thisSystDict['HISTFAIL_UP'])
                     elif 'HISTFAIL' in thisSystDict:
                         dictHists[process]['fail'][syst+'Up'] = file_up.Get(thisSystDict['HISTFAIL'])
+                    elif 'HISTFAIL_UP_*' in thisSystDict:
+                        dictHists[process]['fail'][syst+'Up'] = file_up.Get(thisSystDict['HISTFAIL_UP_*'].replace('*',process))    
                     else:
                         dictHists[process]['fail'][syst+'Up'] = file_up.Get(thisSystDict['HISTFAIL_UP_' + process])
 
@@ -125,6 +131,8 @@ def main(inputConfig, blinded):
                         dictHists[process]['fail'][syst+'Down'] = file_down.Get(thisSystDict['HISTFAIL_DOWN'])
                     elif 'HISTFAIL' in thisSystDict:
                         dictHists[process]['fail'][syst+'Down'] = file_down.Get(thisSystDict['HISTFAIL'])
+                    elif 'HISTFAIL_DOWN_*' in thisSystDict:
+                        dictHists[process]['fail'][syst+'Down'] = file_up.Get(thisSystDict['HISTFAIL_DOWN_*'].replace('*',process))
                     else:
                         dictHists[process]['fail'][syst+'Down'] = file_down.Get(thisSystDict['HISTFAIL_DOWN_' + process])
 
@@ -160,6 +168,13 @@ def main(inputConfig, blinded):
             thisProcessCatDict = dictHists[process][cat]
             for dist in thisProcessCatDict.keys():
                 print 'Making ' + process +'_' + cat + '_' + dist
+
+                # Get new names
+                histname = process + '_' + cat
+                if dist != 'nominal':                           # if not nominal dist
+                    histname = histname + '_' + dist
+                
+
                 # Check if the user has changed the binning in the config file
                 oldXmin = thisProcessCatDict[dist].GetXaxis().GetXmin()
                 oldXmax = thisProcessCatDict[dist].GetXaxis().GetXmax()
@@ -167,7 +182,11 @@ def main(inputConfig, blinded):
                 oldYmax = thisProcessCatDict[dist].GetYaxis().GetXmax()
 
                 # If the edges have changed, print an error and quit
-                if (oldXmin != newXmin) or (oldXmax != newXmax) or (oldYmin != newYmin) or (oldYmax != newYmax):
+                if (oldXmin != newXmin) or (oldXmax != newXmax):
+                    histWithNewXbounds = copyHistWithNewXbounds(thisProcessCatDict[dist],histname,newXwidth,newXmin,newXmax)
+                    thisProcessCatDict[dist] = histWithNewXbounds
+
+                elif (oldXmin != newXmin) or (oldXmax != newXmax) or (oldYmin != newYmin) or (oldYmax != newYmax):
                     print "Error! Bin edges in input histogram " + histname+" are different than those in the input JSON. This is not currently supported. Exiting."
                     thisProcessCatDict[dist].Print()
                     print '       In hist    v    In json'
@@ -185,10 +204,6 @@ def main(inputConfig, blinded):
                     ratio_Y = int(float(thisProcessCatDict[dist].GetNbinsY())/float(newYnbins))
                     thisProcessCatDict[dist].Rebin2D(ratio_X,ratio_Y)
 
-                # Get new names
-                histname = process + '_' + cat
-                if dist != 'nominal':                           # if not nominal dist
-                    histname = histname + '_' + dist
                 
 
                 # Name the nominal histograms

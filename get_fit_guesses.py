@@ -35,9 +35,17 @@ def main(inputConfig,blinded,tag,nslices=6,sigma=1):
     xmin = inputConfig['BINNING']['X']['LOW']
     xnbins = inputConfig['BINNING']['X']['NBINS']
     xBinWidth = float(xmax - xmin)/float(xnbins)
+    try:
+        x_title = inputConfig['BINNING']['X']['TITLE']
+    except:
+        x_title = ''
 
     ymin = inputConfig['BINNING']['Y']['LOW']
     ymax = inputConfig['BINNING']['Y']['HIGH']
+    try:
+        y_title = inputConfig['BINNING']['Y']['TITLE']
+    except:
+        y_title = ''
 
     # Subtract away non-qcd processes
     for nonqcd in [process for process in inputConfig['PROCESS'].keys() if process != 'HELP' and process != 'data_obs']:
@@ -177,7 +185,7 @@ def main(inputConfig,blinded,tag,nslices=6,sigma=1):
 
     # Plot comparisons out
     # makeCan('rebinned_dists',tag,[rebinnedXPass,rebinnedXFail,rebinnedPass,rebinnedFail])
-    makeCan('Rpfs',tag,[Rpf,rebinnedRpf])
+    makeCan('Rpfs',tag,[rebinnedRpf],xtitle=x_title,ytitle=y_title)
 
     ###############################################
     # Determine fit function from the inputConfig #
@@ -268,7 +276,7 @@ def main(inputConfig,blinded,tag,nslices=6,sigma=1):
             fitResults['X'+str(xparam)+'Y'+str(iy)] = fitResults['fitParam_'+str(xparam)].GetParameter(iy)
             fitResults['X'+str(xparam)+'Y'+str(iy)+'err'] = fitResults['fitParam_'+str(xparam)].GetParError(iy)
 
-    makeCan('xparam_v_y',tag,drawList)
+    makeCan('xparam_v_y',tag,drawList,xtitle=y_title)
 
     # Remove old fit values and store new ones in inputConfig
     print 'Resetting fit parameters in input config'
@@ -293,6 +301,6 @@ def main(inputConfig,blinded,tag,nslices=6,sigma=1):
             paramIndex+=1
 
     # Finally draw the surface
-    makeCan('psuedo2D_Rpf',tag,[psuedo2D_Rpf])
+    makeCan('psuedo2D_Rpf',tag,[psuedo2D_Rpf],xtitle=x_title,ytitle=y_title)
 
     return inputConfig

@@ -182,15 +182,17 @@
         "HELP": "The binning of the x and y axes should be configured here",
         "X": {
             "NAME": "jetmass",
+            "TITLE": "M_{t}",
             "LOW": 50,
-            "HIGH": 350,
-            "NBINS": 15,
+            "HIGH": 330,
+            "NBINS": 14,
             "SIGSTART": 150,
             "SIGEND": 190,
             "BLINDED": true
         },
         "Y": {
             "NAME": "resmass",
+            "TITLE": "M_{tW}",
             "LOW": 800,
             "HIGH": 4000,
             "NBINS": 32
