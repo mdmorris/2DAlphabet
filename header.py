@@ -72,6 +72,42 @@ def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHi
 
     return histCopy
 
+def copyHistWithNewYbounds(thisHist,copyName,newBinWidthY,yNewBinsLow,yNewBinsHigh):
+    # Make a copy with the same Y bins but new X bins
+    nBinsX = thisHist.GetNbinsX()
+    xBinsLow = thisHist.GetXaxis().GetXmin()
+    xBinsHigh = thisHist.GetXaxis().GetXmax()
+    nNewBinsY = int((yNewBinsHigh-yNewBinsLow)/float(newBinWidthY))
+    histCopy = TH2F(copyName,copyName,nBinsX,xBinsLow,xBinsHigh,nNewBinsY,yNewBinsLow,yNewBinsHigh)
+    histCopy.Sumw2()
+    
+    histCopy.GetXaxis().SetName(thisHist.GetXaxis().GetName())
+    histCopy.GetYaxis().SetName(thisHist.GetYaxis().GetName())
+
+
+    # Loop through the old bins
+    for binX in range(1,nBinsX+1):
+        # print 'Bin y: ' + str(binY)
+        for newBinY in range(1,nNewBinsY+1):
+            newBinContent = 0
+            newBinErrorSq = 0
+            newBinYlow = histCopy.GetYaxis().GetBinLowEdge(newBinY)
+            newBinYhigh = histCopy.GetYaxis().GetBinUpEdge(newBinY)
+
+            # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
+            for oldBinY in range(1,thisHist.GetNbinsY()+1):
+                if thisHist.GetYaxis().GetBinLowEdge(oldBinY) >= newBinYlow and thisHist.GetYaxis().GetBinUpEdge(oldBinY) <= newBinYhigh:
+                    # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
+                    # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
+                    newBinContent += thisHist.GetBinContent(binX,oldBinY)
+                    newBinErrorSq += thisHist.GetBinError(binX,oldBinY)**2
+
+            # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
+            histCopy.SetBinContent(binX,newBinY,newBinContent)
+            histCopy.SetBinError(binX,newBinY,sqrt(newBinErrorSq))
+
+    return histCopy
+
 def rebinY(thisHist,name,tag,new_y_bins_array):
     xnbins = thisHist.GetNbinsX()
     xmin = thisHist.GetXaxis().GetXmin()
@@ -203,7 +239,9 @@ def printWorkspace(myfile,myworkspace):
 #     h1.Draw('lego')
 #     my1x1Can.Print('plots/'+name+'.pdf','pdf')
 
-def makeCan(name, tag, histlist, bkglist=[],colors=[],logy=False,root=False,xtitle='',ytitle=''):  
+
+
+def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=False,xtitle='',ytitle='',dataOff=False):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -270,28 +308,46 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],logy=False,root=False,xtit
         if hist.ClassName().find('TH2') != -1:
             if logy == True:
                 gPad.SetLogy()
-                logString = '_semilog'
+            gPad.SetLeftMargin(0.2)
             hist.GetXaxis().SetTitle(xtitle)
+            hist.GetYaxis().SetTitle(ytitle)
+            hist.GetXaxis().SetTitleOffset(1.5)
+            hist.GetYaxis().SetTitleOffset(2.3)
+            hist.GetZaxis().SetTitleOffset(1.8)
+            if len(titles) > 0:
+                hist.SetTitle(titles[hist_index])
+
             hist.Draw('lego')
             if len(bkglist) > 0:
                 print 'ERROR: It seems you are trying to plot backgrounds with data on a 2D plot. This is not supported since there is no good way to view this type of distribution.'
         
         # Otherwise it's a TH1 hopefully
         else:
-            hist.SetLineColor(kBlack)
+            alpha = 1
+            if dataOff:
+                alpha = 0
+            hist.SetLineColorAlpha(kBlack,alpha)
+            hist.SetMarkerColorAlpha(kBlack,alpha)
             hist.SetMarkerStyle(8)
             
             # If there are no backgrounds, only plot the data (semilog if desired)
             if len(bkglist) == 0:
                 hist.GetXaxis().SetTitle(xtitle)
                 hist.GetYaxis().SetTitle(ytitle)
+                if len(titles) > 0:
+                    hist.SetTitle(titles[hist_index])
                 hist.Draw('p e')
             
             # Otherwise...
             else:
                 # Create some subpads, a legend, a stack, and a total bkg hist that we'll use for the error bars
-                mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.3, 1, 1))
-                subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 1, 0.3))
+                if not dataOff:
+                    mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.3, 1, 1))
+                    subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 1, 0.3))
+                else:
+                    mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.1, 1, 1))
+                    subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 0, 0))
+
                 legends.append(TLegend(0.7,0.8,0.95,0.93))
                 stacks.append(THStack(hist.GetName()+'_stack',hist.GetName()+'_stack'))
                 tot_hists.append(TH1F(hist.GetName()+'_tot',hist.GetName()+'_tot',hist.GetNbinsX(),hist.GetXaxis().GetXmin(),hist.GetXaxis().GetXmax()))
@@ -333,7 +389,6 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],logy=False,root=False,xtit
                 mains[hist_index].cd()
                 if logy == True:
                     mains[hist_index].SetLogy()
-                    logString = '_semilog'
 
                 # Set y max of all hists to be the same to accomodate the tallest
                 histList = [stacks[hist_index],tot_hists[hist_index],hist]
@@ -348,15 +403,21 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],logy=False,root=False,xtit
                     h.SetMaximum(yMax*1.1)
 
                 # Now draw the main pad
-                stacks[hist_index].Draw('hist')
+                if len(titles) > 0:
+                    hist.SetTitle(titles[hist_index])
+                hist.SetTitleOffset(1.5,"xy")
+                hist.Draw('pe')
+
+                stacks[hist_index].Draw('same hist')
 
                 tot_hists[hist_index].SetFillColor(kBlack)
                 tot_hists[hist_index].SetFillStyle(3354)
 
                 tot_hists[hist_index].Draw('e2 same')
-                legends[hist_index].Draw()
+                # legends[hist_index].Draw()
 
-                hist.Draw('p e same')
+                if not dataOff:
+                    hist.Draw('p e same')
 
                 # Draw the pull
                 subs[hist_index].cd()
@@ -383,9 +444,10 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],logy=False,root=False,xtit
                 pulls[hist_index].Draw('hist')
 
     if root:
-        myCan.Print(tag+'plots/'+name+logString+'.root','root')
+        myCan.Print(tag+'plots/'+name+'.root','root')
     else:
-        myCan.Print(tag+'plots/'+name+logString+'.pdf','pdf')
+        myCan.Print(tag+'plots/'+name+'.pdf','pdf')
+
 
 # Not yet integrated/used
 def Make_Pull_plot( DATA,BKG):
@@ -531,6 +593,22 @@ def WaitForJobs( listOfJobs ):
         quit()
     else:
         print 'No errors!'
+
+def Inter(g1,g2):
+    xaxisrange = g1.GetXaxis().GetXmax()-g1.GetXaxis().GetXmin()
+    xaxismin = g1.GetXaxis().GetXmin()
+    inters = []
+    for x in range(0,10000):
+        xpoint = xaxismin + (float(x)/1000.0)*xaxisrange
+        xpoint1 = xaxismin + (float(x+1)/1000.0)*xaxisrange
+        Pr1 = g1.Eval(xpoint)
+        Pr2 = g2.Eval(xpoint)
+        Po1 = g1.Eval(xpoint1)
+        Po2 = g2.Eval(xpoint1)
+        if (Pr1-Pr2)*(Po1-Po2)<0:
+            inters.append(0.5*(xpoint+xpoint1))
+        
+    return inters
 
 # Right after I wrote this I realized it's obsolete... It's cool parentheses parsing though so I'm keeping it
 def separateXandYfromFitString(fitForm):

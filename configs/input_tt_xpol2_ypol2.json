@@ -17,7 +17,7 @@
             "FILE": "path/TT2Dalphabetweightedttbar_Trigger_nominal_none_PSET_default.root",
             "HISTPASS": "MttvMtPass",
             "HISTFAIL": "MttvMtFail",
-            "SYSTEMATICS":["lumi","ttbar_xsec","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","ttbar_xsec","Scale","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
             "CODE": 2
         },
         "signalLH1200": {
@@ -59,6 +59,14 @@
             "HISTFAIL_UP": "MttvMtFailTrigup",
             "HISTPASS_DOWN": "MttvMtPassTrigdown",
             "HISTFAIL_DOWN": "MttvMtFailTrigdown",
+            "SCALE": 1.0
+        },
+        "Scale": {
+            "CODE":3,
+            "FILE_UP_ttbar": "path/TT2Dalphabetweightedttbarscaleup_Trigger_nominal_none_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TT2Dalphabetweightedttbarscaledown_Trigger_nominal_none_PSET_default.root",
+            "HISTPASS": "MttvMtPass",
+            "HISTFAIL": "MttvMtFail",
             "SCALE": 1.0
         },
         "Pileup": {
@@ -116,8 +124,8 @@
         "X": {
             "NAME": "jetmass",
             "LOW": 50,
-            "HIGH": 350,
-            "NBINS": 15,
+            "HIGH": 330,
+            "NBINS": 14,
             "SIGSTART": 150,
             "SIGEND": 190,
             "BLINDED": false

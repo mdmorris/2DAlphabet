@@ -17,8 +17,9 @@
             "FILE": "path/TT2Dalphabetweightedttbar_Trigger_nominal_none_PSET_default.root",
             "HISTPASS": "MttvMtPass",
             "HISTFAIL": "MttvMtFail",
-            "SYSTEMATICS":["lumi","ttbar_xsec","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
-            "CODE": 2
+            "SYSTEMATICS":["lumi","ttbar_xsec","Scale","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
+            "CODE": 2,
+            "COLOR": 2
         },
         "signalLH1200": {
             "FILE": "path/TT2DalphabetweightedsignalLH1200_Trigger_nominal_none_PSET_default.root",
@@ -59,6 +60,14 @@
             "HISTFAIL_UP": "MttvMtFailTrigup",
             "HISTPASS_DOWN": "MttvMtPassTrigdown",
             "HISTFAIL_DOWN": "MttvMtFailTrigdown",
+            "SCALE": 1.0
+        },
+        "Scale": {
+            "CODE":3,
+            "FILE_UP_ttbar": "path/TT2Dalphabetweightedttbarscaleup_Trigger_nominal_none_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TT2Dalphabetweightedttbarscaledown_Trigger_nominal_none_PSET_default.root",
+            "HISTPASS": "MttvMtPass",
+            "HISTFAIL": "MttvMtFail",
             "SCALE": 1.0
         },
         "Pileup": {
@@ -115,15 +124,17 @@
         "HELP": "The binning of the x and y axes should be configured here",
         "X": {
             "NAME": "jetmass",
+            "TITLE":"M_{t}",
             "LOW": 50,
             "HIGH": 330,
             "NBINS": 14,
             "SIGSTART": 110,
             "SIGEND": 210,
-            "BLINDED": true
+            "BLINDED": false
         },
         "Y": {
             "NAME": "resmass",
+            "TITLE":"M_{tt}",
             "LOW": 700,
             "HIGH": 4000,
             "NBINS": 33

@@ -43,12 +43,21 @@ def main(inputConfig, blinded):
         hist_pass = file_nominal.Get(thisProcessDict['HISTPASS'])
         hist_fail = file_nominal.Get(thisProcessDict['HISTFAIL'])
 
-        this_proc_scale = 1.0
+
         if "SCALE" in thisProcessDict.keys():
             this_proc_scale = thisProcessDict["SCALE"]
+            hist_pass.Scale(this_proc_scale)
+            hist_fail.Scale(this_proc_scale)
+        elif "SCALEPASS" in thisProcessDict.keys():
+            thisScalePassFile = TFile.Open(thisProcessDict["SCALEPASS"])
+            thisScaleFailFile = TFile.Open(thisProcessDict["SCALEFAIL"])
+            
+            this_proc_scale_pass = thisScalePassFile.Get(thisProcessDict["SCALEPASS_HISTNAME"])
+            this_proc_scale_fail = thisScaleFailFile.Get(thisProcessDict["SCALEFAIL_HISTNAME"])
 
-        hist_pass.Scale(this_proc_scale)
-        hist_fail.Scale(this_proc_scale)
+            hist_pass.Multiply(this_proc_scale_pass)
+            hist_fail.Multiply(this_proc_scale_fail)
+
 
         dictHists[process]['file'] = file_nominal
         dictHists[process]['pass']['nominal'] = hist_pass

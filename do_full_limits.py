@@ -52,8 +52,10 @@ import ROOT
 from ROOT import *
 
 import header
-from header import WaitForJobs, make_smooth_graph
+from header import WaitForJobs, make_smooth_graph, Inter
 
+gStyle.SetOptStat(0)
+gROOT.SetBatch(kTRUE)
 
 parser = OptionParser()
 
@@ -85,6 +87,10 @@ parser.add_option('-l', '--lumi', metavar='F', type='string', action='store',
                   default       =       '35851',
                   dest          =       'lumi',
                   help          =       'Luminosity option')
+parser.add_option('-H', '--hand', metavar='F', type='string', action='store',
+                  default       =       '',
+                  dest          =       'hand',
+                  help          =       'LH,RH,VL')
 
 (options, args) = parser.parse_args()
 
@@ -129,7 +135,7 @@ if not options.plotOnly:
     subprocess.call(['source ' + tag+ '/listOfJobs.csh'],shell=True)
     
     for name in signal_names:
-        subprocess.call(['mv '+tag+'/'+'higgsCombine'+tag+'_'+name+'.Asymptotic.mH120.root ' + tag+'/'+name+'/'])
+        subprocess.call(['mv '+'higgsCombine'+tag+'_'+name+'.Asymptotic.mH120.root ' + tag+'/'+name+'/'])
 
     # Now equipped with jobs and a list of them, we can submit to condor
 
@@ -196,7 +202,15 @@ climits.SetLogy(True)
 climits.SetLeftMargin(.18)
 climits.SetBottomMargin(.18)  
 
-cstr = 'L'
+if options.hand == 'LH':
+    cstr = 'L'
+elif options.hand == 'RH':
+    cstr = 'R'
+elif options.hand == 'VL':
+    cstr = 'LR'
+else:
+    cstr = ''
+
 
 TPT = ROOT.TPaveText(.20, .22, .5, .27,"NDC")
 TPT.AddText("All-Hadronic Channel")
@@ -348,4 +362,11 @@ text1.DrawLatex(0.2,0.84, "#scale[1.0]{CMS, L = "+options.lumi+" pb^{-1} at  #sq
 
 TPT.Draw()      
 climits.RedrawAxis()
-climits.SaveAs("limits_combine_"+options.lumi+"pb_"+options.signals[:options.signals.find('.')]+".pdf")
+climits.SaveAs(tag+"/limits_combine_"+options.lumi+"pb_"+options.signals[:options.signals.find('.')]+".pdf")
+
+# Finally calculate the intercept
+expectedLimit = Inter(g_mclimit,graphWP)[0]
+upLimit = Inter(g_mcminus,graphWP)[0]
+lowLimit = Inter(g_mcplus,graphWP)[0]
+
+print str(expectedLimit/1000.) + ' +'+str(upLimit/1000.-expectedLimit/1000.) +' -'+str(expectedLimit/1000.-lowLimit/1000.) + ' TeV'

@@ -33,28 +33,46 @@
 
 
 \section{Prerequisites}
-    The only environement this software has been tested in is CMSSW\textunderscore 7\textunderscore 4\textunderscore 7\textunderscore patch2 on CMSLPC. The Higgs Analysis Combine Tool must be installed. To set this up on CMSLPC, follow the below recipe:
+    % The only environement this software has been tested in is CMSSW\textunderscore 7\textunderscore 4\textunderscore 7\textunderscore patch2 on CMSLPC. The Higgs Analysis Combine Tool must be installed. To set this up on CMSLPC, follow the below recipe:
+
+    % \begin{itemize}
+    %     \item \verb"cmsrel CMSSW_7_4_7_patch2"
+    %     \item \verb"cd CMSSW_7_4_7_patch2/src"
+    %     \item \verb"cmsenv"
+    %     \item \verb"scram b -j 10"
+    %     \item \verb"git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git" \verb"HiggsAnalysis/CombinedLimit"
+    %     \begin{itemize}
+    %         \item Your target directory MUST be HiggsAnalysis/CombinedLimit or the package won't compile
+    %         \item There is a git bug that started in the Spring of 2018 that will not allow you to clone using CMSSW\textunderscore 7\textunderscore 4\textunderscore 7\textunderscore patch2. Since it's difficult to get Combine to compile in a different CMSSW release, the workaround is to clone in a newer version of CMSSW and then copy the HiggsAnalysis folder over to CMSSW\textunderscore 7\textunderscore 4\textunderscore 7\textunderscore patch2.
+    %     \end{itemize}
+    %     \item \verb"cd HiggsAnalysis/CombinedLimit"
+    %     \item \verb"git checkout -b <new_branch> origin/74x-root6"
+    %     \item \verb"cat env_standalone.sh | sed 's/=/ /g' | sed 's/export/setenv/g' > env_standalone.csh"
+    %     \item \verb"source env_standalone.csh"
+    %     \item \verb"make -j 8; make"
+    %     \item \verb"scram b -j 10"
+    %     \item \verb"cmsenv"
+    % \end{itemize}
+    The only environement this software has been tested in is CMSSW\textunderscore 8\textunderscore 1\textunderscore 0 on CMSLPC. The Higgs Analysis Combine Tool must be installed. To set this up on CMSLPC, follow the below recipe:
 
     \begin{itemize}
-        \item \verb"cmsrel CMSSW_7_4_7_patch2"
-        \item \verb"cd CMSSW_7_4_7_patch2/src"
+        \item \verb"cmsrel CMSSW_8_1_0"
+        \item \verb"cd CMSSW_8_1_0/src"
         \item \verb"cmsenv"
         \item \verb"scram b -j 10"
         \item \verb"git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git" \verb"HiggsAnalysis/CombinedLimit"
         \begin{itemize}
             \item Your target directory MUST be HiggsAnalysis/CombinedLimit or the package won't compile
-            \item There is a git bug that started in the Spring of 2018 that will not allow you to clone using CMSSW\textunderscore 7\textunderscore 4\textunderscore 7\textunderscore patch2. Since it's difficult to get Combine to compile in a different CMSSW release, the workaround is to clone in a newer version of CMSSW and then copy the HiggsAnalysis folder over to CMSSW\textunderscore 7\textunderscore 4\textunderscore 7\textunderscore patch2.
         \end{itemize}
         \item \verb"cd HiggsAnalysis/CombinedLimit"
-        \item \verb"git checkout -b <new_branch> origin/74x-root6"
         \item \verb"cat env_standalone.sh | sed 's/=/ /g' | sed 's/export/setenv/g' > env_standalone.csh"
         \item \verb"source env_standalone.csh"
-        \item \verb"make -j 8; make"
-        \item \verb"scram b -j 10"
+        \item \verb"make -j 8; make; scram b -j 10"
         \item \verb"cmsenv"
     \end{itemize}
 
     If the command \verb"combine --help" returns the help menu then you've successfully setup root.
+
 
 \section{Installation}
     \textit{PLEASE NOTE THAT THE SOFTWARE IS NOT CURRENTLY READY TO BE INSTALLED AND USED. THIS SECTION IS BEING DEVELOPED ALONG WITH THE SOFTWARE.}

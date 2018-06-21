@@ -17,6 +17,7 @@ import pprint
 pp = pprint.PrettyPrinter(indent = 2)
 
 import make_card
+import make_systematic_plots
 import get_fit_guesses
 import input_organizer
 import build_fit_workspace
@@ -66,6 +67,14 @@ parser.add_option('-b', '--batch', action="store_true",
                   default   =   False,
                   dest      =   'batch',
                   help      =   'Runs limits in batch mode for multiple signals')
+parser.add_option('-B', '--blinded', action="store_true",
+                  default   =   False,
+                  dest      =   'blinded',
+                  help      =   'Turns off data points. Different from blinding the signal region during the fit')
+parser.add_option('-u', '--plotUncerts', action="store_true",
+                  default   =   False,
+                  dest      =   'plotUncerts',
+                  help      =   'Plots shape based uncertainties')
 # parser.add_option('-D', '--globalDir', type='string', action="store",
 #                   default   =   '',
 #                   dest      =   'globalDir',
@@ -103,7 +112,7 @@ if options.signalOff:
     sig_tag = '_nosig'
 
 # If input has form input_<tag>_<sig>.json...
-if len(options.input.split('_')) == 3:
+if len(options.input.split('_')) == 3 and options.batch:
     maindir = options.input.split('_')[1] + '/'
     subdir = options.input.split('_')[2]
     subdir = subdir[:subdir.find('.')] + '/'
@@ -117,11 +126,13 @@ if len(options.input.split('_')) == 3:
 # Otherwise treat it as input_<tag>.json
 else:
     maindir = options.input[options.input.find('input_')+len('input_'):options.input.find('.')] + '/'
-    tag = maindir[:-1] + sig_tag
+    maindir = maindir[:-1] + sig_tag + '/'
+    tag = maindir[:-1]
     subdir = ''
     try:
         subprocess.call(['mkdir ' + tag], shell=True)
         subprocess.call(['mkdir ' + tag + '/plots'], shell=True)
+        subprocess.call(['mkdir ' + tag + '/UncertPlots'], shell=True)
     except:
         print 'dir ' + tag + '/ already exists'
 
@@ -195,6 +206,12 @@ else:
     blinded = False
 
 
+#########################################################
+#            Plot the systematic uncertainties          #
+#########################################################
+if options.plotUncerts:
+  make_systematic_plots.main(input_config,maindir+subdir)
+
 
 #########################################################
 #             Get new fit parameter guesses             #
@@ -215,7 +232,7 @@ print 'Done'
 
 # Plot only
 if options.plotOnly:
-    plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir)
+    plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir,options.blinded)
     quit()
 
 
@@ -258,7 +275,24 @@ if options.runFit:
     subprocess.call(['mv higgsCombineTest.MaxLikelihoodFit.mH120.root ' + maindir+subdir + '/'], shell=True)
     subprocess.call(['mv mlfit.root ' + maindir+subdir + '/'], shell=True)
 
-    plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir)
+    plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir,options.blinded)
+
+# if options.runDiagnostic:
+    
+#     # Run Combine
+#     print 'Executing combine -M FitDiagnostics '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option 
+#     subprocess.call(['combine -M FitDiagnostics '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option], shell=True)
+
+#     # Test that Combine ran successfully 
+#     if not os.path.isfile('FitDiagnostics.root'):
+#         print "Combine failed and never made FitDiagnostics.root. Quitting..."
+#         quit()
+
+#     subprocess.call(['mv FitDiagnostics.root ' + maindir+subdir + '/'], shell=True)
+#     subprocess.call(['mv higgsCombineTest.MaxLikelihoodFit.mH120.root ' + maindir+subdir + '/'], shell=True)
+#     subprocess.call(['mv mlfit.root ' + maindir+subdir + '/'], shell=True)
+
+#     plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir)
 
 
 

@@ -1,7 +1,7 @@
 {
     "GLOBAL": {
         "HELP": "The 'global' item can be used to set global variables inside of this json configuration file. This is the only place where you can customize the keys of dictionaries. For example, you could store 'dir': 'path/to/my/files/' and then later use 'dir' instead of writing the same file path multiple times",
-        "path": "../2DCombineFitCode/bstar/input_hists/rootfiles"
+        "path": "rootfiles"
     },
 
     "PROCESS": {
@@ -17,7 +17,11 @@
             "FILE":"path/TW2Dalphabetweightedttbar_Trigger_nominal_none_PSET_sideband.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","ttbar_xsec","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
+            "SYSTEMATICS":[],
+            "SCALEPASS":"ttSF/passRatio2D.root",
+            "SCALEPASS_HISTNAME":"passRatio2D",
+            "SCALEFAIL":"ttSF/failRatio2D.root",
+            "SCALEFAIL_HISTNAME":"failRatio2D",
             "COLOR": 2,
             "CODE": 2
         },
@@ -25,7 +29,7 @@
             "FILE":"path/TW2Dalphabetweightedsingletop_t_Trigger_nominal_none_PSET_sideband.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","st_t_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","st_t_xsec","topsf","Tpt","wtagsf","Extrap","Pileup","Trig","jer","jes","jmr","jms"],
             "COLOR": 6,
             "CODE": 2
         },
@@ -33,7 +37,7 @@
             "FILE":"path/TW2Dalphabetweightedsingletop_tB_Trigger_nominal_none_PSET_sideband.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","st_tB_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","st_tB_xsec","topsf","Tpt","wtagsf","Extrap","Pileup","Trig","jer","jes","jmr","jms"],
             "COLOR": 6,
             "CODE": 2
         },
@@ -41,7 +45,7 @@
             "FILE":"path/TW2Dalphabetweightedsingletop_tW_Trigger_nominal_none_PSET_sideband.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","st_tW_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","st_tW_xsec","topsf","Tpt","wtagsf","Extrap","Pileup","Trig","jer","jes","jmr","jms"],
             "COLOR": 6,
             "CODE": 2
         },
@@ -49,7 +53,7 @@
             "FILE":"path/TW2Dalphabetweightedsingletop_tWB_Trigger_nominal_none_PSET_sideband.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","st_tWB_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","st_tWB_xsec","topsf","Tpt","wtagsf","Extrap","Pileup","Trig","jer","jes","jmr","jms"],
             "COLOR": 6,
             "CODE": 2
         },
@@ -128,6 +132,14 @@
             "HISTFAIL_DOWN": "MtwvMtFailTrigdown",
             "SCALE": 1.0
         },
+        "Scale": {
+            "CODE":3,
+            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbarscaleup_Trigger_nominal_none_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbarscaledown_Trigger_nominal_none_PSET_default.root",
+            "HISTPASS": "MtwvMtPass",
+            "HISTFAIL": "MtwvMtFail",
+            "SCALE": 1.0
+        },
         "Pileup": {
             "CODE": 3,
             "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_none_pileup_up_PSET_sideband.root",
@@ -182,7 +194,7 @@
         "HELP": "The binning of the x and y axes should be configured here",
         "X": {
             "NAME": "jetmass",
-            "TITLE": "M_{t}",
+            "TITLE": "M_{t} (GeV)",
             "LOW": 50,
             "HIGH": 350,
             "NBINS": 15,
@@ -192,8 +204,8 @@
         },
         "Y": {
             "NAME": "resmass",
-            "TITLE": "M_{tW}",
-            "LOW": 800,
+            "TITLE": "M_{tW} (GeV)",
+            "LOW": 800, 
             "HIGH": 4000,
             "NBINS": 32
         }
