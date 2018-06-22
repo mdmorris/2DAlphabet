@@ -7,4 +7,4 @@ sed -i '/RooParametricHist.h/ a\#include "HiggsAnalysis/CombinedLimit/interface/
 sed -i '/RooParametricHist/ a\        <class name="RooParametricHist2D" />' classes_def.xml
 
 scramv1 b clean; scramv1 b
-cd $CMSSW_BASE/2DAlphabet
+cd $CMSSW_BASE/src/2DAlphabet
