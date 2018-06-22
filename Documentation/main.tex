@@ -53,36 +53,27 @@
     %     \item \verb"scram b -j 10"
     %     \item \verb"cmsenv"
     % \end{itemize}
-    The only environement this software has been tested in is CMSSW\textunderscore 8\textunderscore 1\textunderscore 0 on CMSLPC. The Higgs Analysis Combine Tool must be installed. To set this up on CMSLPC, follow the below recipe:
+    2D Alphabet has only been tested in a CMSSW environment. The Higgs Analysis Combine Tool must be installed. Please follow the instructions in the Combine documentation \footnote{\verb"https://cms-hcomb.gitbooks.io/combine/content/part1/"} to setup the prerequisite software.
 
-    \begin{itemize}
-        \item \verb"cmsrel CMSSW_8_1_0"
-        \item \verb"cd CMSSW_8_1_0/src"
-        \item \verb"cmsenv"
-        \item \verb"scram b -j 10"
-        \item \verb"git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git" \verb"HiggsAnalysis/CombinedLimit"
-        \begin{itemize}
-            \item Your target directory MUST be HiggsAnalysis/CombinedLimit or the package won't compile
-        \end{itemize}
-        \item \verb"cd HiggsAnalysis/CombinedLimit"
-        \item \verb"cat env_standalone.sh | sed 's/=/ /g' | sed 's/export/setenv/g' > env_standalone.csh"
-        \item \verb"source env_standalone.csh"
-        \item \verb"make -j 8; make; scram b -j 10"
-        \item \verb"cmsenv"
-    \end{itemize}
-
-    If the command \verb"combine --help" returns the help menu then you've successfully setup root.
+    If the command \verb"combine --help" returns the help menu then you've successfully setup the environment (remember to run \verb"cmsenv" before trying this!).
 
 
 \section{Installation}
     \textit{PLEASE NOTE THAT THE SOFTWARE IS NOT CURRENTLY READY TO BE INSTALLED AND USED. THIS SECTION IS BEING DEVELOPED ALONG WITH THE SOFTWARE.}
 
-    Once a CMSSW environment with Combine is setup, one can install the 2D Alphabet software. There are two main steps. The first is to clone the master release from \url{https://github.com/lcorcodilos/2DAlphabet}. This can be done using the command \verb"git clone https://github.com/lcorcodilos/2DAlphabet". The second step is to copy several files to your Combine directory and re-compile Combine so it can use a new class - RooParametricHist2D. You can grab these using the following commands
+    Once a CMSSW environment with Combine is setup, one can install the 2D Alphabet software. There are two main steps. The first is to clone the master release from \url{https://github.com/lcorcodilos/2DAlphabet}. This can be done by doing
     \begin{itemize}
-        \item \verb"..."
+        \item \verb"cd $CMSSW_BASE/src"
+        \item \verb"git clone https://github.com/lcorcodilos/2DAlphabet"
+    \end{itemize}
+    
+    The second step is to copy several files from the 2D Alphabet release to your Combine directory and re-compile Combine so it can use a new class - RooParametricHist2D. You can grab these using the following commands
+    \begin{itemize}
+        \item \verb"cd $CMSSW_BASE/src/2DAlphabet/setup"
+        \item \verb"source run_setup.csh"
     \end{itemize}
 
-    ...
+    It's a good idea to run \verb"combine --help" again and if you're feeling uneasy, try to call RooParametricHist2D in interactive python to ensure everything is working.
 
 \section{How To Run}
     The 2D Alphabet framework is designed to run by calling a single script (\verb"2DAlphabet.py") with a JSON configuration file as input via the command line option \verb"-i". There are several other options that will be discussed later but they are truly "optional" whereas the configuration file is not - so I will discuss that first.
