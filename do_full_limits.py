@@ -1,28 +1,26 @@
 #####################################################################################################
-# INCOMPLETE AND NOT GENERIC                                                                        #
+# INCOMPLETE AND NOT GENERIC - bad lines marked NOT GENERIC                                         #
 #####################################################################################################
 # do_full_limits.py - written by Lucas Corcodilos, 5/31/18                                          #
 # --------------------------------------------------------                                          #
-# This is the wrapper of 2DAlphabet.py that can run limits for multiple signals using the condor    #
-# batch system. Afterwards, the limits are plotted on a traditional 'Brazilian flag' limit plot.    #
+# This is the wrapper of 2DAlphabet.py that can run limits for multiple signals in the current      #
+# session (condor support is in development)                                                        #
+# Afterwards, the limits are plotted on a traditional 'Brazilian flag' limit plot.                  #
 # This is NOT generic and requires some work from the user. The user must use the CL options        #
 # to define a config file template, a file containing the list of signal names on the top line and  #
 # the list of cross sections for each signal (in the same order as the signal name list and both    #
 # comma separated), and the placeholder in the config template that will be replaced with the       #
 # signal names (default is TEMPLATE).                                                               #
 #                                                                                                   #
-# The remainder of this script will submit the Combine Asymptotic limit command to condor with the  #
-# accompanying RooWorkspaces for limit processing, wait for the condor output and check for basic   #
-# errors (it will not catch everything!), and compile the values into a limit plot.                 #
 #                                                                                                   #
-# WARNING: This script requires some prep by the user. In order for condor to run, it needs to have #
-# the 2D Alphabet environment setup WITH the workspaces that are created in the middle of this      #
-# script. There are obviously several ways to do this but the simplest is to tarball the entire     #
-# CMSSW release that the user is working in (7_4_7_patch2 most likely). However, it's entirely      #
-# possible that you have other things in this CMSSW that condor does NOT need (I do). So below is   #
-# an explanation of what I've setup to get the cleanest and smallest environment in condor without  #
-# too much confusion. Users could obviously approach this problem in different ways. This script    #
-# will need to be edited to reflect those changes.                                                  #
+# WARNING AFTER CONDOR IS SUPPORTED: In order to use condor, this script requires some prep by the  #
+# user. In order for condor to run, it needs to have the 2D Alphabet environment setup WITH the     #
+# workspaces that are created in the middle of this script. There are obviously several ways to do  #
+# this but the simplest is to tarball the entire CMSSW release that the user is working in.         #
+# However, it's entirely possible that you have other things in this CMSSW that condor does NOT     #
+# So below is an explanation of what I've setup to get the cleanest and smallest environment in     #
+# condor without too much confusion. Users could obviously approach this problem in different ways. #
+# This script will need to be edited to reflect those changes.                                      #
 #                                                                                                   #
 # 2DAlpha_env Setup (not working)                                                                   #
 # -----------------                                                                                 #
@@ -112,18 +110,25 @@ input_template_file = open(options.template,'r')
 
 # Derive the tag
 tag = options.template[options.template.find('input_')+len('input_'):options.template.find('_template.json')]
-# Try to create a folder for this <tag>
 
-
+# If you want to do more than plot
 if not options.plotOnly:
+
+    # Try to create a folder for this <tag>
     try:
+        # Make directory
         subprocess.call(['mkdir ' + tag], shell=True)
     except:
         print 'dir ' + tag + '/ already exists'
+    
+    # For each signal mass
     for name in signal_names:
+        # Setup a signal specific config
         config_file_location = options.template.replace("template",name)
         config_file_name = config_file_location[config_file_location.find('input_'):config_file_location.find('.json')+len('.json')]
         print 'Running 2DAlphabet for ' + name
+
+        # Execute some shell commands to setup 2DAlphabet for this config (notice we AREN'T running combine here)
         commands = ['sed s/' + options.dummy+'/'+name+'/g ' + options.template + ' > '+config_file_location,  # find and replace the dummy
                     'mkdir ' + tag + '/'+name,
                     'mv ' + config_file_location + ' ' + tag + '/'+name+'/' ,                             # move to folder <tag>/<tag>_signalname/
@@ -132,11 +137,13 @@ if not options.plotOnly:
             print '\t Executing ' + c
             subprocess.call([c],shell=True)
 
+    # Now run combine with the listOfJobs generated
     subprocess.call(['source ' + tag+ '/listOfJobs.csh'],shell=True)
     
     for name in signal_names:
         subprocess.call(['mv '+'higgsCombine'+tag+'_'+name+'.Asymptotic.mH120.root ' + tag+'/'+name+'/'])
 
+    # IN DEVELOPMENT
     # Now equipped with jobs and a list of them, we can submit to condor
 
     # # Edit the grid submission script
@@ -153,7 +160,7 @@ if not options.plotOnly:
     # WaitForJobs(tag+'/listOfJobs.txt')
 
 
-# Initialize arrays to store the eventually points on the TGraph
+# Initialize arrays to eventually store the points on the TGraph
 x_mass = array('d')
 y_limit = array('d')
 y_mclimit  = array('d')
@@ -162,6 +169,7 @@ y_mclimitup68 = array('d')
 y_mclimitlow95 = array('d')
 y_mclimitup95 = array('d')
 
+# For each signal
 for this_index, this_name in enumerate(signal_names):
     # Setup call for one of the signal
     this_xsec = signal_xsecs[this_index]
@@ -175,21 +183,24 @@ for this_index, this_name in enumerate(signal_names):
     # Grab the cross section limits (y axis)
     for ievent in range(int(this_tree.GetEntries())):
         this_tree.GetEntry(ievent)
+        
+        # Nominal expected
         if this_tree.quantileExpected == 0.5:
             y_mclimit.append(this_tree.limit*this_xsec)
-
+        # -1 sigma expected
         if round(this_tree.quantileExpected,2) == 0.16:
             y_mclimitlow68.append(this_tree.limit*this_xsec)
-
+        # +1 sigma expected
         if round(this_tree.quantileExpected,2) == 0.84:
             y_mclimitup68.append(this_tree.limit*this_xsec)
-
+        # -2 sigma expected
         if round(this_tree.quantileExpected,3) == 0.025:
             y_mclimitlow95.append(this_tree.limit*this_xsec)
-
+        # +2 sigma expected
         if round(this_tree.quantileExpected,3) == 0.975:
             y_mclimitup95.append(this_tree.limit*this_xsec)
 
+        # Observed (plot only if unblinded)
         if this_tree.quantileExpected == -1: 
             if options.unblind:
                 y_limit.append(this_tree.limit*this_xsec)
@@ -202,6 +213,7 @@ climits.SetLogy(True)
 climits.SetLeftMargin(.18)
 climits.SetBottomMargin(.18)  
 
+# NOT GENERIC
 if options.hand == 'LH':
     cstr = 'L'
 elif options.hand == 'RH':
@@ -213,7 +225,7 @@ else:
 
 
 TPT = ROOT.TPaveText(.20, .22, .5, .27,"NDC")
-TPT.AddText("All-Hadronic Channel")
+TPT.AddText("All-Hadronic Channel") # NOT GENERIC
 TPT.SetFillColor(0)
 TPT.SetBorderSize(0)
 TPT.SetTextAlign(12)
@@ -226,8 +238,8 @@ g_limit.SetMarkerColor(1)
 g_limit.SetLineColor(1)
 g_limit.SetLineWidth(3)
 g_limit.SetMarkerSize(0.5) #0.5
-g_limit.GetXaxis().SetTitle("M_{b*_{"+cstr+"}} (GeV)")
-g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]")
+g_limit.GetXaxis().SetTitle("M_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
+g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
 g_limit.GetYaxis().SetRangeUser(0., 80.)
 g_limit.GetXaxis().SetRangeUser(1, 3.2)
 g_limit.SetMinimum(3.0e-3) #0.005
@@ -345,7 +357,7 @@ if options.unblind:
 legend.AddEntry(g_mclimit, "Expected (95% CL)","l")
 legend.AddEntry(g_error, "#pm 1 #sigma Expected", "f")
 legend.AddEntry(g_error95, "#pm 2 #sigma Expected", "f")
-legend.AddEntry(graphWP, "Theory b*_{"+cstr+"}", "l")
+legend.AddEntry(graphWP, "Theory b*_{"+cstr+"}", "l")   # NOT GENERIC
 # legend.AddEntry(graphWPup, "Theory b*_{"+cstr+"} 1 #sigma uncertainty", "l")
 g_limit.GetYaxis().SetTitleOffset(1.4)
 
@@ -358,7 +370,7 @@ legend.Draw("same")
 text1 = ROOT.TLatex()
 text1.SetNDC()
 text1.SetTextFont(42)
-text1.DrawLatex(0.2,0.84, "#scale[1.0]{CMS, L = "+options.lumi+" pb^{-1} at  #sqrt{s} = 13 TeV}")
+text1.DrawLatex(0.2,0.84, "#scale[1.0]{CMS, L = "+options.lumi+" pb^{-1} at  #sqrt{s} = 13 TeV}") # NOT GENERIC
 
 TPT.Draw()      
 climits.RedrawAxis()
@@ -369,4 +381,4 @@ expectedLimit = Inter(g_mclimit,graphWP)[0]
 upLimit = Inter(g_mcminus,graphWP)[0]
 lowLimit = Inter(g_mcplus,graphWP)[0]
 
-print str(expectedLimit/1000.) + ' +'+str(upLimit/1000.-expectedLimit/1000.) +' -'+str(expectedLimit/1000.-lowLimit/1000.) + ' TeV'
+print str(expectedLimit/1000.) + ' +'+str(upLimit/1000.-expectedLimit/1000.) +' -'+str(expectedLimit/1000.-lowLimit/1000.) + ' TeV' # NOT GENERIC
