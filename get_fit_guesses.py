@@ -126,8 +126,8 @@ def main(inputConfig,blinded,tag,nslices=6,sigma=1):
     print 'Will bin y-axis for fit guesses using bins ',
     print new_y_bins
 
-    new_y_bins_array = array('d',new_y_bins)
-    # new_y_bins_array = array('d',[800.0, 1100.0, 1300.0, 1600.0, 2000.0, 2800.0, 4000.0])    
+    # new_y_bins_array = array('d',new_y_bins)
+    new_y_bins_array = array('d',[800.0, 1100.0, 1300.0, 1600.0, 2000.0, 2800.0, 4000.0])    
 
     ##############################
     #   Rebin the distributions  #

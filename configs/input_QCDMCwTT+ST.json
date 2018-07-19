@@ -7,7 +7,7 @@
     "PROCESS": {
         "HELP": "FILE is both the file path relative to the running directory. SYSTEMATICS is a list with all applicable systematic uncertainties listed with names that match those defined in SYSTEMATC. CODE can be 0 (signal), 1 (data), 2 (unchanged MC), 3 (MC to be renormalized)",
         "data_obs": {
-            "FILE": "fakeData/fakeData_QCDMC_plus_TT+ST.root",
+            "FILE": "path/fakeData/fakeData_QCDMC_plus_TT+ST.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SYSTEMATICS":[],
@@ -17,7 +17,7 @@
             "FILE":"path/TW2Dalphabetweightedttbar_Trigger_nominal_none_PSET_default.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","Scale","ttbar_xsec","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","ttbar_xsec","Scale","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
             "COLOR": 2,
             "CODE": 2
         },
@@ -25,7 +25,7 @@
             "FILE":"path/TW2Dalphabetweightedsingletop_t_Trigger_nominal_none_PSET_default.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","st_t_xsec","topsf","Tpt","wtagsf","Extrap","Pileup","Trig","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","st_t_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
             "COLOR": 6,
             "CODE": 2
         },
@@ -33,7 +33,7 @@
             "FILE":"path/TW2Dalphabetweightedsingletop_tB_Trigger_nominal_none_PSET_default.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","st_tB_xsec","topsf","Tpt","wtagsf","Extrap","Pileup","Trig","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","st_tB_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
             "COLOR": 6,
             "CODE": 2
         },
@@ -41,7 +41,7 @@
             "FILE":"path/TW2Dalphabetweightedsingletop_tW_Trigger_nominal_none_PSET_default.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","st_tW_xsec","topsf","Tpt","wtagsf","Extrap","Pileup","Trig","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","st_tW_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
             "COLOR": 6,
             "CODE": 2
         },
@@ -49,15 +49,15 @@
             "FILE":"path/TW2Dalphabetweightedsingletop_tWB_Trigger_nominal_none_PSET_default.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","st_tWB_xsec","topsf","Tpt","wtagsf","Extrap","Pileup","Trig","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","st_tWB_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
             "COLOR": 6,
             "CODE": 2
         },
-        "signalRH1200": {
-            "FILE": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_PSET_default.root",
+        "signalLH1200": {
+            "FILE": "path/TW2DalphabetweightedsignalLH1200_Trigger_nominal_none_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
-            "SYSTEMATICS":["lumi","topsf","wtagsf","Extrap","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
             "CODE": 0
         }
     },
@@ -192,8 +192,8 @@
             "NAME": "jetmass",
             "TITLE": "M_{t} (GeV)",
             "LOW": 50,
-            "HIGH": 330,
-            "NBINS": 14,
+            "HIGH": 350,
+            "NBINS": 15,
             "SIGSTART": 150,
             "SIGEND": 190,
             "BLINDED": true
@@ -201,7 +201,7 @@
         "Y": {
             "NAME": "resmass",
             "TITLE": "M_{tW} (GeV)",
-            "LOW": 800,
+            "LOW": 800, 
             "HIGH": 4000,
             "NBINS": 32
         }

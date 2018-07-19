@@ -34,7 +34,7 @@ gStyle.SetOptStat(0)
 #                       Options                         #
 #########################################################
 parser = OptionParser()
-
+# Input and what to run
 parser.add_option('-i', '--input', metavar='FILE', type='string', action='store',
                   default   =   '',
                   dest      =   'input',
@@ -43,18 +43,6 @@ parser.add_option('-p', '--pseudo2D', action="store_true",
                   default   =   False,
                   dest      =   'pseudo2D',
                   help      =   'Recalculate the fit guesses using pseudo2D method')
-parser.add_option('-P', '--plotOnly', action="store_true",
-                  default   =   False,
-                  dest      =   'plotOnly',
-                  help      =   'Only plots if True')
-parser.add_option('-d', '--draw', action="store_true",
-                  default   =   False,
-                  dest      =   'draw',
-                  help      =   'Draws canvases live')
-parser.add_option('-s', '--signalOff', action="store_true",
-                  default   =   False,
-                  dest      =   'signalOff',
-                  help      =   'Turns off signal by using --expectSignal=0 option in Combine')
 parser.add_option('-l', '--runLimits', action="store_true",
                   default   =   False,
                   dest      =   'runLimits',
@@ -63,6 +51,26 @@ parser.add_option('-f', '--runFit', action="store_true",
                   default   =   False,
                   dest      =   'runFit',
                   help      =   'Runs Combine Rp/f fit and plots outputs')
+
+# Plotting/drawing
+parser.add_option('-P', '--plotOnly', action="store_true",
+                  default   =   False,
+                  dest      =   'plotOnly',
+                  help      =   'Only plots if True')
+parser.add_option('-u', '--plotUncerts', action="store_true",
+                  default   =   False,
+                  dest      =   'plotUncerts',
+                  help      =   'Plots shape based uncertainties')
+parser.add_option('-d', '--draw', action="store_true",
+                  default   =   False,
+                  dest      =   'draw',
+                  help      =   'Draws canvases live')
+
+# Configurations for the run
+parser.add_option('-s', '--signalOff', action="store_true",
+                  default   =   False,
+                  dest      =   'signalOff',
+                  help      =   'Turns off signal by using --expectSignal=0 option in Combine')
 parser.add_option('-b', '--batch', action="store_true",
                   default   =   False,
                   dest      =   'batch',
@@ -71,14 +79,8 @@ parser.add_option('-B', '--blinded', action="store_true",
                   default   =   False,
                   dest      =   'blinded',
                   help      =   'Turns off data points. Different from blinding the signal region during the fit')
-parser.add_option('-u', '--plotUncerts', action="store_true",
-                  default   =   False,
-                  dest      =   'plotUncerts',
-                  help      =   'Plots shape based uncertainties')
-# parser.add_option('-D', '--globalDir', type='string', action="store",
-#                   default   =   '',
-#                   dest      =   'globalDir',
-#                   help      =   'Only used by the do_full_limits.py wrapper to do multiple signals')
+
+# 
 
 
 (options, args) = parser.parse_args()
@@ -193,7 +195,7 @@ fInput_config_vars_replaced.close()
 
 print 'Done'
 
-# A quick flag to check for blinding
+# A quick flag to check for blinding of the background estimate
 if input_config['BINNING']['X']['BLINDED'] == True:
     if options.runLimits == False:
         print 'Background estimate is blinded'
@@ -210,7 +212,7 @@ else:
 #            Plot the systematic uncertainties          #
 #########################################################
 if options.plotUncerts:
-  make_systematic_plots.main(input_config,maindir+subdir)
+    make_systematic_plots.main(input_config,maindir+subdir)
 
 
 #########################################################
@@ -227,7 +229,7 @@ if options.pseudo2D == True:
 #########################################################
 # input_organizer.main() returns a dictionary with all of the TH2s organized
 print 'Organizing histograms into single file...'
-organized_dict = input_organizer.main(input_config,blinded)
+organized_dict = input_organizer.main(input_config,blinded,subdir)
 print 'Done'
 
 # Plot only
@@ -240,7 +242,7 @@ if options.plotOnly:
 #             Make the workspace for Combine            #
 #########################################################
 # Make the RooWorkspace - creates workspace name 'w_2D' in base.root
-workspace = build_fit_workspace.main(organized_dict,input_config,blinded,tag)
+workspace = build_fit_workspace.main(organized_dict,input_config,blinded,tag,subdir)
 subprocess.call(['mv base_'+tag+'.root ' + maindir + subdir+'/'], shell=True)
 print 'Workspace built'
 
@@ -249,7 +251,7 @@ print 'Workspace built'
 #########################################################
 # Make the data card - makes a text file named card_2D.txt, return 0
 print 'Making Combine card...'
-make_card.main(input_config, blinded, tag, maindir+subdir)
+make_card.main(input_config, blinded, tag, maindir, subdir)
 print 'Done'
 
 syst_option = ''
@@ -293,7 +295,6 @@ if options.runFit:
 #     subprocess.call(['mv mlfit.root ' + maindir+subdir + '/'], shell=True)
 
 #     plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir)
-
 
 
 if options.runLimits:

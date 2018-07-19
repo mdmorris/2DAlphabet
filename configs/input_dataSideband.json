@@ -17,11 +17,7 @@
             "FILE":"path/TW2Dalphabetweightedttbar_Trigger_nominal_none_PSET_sideband.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":[],
-            "SCALEPASS":"ttSF/passRatio2D.root",
-            "SCALEPASS_HISTNAME":"passRatio2D",
-            "SCALEFAIL":"ttSF/failRatio2D.root",
-            "SCALEFAIL_HISTNAME":"failRatio2D",
+            "SYSTEMATICS":["lumi","ttbar_xsec","Scale","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
             "COLOR": 2,
             "CODE": 2
         },

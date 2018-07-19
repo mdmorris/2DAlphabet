@@ -15,7 +15,7 @@ pp = pprint.PrettyPrinter(indent = 2)
 
 
 # inputConfig is a dictionary from the input JSON
-def main(inputConfig, blinded):
+def main(inputConfig, blinded, subdir=''):
 
     # Initialize an output root file
     # outfile = TFile('organized_TH2s.root','recreate')
@@ -24,6 +24,10 @@ def main(inputConfig, blinded):
     # First we need to get histograms from files and store them in a new dictionary #
     #################################################################################
     dictHists = {}
+
+    suffix = ''
+    if subdir != '':                 # Used when doing simultaneous fit and polyCoeffs and bins
+        suffix = '_'+subdir[:-1]     # need different names between the spaces
 
     # Grab all process names and loop through
     processes = [process for process in inputConfig['PROCESS'].keys() if process != "HELP"]
@@ -179,7 +183,7 @@ def main(inputConfig, blinded):
                 print 'Making ' + process +'_' + cat + '_' + dist
 
                 # Get new names
-                histname = process + '_' + cat
+                histname = process + '_' + cat+suffix
                 if dist != 'nominal':                           # if not nominal dist
                     histname = histname + '_' + dist
                 
