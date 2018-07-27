@@ -1,13 +1,13 @@
 {
     "GLOBAL": {
         "HELP": "The 'global' item can be used to set global variables inside of this json configuration file. This is the only place where you can customize the keys of dictionaries. For example, you could store 'dir': 'path/to/my/files/' and then later use 'dir' instead of writing the same file path multiple times",
-        "path": "rootfiles"
+        "path": "../2DCombineFitCode/bstar/input_hists/rootfiles"
     },
 
     "PROCESS": {
         "HELP": "FILE is both the file path relative to the running directory. SYSTEMATICS is a list with all applicable systematic uncertainties listed with names that match those defined in SYSTEMATC. CODE can be 0 (signal), 1 (data), 2 (unchanged MC), 3 (MC to be renormalized)",
         "data_obs": {
-            "FILE": "path/fakeData/fakeData_QCDMC_plus_TT+ST.root",
+            "FILE": "fakeData/fakeData_QCDMC_plus_TTMC.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SYSTEMATICS":[],
@@ -17,52 +17,22 @@
             "FILE":"path/TW2Dalphabetweightedttbar_Trigger_nominal_none_PSET_default.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","ttbar_xsec","Scale","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
-            "COLOR": 2,
+            "SYSTEMATICS":["lumi","ttbar_xsec","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
+
             "CODE": 2
         },
-        "singletop_t": {
-            "FILE":"path/TW2Dalphabetweightedsingletop_t_Trigger_nominal_none_PSET_default.root",
-            "HISTPASS":"MtwvMtPass",
-            "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","st_t_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
-            "COLOR": 6,
-            "CODE": 2
-        },
-        "singletop_tB": {
-            "FILE":"path/TW2Dalphabetweightedsingletop_tB_Trigger_nominal_none_PSET_default.root",
-            "HISTPASS":"MtwvMtPass",
-            "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","st_tB_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
-            "COLOR": 6,
-            "CODE": 2
-        },
-        "singletop_tW": {
-            "FILE":"path/TW2Dalphabetweightedsingletop_tW_Trigger_nominal_none_PSET_default.root",
-            "HISTPASS":"MtwvMtPass",
-            "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","st_tW_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
-            "COLOR": 6,
-            "CODE": 2
-        },
-        "singletop_tWB": {
-            "FILE":"path/TW2Dalphabetweightedsingletop_tWB_Trigger_nominal_none_PSET_default.root",
-            "HISTPASS":"MtwvMtPass",
-            "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","st_tWB_xsec","topsf","Tpt","wtagsf","Extrap","Tpt","Pileup","Trig","jer","jes","jmr","jms"],
-            "COLOR": 6,
-            "CODE": 2
-        },
-        "signalLH1200": {
-            "FILE": "path/TW2DalphabetweightedsignalLH1200_Trigger_nominal_none_PSET_default.root",
+
+        "signalRH1200": {
+            "FILE": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
-            "SYSTEMATICS":["lumi","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","ttbar_xsec","topsf","wtagsf","Extrap","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
+
             "CODE": 0
         }
     },
 
-    "SYSTEMATIC": {
+   "SYSTEMATIC": {
         "HELP": "All systematics should be configured here. The info for them will be pulled for each process that calls each systematic. These are classified by codes 0 (symmetric, lnN), 1 (asymmetric, lnN), 2 (shape and in same file as nominal), 3 (shape and NOT in same file as nominal)",
         "lumi": {
             "CODE": 0,
@@ -72,24 +42,6 @@
             "CODE": 1,
             "VALUP": 1.024,
             "VALDOWN": 1.035
-        },
-        "st_t_xsec": {
-            "CODE": 1,
-            "VALUP":1.040,
-            "VALDOWN":1.034
-        },
-        "st_tB_xsec": {
-            "CODE": 1,
-            "VALUP":1.050,
-            "VALDOWN":1.045
-        },
-        "st_tW_xsec": {
-            "CODE": 0,
-            "VAL":1.0385
-        },
-        "st_tWB_xsec": {
-            "CODE": 0,
-            "VAL":1.0385
         },
         "topsf":{
             "CODE": 1,
@@ -128,58 +80,62 @@
             "HISTFAIL_DOWN": "MtwvMtFailTrigdown",
             "SCALE": 1.0
         },
-        "Scale": {
-            "CODE":3,
-            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbarscaleup_Trigger_nominal_none_PSET_default.root",
-            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbarscaledown_Trigger_nominal_none_PSET_default.root",
-            "HISTPASS": "MtwvMtPass",
-            "HISTFAIL": "MtwvMtFail",
-            "SCALE": 1.0
-        },
         "Pileup": {
             "CODE": 3,
-            "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_none_pileup_up_PSET_default.root",
-            "FILE_DOWN_*": "path/TW2Dalphabetweighted*_Trigger_nominal_none_pileup_down_PSET_default.root",
+            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_pileup_up_PSET_default.root",
+            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_pileup_down_PSET_default.root",
+            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pileup_up_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pileup_down_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0
         },
         "pdf": {
             "CODE": 3,
-            "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_none_pdf_up_PSET_default.root",
-            "FILE_DOWN_*": "path/TW2Dalphabetweighted*_Trigger_nominal_none_pdf_down_PSET_default.root",
+            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_pdf_up_PSET_default.root",
+            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_pdf_down_PSET_default.root",
+            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pdf_up_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_none_pdf_down_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0
         },
         "jer": {
             "CODE": 3,
-            "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JER_up_PSET_default.root",
-            "FILE_DOWN_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JER_down_PSET_default.root",
+            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JER_up_PSET_default.root",
+            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JER_down_PSET_default.root",
+            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JER_up_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JER_down_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0
         },
         "jes": {
             "CODE": 3,
-            "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JES_up_PSET_default.root",
-            "FILE_DOWN_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JES_down_PSET_default.root",
+            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JES_up_PSET_default.root",
+            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JES_down_PSET_default.root",
+            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JES_up_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JES_down_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0
         },
         "jmr": {
             "CODE": 3,
-            "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JMR_up_PSET_default.root",
-            "FILE_DOWN_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JMR_down_PSET_default.root",
+            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JMR_up_PSET_default.root",
+            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JMR_down_PSET_default.root",
+            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JMR_up_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JMR_down_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0
         },
         "jms": {
             "CODE": 3,
-            "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JMS_up_PSET_default.root",
-            "FILE_DOWN_*": "path/TW2Dalphabetweighted*_Trigger_nominal_JMS_down_PSET_default.root",
+            "FILE_UP_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JMS_up_PSET_default.root",
+            "FILE_DOWN_signalRH1200": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_JMS_down_PSET_default.root",
+            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JMS_up_PSET_default.root",
+            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbar_Trigger_nominal_JMS_down_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SCALE": 1.0
@@ -190,7 +146,6 @@
         "HELP": "The binning of the x and y axes should be configured here",
         "X": {
             "NAME": "jetmass",
-            "TITLE": "M_{t} (GeV)",
             "LOW": 50,
             "HIGH": 350,
             "NBINS": 15,
@@ -200,8 +155,7 @@
         },
         "Y": {
             "NAME": "resmass",
-            "TITLE": "M_{tW} (GeV)",
-            "LOW": 800, 
+            "LOW": 800,
             "HIGH": 4000,
             "NBINS": 32
         }

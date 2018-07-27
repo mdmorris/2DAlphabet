@@ -12,15 +12,21 @@ from header import colliMate
 import subprocess
 
 
-def main(inputConfig, blinded, tag, globalDir):
+def main(inputConfig, blinded, tag, maindir, subdir):
     # Recreate file
     card_new = open('card_'+tag+'.txt','w')
     
+    suffix = ''
+    if subdir != '':            # Used when doing simultaneous fit and polyCoeffs and bins
+        suffix = '_'+subdir[:-1]     # need different names between the spaces
+
+    globalDir = maindir+subdir
+
     #######################################################
     # imax (bins), jmax (backgrounds), kmax (systematics) #
     #######################################################
     imax = '2'                      # pass, fail
-    channels = ['pass', 'fail']
+    channels = ['pass'+suffix,'fail'+suffix]
 
     # Get the length of the list of all process that have CODE 2 or 3 (and ignore "HELP" key) and add 1 for qcd (which won't be in the inputConfig)
     jmax = str(len([proc for proc in inputConfig['PROCESS'].keys() if proc != 'HELP' and inputConfig['PROCESS'][proc]['CODE'] >= 2]) + 1)
@@ -106,8 +112,8 @@ def main(inputConfig, blinded, tag, globalDir):
                 processCode_line += (str(MC_bkg_procs.index(proc)+1)+' ')
                 if inputConfig['PROCESS'][proc]['CODE'] == 2:       # No floating normalization
                     rate_line += '-1 '                                            
-                elif inputConfig['PROCESS'][proc]['CODE'] == 3:     # Floating normalization        
-                    rate_line += '1 '
+                # elif inputConfig['PROCESS'][proc]['CODE'] == 3:     # Floating normalization        
+                #     rate_line += '1 '
 
             # If qcd
             if proc == 'qcd':
@@ -179,17 +185,19 @@ def main(inputConfig, blinded, tag, globalDir):
         for coeff in [key for key in inputConfig['FIT'].keys() if key != 'HELP' and key.find('FORM') == -1]:
             if 'LOW' in inputConfig['FIT'][coeff].keys() and 'HIGH' in inputConfig['FIT'][coeff].keys():
                 lower_coeff = coeff.lower()
-                card_new.write(colliMate('polyCoeff_'+lower_coeff+' flatParam\n',22))
+                card_new.write(colliMate('polyCoeff_'+lower_coeff+suffix+' flatParam\n',22))
 
 
     # Check if we have any renormalized MCs, store which processes, and declare the _norm as a flatParam
-    renormFlag = False
-    renormProcesses = []
-    for process in inputConfig['PROCESS']:
-        if process != 'HELP' and inputConfig['PROCESS'][process]['CODE'] == 3:
-            card_new.write(colliMate(process + '_norm flatParam\n',22))
-            renormProcesses.append(process)
-            renormFlag = True
+    # OUTDATED AND NOT USED OR USEFULL
+    # renormFlag = False
+    # renormProcesses = []
+    # for process in inputConfig['PROCESS']:
+    #     if process != 'HELP' and inputConfig['PROCESS'][process]['CODE'] == 3:
+    #         card_new.write(colliMate(process + '_norm flatParam\n',22))
+    #         renormProcesses.append(process)
+    #         renormFlag = True
+
 
     # Clearer code if I grab all of this
     xbins_low = inputConfig['BINNING']['X']['LOW']
@@ -221,7 +229,7 @@ def main(inputConfig, blinded, tag, globalDir):
             #     # for process in renormProcesses:
             #     #     card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_'+process+'_nominal flatParam\n',22))
             # else:
-            card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+' flatParam\n',22))
+            card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+suffix+' flatParam\n',22))
             
        
     card_new.close()

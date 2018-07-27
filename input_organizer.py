@@ -15,7 +15,7 @@ pp = pprint.PrettyPrinter(indent = 2)
 
 
 # inputConfig is a dictionary from the input JSON
-def main(inputConfig, blinded):
+def main(inputConfig, blinded, subdir=''):
 
     # Initialize an output root file
     # outfile = TFile('organized_TH2s.root','recreate')
@@ -24,6 +24,10 @@ def main(inputConfig, blinded):
     # First we need to get histograms from files and store them in a new dictionary #
     #################################################################################
     dictHists = {}
+
+    suffix = ''
+    if subdir != '':                 # Used when doing simultaneous fit and polyCoeffs and bins
+        suffix = '_'+subdir[:-1]     # need different names between the spaces
 
     # Grab all process names and loop through
     processes = [process for process in inputConfig['PROCESS'].keys() if process != "HELP"]
@@ -43,12 +47,21 @@ def main(inputConfig, blinded):
         hist_pass = file_nominal.Get(thisProcessDict['HISTPASS'])
         hist_fail = file_nominal.Get(thisProcessDict['HISTFAIL'])
 
-        this_proc_scale = 1.0
+
         if "SCALE" in thisProcessDict.keys():
             this_proc_scale = thisProcessDict["SCALE"]
+            hist_pass.Scale(this_proc_scale)
+            hist_fail.Scale(this_proc_scale)
+        elif "SCALEPASS" in thisProcessDict.keys():
+            thisScalePassFile = TFile.Open(thisProcessDict["SCALEPASS"])
+            thisScaleFailFile = TFile.Open(thisProcessDict["SCALEFAIL"])
+            
+            this_proc_scale_pass = thisScalePassFile.Get(thisProcessDict["SCALEPASS_HISTNAME"])
+            this_proc_scale_fail = thisScaleFailFile.Get(thisProcessDict["SCALEFAIL_HISTNAME"])
 
-        hist_pass.Scale(this_proc_scale)
-        hist_fail.Scale(this_proc_scale)
+            hist_pass.Multiply(this_proc_scale_pass)
+            hist_fail.Multiply(this_proc_scale_fail)
+
 
         dictHists[process]['file'] = file_nominal
         dictHists[process]['pass']['nominal'] = hist_pass
@@ -170,7 +183,7 @@ def main(inputConfig, blinded):
                 print 'Making ' + process +'_' + cat + '_' + dist
 
                 # Get new names
-                histname = process + '_' + cat
+                histname = process + '_' + cat+suffix
                 if dist != 'nominal':                           # if not nominal dist
                     histname = histname + '_' + dist
                 
@@ -221,10 +234,15 @@ def main(inputConfig, blinded):
 
                     # Create the split histograms (do the naming for them in this step)
                     hist_to_split = dictHists[process][cat][dist]
-                    dictHists[process][cat][dist+'_unblinded'] = hist_to_split   # Backing up the unblinded hist
+                    dictHists[process][cat][dist+'_unblinded'] = hist_to_split.Clone()   # Backing up the unblinded hist
+                    if process == 'ttbar':
+                        print '1'
+                        dictHists[process][cat][dist+'_unblinded'].Draw('lego')
                     low_hist = copyHistWithNewXbounds(hist_to_split,low_histname,newXwidth,newXmin,sigStart)
                     high_hist = copyHistWithNewXbounds(hist_to_split,high_histname,newXwidth,sigEnd,newXmax)
                     dictHists[process][cat][dist] = makeBlindedHist(hist_to_split,low_hist,high_hist)
-
+                    if process == 'ttbar':
+                        print '2'
+                        dictHists[process][cat][dist+'_unblinded'].Draw('lego')
 
     return dictHists

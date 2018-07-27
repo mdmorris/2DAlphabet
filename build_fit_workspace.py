@@ -20,11 +20,14 @@ pp = pprint.PrettyPrinter(indent = 2)
 #########################
 #       Start Here      #
 #########################
-def main(dictTH2s,inputConfig,blinded,tag):
+def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
 
     allVars = []    # This is a list of all RooFit objects made. It never gets used for anything but if the
                     # objects never get saved here, then the python memory management will throw them out
                     # because of conflicts with the RooFit memory management. It's a hack.
+    suffix = ''
+    if subdir != '':            # Used when doing simultaneous fit and polyCoeffs and bins
+        suffix = '_'+subdir[:-1]     # need different names between the spaces
 
     ################################
     # Establish our axis variables #
@@ -49,32 +52,34 @@ def main(dictTH2s,inputConfig,blinded,tag):
 
     # For procees, cat, dict...
     for process in Roo_dict.keys():
+        # COMMENTED OUT CODE IS THE DATED AND UNNECESSARY RENORMALIZATION CODE
         # Make a normalization for CODE 3 process that floats between 0 and double
-        if inputConfig["PROCESS"][process]["CODE"] == 3:
-            Roo_dict[process]['NORM'] = RooRealVar(process+'_norm',process+'_norm',0.0,2.0)
+        # if inputConfig["PROCESS"][process]["CODE"] == 3:
+        #     Roo_dict[process]['NORM'] = RooRealVar(process+'_norm',process+'_norm',0.0,2.0)
         for cat in ['pass','fail']:
             for dist in Roo_dict[process][cat].keys():
 
-                if inputConfig["PROCESS"][process]["CODE"] != 3:
-                    Roo_dict[process][cat][dist] = {}
-                    Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],var_list)
+                # if inputConfig["PROCESS"][process]["CODE"] != 3:
+                Roo_dict[process][cat][dist] = {}
+                Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],var_list)
 
-                elif inputConfig["PROCESS"][process]["CODE"] == 3:
-                    print 'Will have floating process ' + process,         
-                    Roo_dict[process][cat][dist] = {}
-                    Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],var_list) 
-                    Roo_dict[process][cat][dist]['RDH'].SetName(dictTH2s[process][cat][dist].GetName()+'_RDH') 
-                    Roo_dict[process][cat][dist]['RHP'] = makeRHP(Roo_dict[process][cat][dist]['RDH'],var_list)
-                    Roo_dict[process][cat][dist]['RHP'].SetName(dictTH2s[process][cat][dist].GetName().replace('_RDH',''))
-                    Roo_dict[process][cat][dist]['RHP'].Print()
+                # elif inputConfig["PROCESS"][process]["CODE"] == 3:
+                    # print 'Will have floating process ' + process,         
+                    # Roo_dict[process][cat][dist] = {}
+                    # Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],var_list) 
+                    # Roo_dict[process][cat][dist]['RDH'].SetName(dictTH2s[process][cat][dist].GetName()+'_RDH') 
+                    # Roo_dict[process][cat][dist]['RHP'] = makeRHP(Roo_dict[process][cat][dist]['RDH'],var_list)
+                    # Roo_dict[process][cat][dist]['RHP'].SetName(dictTH2s[process][cat][dist].GetName().replace('_RDH',''))
+                    # Roo_dict[process][cat][dist]['RHP'].Print()
 
-                    # Make normalization
-                    norm_name = Roo_dict[process][cat][dist]['RHP'].GetName() + '_norm'
-                    norm_start = RooConstVar(norm_name+'_start',norm_name+'_start',float(dictTH2s[process][cat][dist].Integral()))
-                    allVars.append(norm_start)
+                    # # Make normalization
+                    # norm_name = Roo_dict[process][cat][dist]['RHP'].GetName() + '_norm'
+                    # norm_start = RooConstVar(norm_name+'_start',norm_name+'_start',float(dictTH2s[process][cat][dist].Integral()))
+                    # allVars.append(norm_start)
 
-                    norm = RooProduct(norm_name,norm_name,RooArgList(Roo_dict[process]['NORM'],norm_start))
-                    Roo_dict[process][cat][dist]['NORM'] = norm
+                    # norm = RooProduct(norm_name,norm_name,RooArgList(Roo_dict[process]['NORM'],norm_start))
+                    # Roo_dict[process][cat][dist]['NORM'] = norm
+
 
 
 #############################################################################################
@@ -105,7 +110,7 @@ def main(dictTH2s,inputConfig,blinded,tag):
                 input_param_vals = inputConfig['FIT'][thisVar+str(ip)]
                 thisNom = input_param_vals['NOMINAL']
 
-                name = 'fitParam'+thisVar+'_'+str(ip)
+                name = 'fitParam'+thisVar+'_'+str(ip)+suffix
 
                 if 'LOW' in input_param_vals.keys() and 'HIGH' in input_param_vals.keys():
                     thisLow = input_param_vals['LOW']
@@ -143,7 +148,7 @@ def main(dictTH2s,inputConfig,blinded,tag):
                 input_param_vals = inputConfig['FIT']['X'+str(xi)+'Y'+str(yi)]
                 thisNom = input_param_vals['NOMINAL']
                 
-                name = 'polyCoeff_'+'x'+str(xi)+'y'+str(yi)
+                name = 'polyCoeff_'+'x'+str(xi)+'y'+str(yi)+suffix
 
                 if 'LOW' in input_param_vals.keys() and 'HIGH' in input_param_vals.keys():
                     thisLow = input_param_vals['LOW']
@@ -175,7 +180,7 @@ def main(dictTH2s,inputConfig,blinded,tag):
             # Now that we're in a specific bin, we need to process it
             
             # Now that we know we aren't in the blinded region, make a name for the bin RRV
-            name = 'Fail_bin_'+str(xbin)+'-'+str(ybin)
+            name = 'Fail_bin_'+str(xbin)+'-'+str(ybin)+suffix
 
             # First let's check if we are blinded and if so if we're in a blinded region
             upperEdge_in_sig = False
@@ -189,11 +194,12 @@ def main(dictTH2s,inputConfig,blinded,tag):
             # 1) Have a negligible number of events but NOT zero (will break Combine)
             # 2) Have no dependence on the Rp/f (otherwise they will influence the Rp/f shape)
             if blinded and (upperEdge_in_sig or lowerEdge_in_sig):
+                print "Blinding bin " + name
                 binRRV = RooConstVar(name, name, 0.0001)
                 binListFail.add(binRRV)
                 allVars.append(binRRV)
 
-                thisBinPass = RooConstVar('Pass_bin_'+str(xbin)+'-'+str(ybin), 'Pass_bin_'+str(xbin)+'-'+str(ybin), 0.0001)
+                thisBinPass = RooConstVar('Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix, 'Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix, 0.0001)
                 binListPass.add(thisBinPass)
                 allVars.append(thisBinPass)
 
@@ -201,8 +207,8 @@ def main(dictTH2s,inputConfig,blinded,tag):
             else:
                 # Initialize contents
                 binContent = TH2_data_fail.GetBinContent(xbin,ybin)
-                binErrUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)
-                binErrDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)
+                binErrUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)*3
+                binErrDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)*3
                 
                 # Now subtract away the parts that we don't want
                 for process in dictTH2s.keys():
@@ -215,12 +221,13 @@ def main(dictTH2s,inputConfig,blinded,tag):
                         continue
                     elif inputConfig['PROCESS'][process]['CODE'] == 2: # unchanged MC
                         binContent  = binContent    - thisTH2.GetBinContent(xbin,ybin)
-                        binErrUp    = binErrUp      - thisTH2.GetBinContent(xbin,ybin) + thisTH2.GetBinErrorUp(xbin,ybin)*2              # Just propagator errors normally
-                        binErrDown  = binErrDown    - thisTH2.GetBinContent(xbin,ybin) - thisTH2.GetBinErrorLow(xbin,ybin)*2
-                    elif inputConfig['PROCESS'][process]['CODE'] == 3: # renorm MC
-                        binErrUp    = binContent                                               # Err up is no MC subtraction
-                        binErrDown  = binContent    - 2.0 * thisTH2.GetBinContent(xbin,ybin)   # Err down is double MC subtraction
-                        binContent  = binContent    - thisTH2.GetBinContent(xbin,ybin)         # Nominal is nominal MC subtraction
+                        binErrUp    = binErrUp      - thisTH2.GetBinContent(xbin,ybin) + thisTH2.GetBinErrorUp(xbin,ybin)*3             # Just propagator errors normally
+                        binErrDown  = binErrDown    - thisTH2.GetBinContent(xbin,ybin) - thisTH2.GetBinErrorLow(xbin,ybin)*3
+                    # OUT OF DATE AND NOT SUPPORTED
+                    # elif inputConfig['PROCESS'][process]['CODE'] == 3: # renorm MC
+                    #     binErrUp    = binContent                                               # Err up is no MC subtraction
+                    #     binErrDown  = binContent    - 2.0 * thisTH2.GetBinContent(xbin,ybin)   # Err down is double MC subtraction
+                    #     binContent  = binContent    - thisTH2.GetBinContent(xbin,ybin)         # Nominal is nominal MC subtraction
 
                 # If bin content is <= 0, treat this bin as a RooConstVar at 0
                 if binContent <= 0:
@@ -228,7 +235,7 @@ def main(dictTH2s,inputConfig,blinded,tag):
                     binListFail.add(binRRV)
                     allVars.append(binRRV)
 
-                    thisBinPass = RooConstVar('Pass_bin_'+str(xbin)+'-'+str(ybin), 'Pass_bin_'+str(xbin)+'-'+str(ybin), 0.0001)
+                    thisBinPass = RooConstVar('Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix, 'Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix, 0.0001)
                     binListPass.add(thisBinPass)
                     allVars.append(thisBinPass)
 
@@ -243,8 +250,8 @@ def main(dictTH2s,inputConfig,blinded,tag):
                     xCenter = TH2_data_fail.GetXaxis().GetBinCenter(xbin)
                     yCenter = TH2_data_fail.GetYaxis().GetBinCenter(ybin)
 
-                    xConst = RooConstVar("ConstVar_x_"+str(xbin)+'_'+str(ybin),"ConstVar_x_"+str(xbin)+'_'+str(ybin),xCenter)
-                    yConst = RooConstVar("ConstVar_y_"+str(xbin)+'_'+str(ybin),"ConstVar_y_"+str(xbin)+'_'+str(ybin),yCenter)
+                    xConst = RooConstVar("ConstVar_x_"+str(xbin)+'_'+str(ybin)+suffix,"ConstVar_x_"+str(xbin)+'_'+str(ybin)+suffix,xCenter)
+                    yConst = RooConstVar("ConstVar_y_"+str(xbin)+'_'+str(ybin)+suffix,"ConstVar_y_"+str(xbin)+'_'+str(ybin)+suffix,yCenter)
 
                     allVars.append(xConst)
                     allVars.append(yConst)
@@ -255,7 +262,7 @@ def main(dictTH2s,inputConfig,blinded,tag):
                         xParamList = RooArgList(xConst)
                         for xParam in range(1,nxparams+1):                    
                             xParamList.add(fitParamRRVs['fitParamX_'+str(xParam)])
-                        xFormulaName = 'xFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))
+                        xFormulaName = 'xFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))+suffix
                         xFormulaVar = RooFormulaVar(xFormulaName,xFormulaName,xFitForm.replace('x','@0'),xParamList)
                         allVars.extend([xFormulaVar,xParamList])
 
@@ -263,12 +270,12 @@ def main(dictTH2s,inputConfig,blinded,tag):
                         yParamList = RooArgList(yConst)
                         for yParam in range(1,nyparams+1):                    
                             yParamList.add(fitParamRRVs['fitParamY_'+str(yParam)])
-                        yFormulaName = 'yFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))
+                        yFormulaName = 'yFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))+suffix
                         yFormulaVar = RooFormulaVar(yFormulaName,yFormulaName,yFitForm.replace('y','@0'),yParamList)
                         allVars.extend([yFormulaVar,yParamList])
 
                         # X*Y
-                        fullFormulaName = 'FullFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))
+                        fullFormulaName = 'FullFunc_Bin_'+str(int(xbin))+"_"+str(int(ybin))+suffix
                         fullFormulaVar = RooProduct(fullFormulaName,fullFormulaName,RooArgList(xFormulaVar,yFormulaVar))
                         allVars.append(fullFormulaVar)
 
@@ -308,10 +315,10 @@ def main(dictTH2s,inputConfig,blinded,tag):
     Roo_dict['qcd']['fail'] = {}
     Roo_dict['qcd']['pass'] = {}
 
-    Roo_dict['qcd']['fail']['RPH2D'] = RooParametricHist2D('qcd_fail','qcd_fail',x_var, y_var, binListFail, TH2_data_fail)
-    Roo_dict['qcd']['fail']['norm']  = RooAddition('qcd_fail_norm','qcd_fail_norm',binListFail)
-    Roo_dict['qcd']['pass']['RPH2D'] = RooParametricHist2D('qcd_pass','qcd_pass',x_var, y_var, binListPass, TH2_data_fail)
-    Roo_dict['qcd']['pass']['norm']  = RooAddition('qcd_pass_norm','qcd_pass_norm',binListPass)
+    Roo_dict['qcd']['fail']['RPH2D'] = RooParametricHist2D('qcd_fail'+suffix,'qcd_fail'+suffix,x_var, y_var, binListFail, TH2_data_fail)
+    Roo_dict['qcd']['fail']['norm']  = RooAddition('qcd_fail'+suffix+'_norm','qcd_fail'+suffix+'_norm',binListFail)
+    Roo_dict['qcd']['pass']['RPH2D'] = RooParametricHist2D('qcd_pass'+suffix,'qcd_pass'+suffix,x_var, y_var, binListPass, TH2_data_fail)
+    Roo_dict['qcd']['pass']['norm']  = RooAddition('qcd_pass'+suffix+'_norm','qcd_pass'+suffix+'_norm',binListPass)
 
 
     print "Making workspace..."
@@ -334,7 +341,14 @@ def main(dictTH2s,inputConfig,blinded,tag):
                             print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat + ', ' + dist + ', ' + itemkey
                             getattr(myWorkspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes(),RooFit.Silence())
                     
-
+    # Check if we need to import any new pdfs for the nusiances from sideband_bkg_morph.py
+    # for process in Roo_dict.keys():
+    #     if process != 'qcd':
+    #         if inputConfig['PROCESS'][process]['CODE'] == 3:
+    #             morph_workspace = TFile.Open('bkg_morph_results/'+process+'_morph.root').Get('w_'+process)
+    #             for syst in inputConfig['PROCESS'][process]['SYSTEMATICS']:
+    #                 thisMorphPdf = morph_workspace.pdf('newpdf_'+process+'_'+syst)
+    #                 getattr(myWorkspace,'import')(thisMorphPdf,RooFit.RecycleConflictNodes())
 
     # Now save out the RooDataHists
     myWorkspace.writeToFile('base_'+tag+'.root',True)  

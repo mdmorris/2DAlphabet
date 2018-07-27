@@ -1,13 +1,13 @@
 {
     "GLOBAL": {
         "HELP": "The 'global' item can be used to set global variables inside of this json configuration file. This is the only place where you can customize the keys of dictionaries. For example, you could store 'dir': 'path/to/my/files/' and then later use 'dir' instead of writing the same file path multiple times",
-        "path": "rootfiles"
+        "path": "../2DCombineFitCode/bstar/input_hists/rootfiles"
     },
 
     "PROCESS": {
         "HELP": "FILE is both the file path relative to the running directory. SYSTEMATICS is a list with all applicable systematic uncertainties listed with names that match those defined in SYSTEMATC. CODE can be 0 (signal), 1 (data), 2 (unchanged MC), 3 (MC to be renormalized)",
         "data_obs": {
-            "FILE": "path/fakeData/fakeData_QCDMC_plus_TT+ST.root",
+            "FILE": "fakeData/fakeData_QCDMC_plus_TT+ST.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SYSTEMATICS":[],
@@ -17,7 +17,7 @@
             "FILE":"path/TW2Dalphabetweightedttbar_Trigger_nominal_none_PSET_default.root",
             "HISTPASS":"MtwvMtPass",
             "HISTFAIL":"MtwvMtFail",
-            "SYSTEMATICS":["lumi","ttbar_xsec","Scale","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","ttbar_xsec","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
             "COLOR": 2,
             "CODE": 2
         },
@@ -53,11 +53,11 @@
             "COLOR": 6,
             "CODE": 2
         },
-        "signalLH1200": {
-            "FILE": "path/TW2DalphabetweightedsignalLH1200_Trigger_nominal_none_PSET_default.root",
+        "signalRH1200": {
+            "FILE": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_PSET_default.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
-            "SYSTEMATICS":["lumi","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
+            "SYSTEMATICS":["lumi","topsf","wtagsf","Extrap","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
             "CODE": 0
         }
     },
@@ -128,14 +128,6 @@
             "HISTFAIL_DOWN": "MtwvMtFailTrigdown",
             "SCALE": 1.0
         },
-        "Scale": {
-            "CODE":3,
-            "FILE_UP_ttbar": "path/TW2Dalphabetweightedttbarscaleup_Trigger_nominal_none_PSET_default.root",
-            "FILE_DOWN_ttbar": "path/TW2Dalphabetweightedttbarscaledown_Trigger_nominal_none_PSET_default.root",
-            "HISTPASS": "MtwvMtPass",
-            "HISTFAIL": "MtwvMtFail",
-            "SCALE": 1.0
-        },
         "Pileup": {
             "CODE": 3,
             "FILE_UP_*": "path/TW2Dalphabetweighted*_Trigger_nominal_none_pileup_up_PSET_default.root",
@@ -190,18 +182,16 @@
         "HELP": "The binning of the x and y axes should be configured here",
         "X": {
             "NAME": "jetmass",
-            "TITLE": "M_{t} (GeV)",
             "LOW": 50,
             "HIGH": 350,
             "NBINS": 15,
-            "SIGSTART": 150,
-            "SIGEND": 190,
+            "SIGSTART": 110,
+            "SIGEND": 210,
             "BLINDED": true
         },
         "Y": {
             "NAME": "resmass",
-            "TITLE": "M_{tW} (GeV)",
-            "LOW": 800, 
+            "LOW": 800,
             "HIGH": 4000,
             "NBINS": 32
         }

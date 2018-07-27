@@ -1,5 +1,6 @@
 cp RooParametricHist2D.cxx $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/src/
 cp RooParametricHist2D.h $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/interface/
+cp ShapeTools.py $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/python/
 
 cd $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/src/
 
