@@ -68,7 +68,7 @@ if not options.plotOnly:
     combine_calls = ['python 2DAlphabet.py -i '+options.input+' -p']    # Only call input and to run pseudo2D first
 
     for cfg in sideband_cfg_strings:
-        combine_calls.append('python 2DAlphabet.py -i '+cfg+' -p --batch')
+        combine_calls.append('python 2DAlphabet.py -i '+cfg+' --batch -p')
 
 
     for c in combine_calls:
@@ -106,7 +106,7 @@ if not options.plotOnly:
 
     # Run Combine
     print 'Executing ' + 'combine -M MaxLikelihoodFit '+ tag+'/card_master.txt --saveWithUncertainties --saveWorkspace --rMin -5 --rMax 5'
-    subprocess.call(['combine -M MaxLikelihoodFit '+tag + '/card_master.txt --saveWithUncertainties --saveWorkspace --rMin -5 --rMax 5'],shell=True)
+    subprocess.call(['combine -M MaxLikelihoodFit '+tag + '/card_master.txt --saveWithUncertainties --saveWorkspace --rMin -5 --rMax 5 -v 9'],shell=True)
 
     subprocess.call(['mv MaxLikelihoodFitResult.root '+tag+'/'],shell=True)
     subprocess.call(['mv mlfit.root '+tag+'/'],shell=True)

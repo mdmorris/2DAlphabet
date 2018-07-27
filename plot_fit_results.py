@@ -520,7 +520,7 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
                 old_dist_fail = organizedDict[bkg]['fail']['nominal']
                 old_dist_fail.SetTitle(bkg + ' - Pre-fit - Fail'+suffix)
             elif test == 'signal':
-                if blinded:
+                if not blinded:
                     old_dist_pass = copyHistWithNewXbounds(organizedDict[bkg]['pass']['nominal_unblinded'],bkg+'_pass_prefit_signal',x_binWidth,sigstart,sigend)
                     old_dist_fail = copyHistWithNewXbounds(organizedDict[bkg]['fail']['nominal_unblinded'],bkg+'_fail_prefit_signal',x_binWidth,sigstart,sigend)
                 else:

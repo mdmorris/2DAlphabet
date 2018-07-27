@@ -21,7 +21,7 @@ import header
 from header import *
 
 
-def main(inputConfig,blinded,tag,nslices=6,sigma=1):
+def main(inputConfig,blinded,tag,nslices=6,sigma=3):
 
     # Grab everything
     file = TFile.Open(inputConfig['PROCESS']['data_obs']['FILE'])

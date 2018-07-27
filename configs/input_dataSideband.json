@@ -53,8 +53,8 @@
             "COLOR": 6,
             "CODE": 2
         },
-        "signalRH1200": {
-            "FILE": "path/TW2DalphabetweightedsignalRH1200_Trigger_nominal_none_PSET_sideband.root",
+        "signalLH1200": {
+            "FILE": "path/TW2DalphabetweightedsignalLH1200_Trigger_nominal_none_PSET_sideband.root",
             "HISTPASS": "MtwvMtPass",
             "HISTFAIL": "MtwvMtFail",
             "SYSTEMATICS":["lumi","topsf","wtagsf","Extrap","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
@@ -212,34 +212,34 @@
         "XFORM":"(@1+@2*x+@3*x**2)",
         "YFORM":"(@1+@2*y+@3*y**2)",
         "X1": {
-            "NOMINAL": 2.87543256705e-16,
-            "LOW":0.0,
-            "HIGH":1e-10
+            "NOMINAL": -0.0318530700318,
+            "LOW":-0.0320,
+            "HIGH":-0.0316
         },
         "X2": {
-            "NOMINAL": 1.05941938999e-18,
-            "LOW":0.0,
-            "HIGH":1e-10
+            "NOMINAL": 0.000228796215491,
+            "LOW":0.000225,
+            "HIGH":0.000231
         },
         "X3": {
-            "NOMINAL": 0.0074,
-            "LOW":0.0,
-            "HIGH":0.1
+            "NOMINAL": 8.30866278599e-06,
+            "LOW":7.5e-06,
+            "HIGH":9.1e-06
         },
         "Y1": {
-            "NOMINAL": 0.0007847,
-            "LOW":0.0,
-            "HIGH":0.01
+            "NOMINAL": 1.82179281117e-05,
+            "LOW":1.80e-05,
+            "HIGH":1.84e-05
         },
         "Y2": {
-            "NOMINAL": -2.8379623401e-07,
-            "LOW":-1e-5,
-            "HIGH":0.0
+            "NOMINAL": -1.55010167058e-07,
+            "LOW":-1.57e-07,
+            "HIGH":-1.53e-07
         },
         "Y3": {
-            "NOMINAL": 4.39330921414e-11,
-            "LOW":0.0,
-            "HIGH":1e-5
+            "NOMINAL": -4.38205671121e-09,
+            "LOW":-4.40e-09,
+            "HIGH":-4.36e-09
         }
     }
 }

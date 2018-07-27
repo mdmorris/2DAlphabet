@@ -234,10 +234,15 @@ def main(inputConfig, blinded, subdir=''):
 
                     # Create the split histograms (do the naming for them in this step)
                     hist_to_split = dictHists[process][cat][dist]
-                    dictHists[process][cat][dist+'_unblinded'] = hist_to_split   # Backing up the unblinded hist
+                    dictHists[process][cat][dist+'_unblinded'] = hist_to_split.Clone()   # Backing up the unblinded hist
+                    if process == 'ttbar':
+                        print '1'
+                        dictHists[process][cat][dist+'_unblinded'].Draw('lego')
                     low_hist = copyHistWithNewXbounds(hist_to_split,low_histname,newXwidth,newXmin,sigStart)
                     high_hist = copyHistWithNewXbounds(hist_to_split,high_histname,newXwidth,sigEnd,newXmax)
                     dictHists[process][cat][dist] = makeBlindedHist(hist_to_split,low_hist,high_hist)
-
+                    if process == 'ttbar':
+                        print '2'
+                        dictHists[process][cat][dist+'_unblinded'].Draw('lego')
 
     return dictHists

@@ -194,6 +194,7 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
             # 1) Have a negligible number of events but NOT zero (will break Combine)
             # 2) Have no dependence on the Rp/f (otherwise they will influence the Rp/f shape)
             if blinded and (upperEdge_in_sig or lowerEdge_in_sig):
+                print "Blinding bin " + name
                 binRRV = RooConstVar(name, name, 0.0001)
                 binListFail.add(binRRV)
                 allVars.append(binRRV)
@@ -206,8 +207,8 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
             else:
                 # Initialize contents
                 binContent = TH2_data_fail.GetBinContent(xbin,ybin)
-                binErrUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)
-                binErrDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)
+                binErrUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)*3
+                binErrDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)*3
                 
                 # Now subtract away the parts that we don't want
                 for process in dictTH2s.keys():
@@ -220,8 +221,8 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
                         continue
                     elif inputConfig['PROCESS'][process]['CODE'] == 2: # unchanged MC
                         binContent  = binContent    - thisTH2.GetBinContent(xbin,ybin)
-                        binErrUp    = binErrUp      - thisTH2.GetBinContent(xbin,ybin) + thisTH2.GetBinErrorUp(xbin,ybin)*2              # Just propagator errors normally
-                        binErrDown  = binErrDown    - thisTH2.GetBinContent(xbin,ybin) - thisTH2.GetBinErrorLow(xbin,ybin)*2
+                        binErrUp    = binErrUp      - thisTH2.GetBinContent(xbin,ybin) + thisTH2.GetBinErrorUp(xbin,ybin)*3             # Just propagator errors normally
+                        binErrDown  = binErrDown    - thisTH2.GetBinContent(xbin,ybin) - thisTH2.GetBinErrorLow(xbin,ybin)*3
                     # OUT OF DATE AND NOT SUPPORTED
                     # elif inputConfig['PROCESS'][process]['CODE'] == 3: # renorm MC
                     #     binErrUp    = binContent                                               # Err up is no MC subtraction

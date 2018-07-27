@@ -275,7 +275,7 @@ if options.runFit:
 
     subprocess.call(['mv MaxLikelihoodFitResult.root ' + maindir+subdir + '/'], shell=True)
     subprocess.call(['mv higgsCombineTest.MaxLikelihoodFit.mH120.root ' + maindir+subdir + '/'], shell=True)
-    subprocess.call(['mv mlfit.root ' + maindir+subdir + '/'], shell=True)
+    # subprocess.call(['mv mlfit.root ' + maindir+subdir + '/'], shell=True)
 
     plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir,options.blinded)
 
