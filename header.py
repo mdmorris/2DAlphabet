@@ -10,7 +10,7 @@ def ascii_encode_dict(data):
     ascii_encode = lambda x: x.encode('ascii') if isinstance(x, unicode) else x 
     return dict(map(ascii_encode, pair) for pair in data.items())
 
-def getRRVs(inputConfig, blinded):
+def getRRVs(inputConfig):#, blinded):
     xname = inputConfig['BINNING']['X']['NAME']
     xlowname = xname + '_Low'
     xhighname = xname + '_High'
@@ -25,16 +25,16 @@ def getRRVs(inputConfig, blinded):
     xRRV = RooRealVar(xname,xname,xlow,xhigh)
     yRRV = RooRealVar(yname,yname,ylow,yhigh)
 
-    if blinded:
-        xSigStart = inputConfig['BINNING']['X']['SIGSTART']
-        xSigEnd = inputConfig['BINNING']['X']['SIGEND']
-        xLowRRV = RooRealVar(xlowname,xlowname,xlow,xSigStart)
-        xHighRRV = RooRealVar(xhighname,xhighname,xSigEnd,xhigh)
+    # if blinded:
+    #     xSigStart = inputConfig['BINNING']['X']['SIGSTART']
+    #     xSigEnd = inputConfig['BINNING']['X']['SIGEND']
+    #     xLowRRV = RooRealVar(xlowname,xlowname,xlow,xSigStart)
+    #     xHighRRV = RooRealVar(xhighname,xhighname,xSigEnd,xhigh)
 
-        return xRRV,xLowRRV,xHighRRV,yRRV
+    #     return xRRV,xLowRRV,xHighRRV,yRRV
     
-    else:
-        return xRRV,yRRV
+    # else:
+    return xRRV,yRRV
 
 def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHigh):
     # Make a copy with the same Y bins but new X bins
@@ -42,7 +42,9 @@ def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHi
     yBinsLow = thisHist.GetYaxis().GetXmin()
     yBinsHigh = thisHist.GetYaxis().GetXmax()
     nNewBinsX = int((xNewBinsHigh-xNewBinsLow)/float(newBinWidthX))
-    histCopy = TH2F(copyName,copyName,nNewBinsX,xNewBinsLow,xNewBinsHigh,nBinsY,yBinsLow,yBinsHigh)
+    # Use copyName with _temp to avoid overwriting if thisHist has the same name
+    # We can do this at the end but not before we're finished with thisHist
+    histCopy = TH2F(copyName+'_temp',copyName+'_temp',nNewBinsX,xNewBinsLow,xNewBinsHigh,nBinsY,yBinsLow,yBinsHigh)
     histCopy.Sumw2()
     
     histCopy.GetXaxis().SetName(thisHist.GetXaxis().GetName())
@@ -69,6 +71,10 @@ def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHi
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             histCopy.SetBinContent(newBinX,binY,newBinContent)
             histCopy.SetBinError(newBinX,binY,sqrt(newBinErrorSq))
+
+    # Will now set the copyName which will overwrite thisHist if it has the same name
+    histCopy.SetName(copyName)
+    histCopy.SetTitle(copyName)
 
     return histCopy
 
@@ -241,7 +247,7 @@ def printWorkspace(myfile,myworkspace):
 
 
 
-def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=False,xtitle='',ytitle='',dataOff=False):  
+def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -317,7 +323,7 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=
             if len(titles) > 0:
                 hist.SetTitle(titles[hist_index])
 
-            hist.Draw('lego')
+            hist.Draw('pe')
             if len(bkglist) > 0:
                 print 'ERROR: It seems you are trying to plot backgrounds with data on a 2D plot. This is not supported since there is no good way to view this type of distribution.'
         
@@ -344,6 +350,7 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=
                 if not dataOff:
                     mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.3, 1, 1))
                     subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 1, 0.3))
+
                 else:
                     mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.1, 1, 1))
                     subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 0, 0))
@@ -383,7 +390,7 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=
 
                     stacks[hist_index].Add(bkg)
 
-                    legends[hist_index].AddEntry(bkg,bkg.GetName()[:bkg.GetName().find('__')],'f')
+                    legends[hist_index].AddEntry(bkg,bkg.GetTitle(),'f')
                     
                 # Go to main pad, set logy if needed
                 mains[hist_index].cd()
@@ -403,6 +410,7 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=
                     h.SetMaximum(yMax*1.1)
 
                 # Now draw the main pad
+                data_leg_title = hist.GetTitle()
                 if len(titles) > 0:
                     hist.SetTitle(titles[hist_index])
                 hist.SetTitleOffset(1.5,"xy")
@@ -414,9 +422,10 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=
                 tot_hists[hist_index].SetFillStyle(3354)
 
                 tot_hists[hist_index].Draw('e2 same')
-                # legends[hist_index].Draw()
+                legends[hist_index].Draw()
 
                 if not dataOff:
+                    legends[hist_index].AddEntry(hist,data_leg_title,'p')
                     hist.Draw('p e same')
 
                 # Draw the pull
@@ -443,7 +452,7 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=
                 pulls[hist_index].GetYaxis().SetTitle(ytitle)
                 pulls[hist_index].Draw('hist')
 
-    if root:
+    if rootfile:
         myCan.Print(tag+'plots/'+name+'.root','root')
     else:
         myCan.Print(tag+'plots/'+name+'.pdf','pdf')
@@ -609,6 +618,103 @@ def Inter(g1,g2):
             inters.append(0.5*(xpoint+xpoint1))
         
     return inters
+
+def applyFitMorph(process, region ,has_shape_uncert, inputConfig, dists, w, suffix=''):
+    # This function will apply the findings of the blinded fit to the signal region 
+    # This is necessary because Combine knows NOTHING about this region
+
+    # dists - dictionary with distributions (nominal, syst_up, syst_down,...) for this process and region
+    # w - workspace output from combine fit
+
+    # Hack
+    allVars = []
+
+    # Setup the axes
+    xvar,yvar = getRRVs(inputConfig)
+    allVars.extend([xvar,yvar])
+    x_low = inputConfig['BINNING']['X']['LOW']
+    x_high = inputConfig['BINNING']['X']['HIGH']
+    x_nbins = inputConfig['BINNING']['X']['NBINS']
+    x_binWidth = float(x_high-x_low)/float(x_nbins)
+    sigstart = inputConfig['BINNING']['X']['SIGSTART']
+    sigend = inputConfig['BINNING']['X']['SIGEND']
+    y_low = inputConfig['BINNING']['Y']['LOW']
+    y_high = inputConfig['BINNING']['Y']['HIGH']
+    y_nbins = inputConfig['BINNING']['Y']['NBINS']
+
+    normlist = RooArgList() # Stores ALL norms for RooProduct at the end
+    allVars.append(normlist)
+
+
+    # Morph only if we had shape based systematics
+    if has_shape_uncert:
+        # Storage for the pre-fit signal region for nominal and each systematic shape
+        signal_hists = {}
+        for dist in dists.keys():
+            if dist.find('_unblinded') != -1:
+                newkey = dist[:dist.find('_unblinded')]
+                if dist[:dist.find('_unblinded')] != 'nominal':
+                    hist_name = process+'_'+region+suffix+'_'+newkey+'_presignal'
+                else:
+                    hist_name = process+'_'+region+suffix+'_presignal'
+                signal_hists[newkey] = copyHistWithNewXbounds(dists[dist],hist_name,x_binWidth,sigstart,sigend)
+
+        # Build the pieces for the FVIHP2D2 along with the AsymPow (normalization) pieces
+        # Get TList with pdfs and RooArgList with RooRealVars for FVIHP2D2 construction
+        coefList = RooArgList()                                     # RAL is ordered [a,b,c,...]
+        pdfList = TList()                                           # TList is ordered [nom, a_hi, a_lo, b_hi, b_lo,...]
+        pdfList.Add(signal_hists['nominal'])
+        asympows = {}
+        for n in inputConfig['PROCESS'][process]['SYSTEMATICS']:
+            if inputConfig['SYSTEMATIC'][n]['CODE'] > 1: # 2 or 3
+                thisVar = w.var(n)
+                if not thisVar:
+                    continue
+                allVars.append(thisVar)
+                # FVIHP2D2 pieces
+                coefList.add(thisVar)
+                allVars.append(thisVar)
+                thisTH2up = signal_hists[n+'Up']
+                thisTH2down = signal_hists[n+'Down']
+                pdfList.Add(thisTH2up)
+                pdfList.Add(thisTH2down)
+                # AsymPow pieces
+                # for su in inputConfig['PROCESS'][process]['SYSTEMATICS']:
+                kappaLowVal = thisTH2down.Integral()/signal_hists['nominal'].Integral()
+                kappaHighVal = thisTH2up.Integral()/signal_hists['nominal'].Integral()
+                if abs(kappaHighVal-1) > 1e-3 and abs(kappaLowVal-1) > 1e-3:    # Combine won't count the systematic unless this condition is satisfied so we shouldn't either
+                    kappaLow = RooConstVar(process+'_'+region+suffix+'_'+n+'_kappaLow',process+'_'+region+suffix+'_'+n+'_kappaLow',kappaLowVal)
+                    kappaHigh = RooConstVar(process+'_'+region+suffix+'_'+n+'_kappaHigh',process+'_'+region+suffix+'_'+n+'_kappaHigh',kappaHighVal)
+                    allVars.extend([kappaLow,kappaHigh])
+                    asympows[n] = AsymPow('systeff_'+region+suffix+'_'+process+'_'+n, 'systeff_'+region+suffix+'_'+process+'_'+n, kappaLow, kappaHigh, thisVar)
+                    allVars.extend([kappaLow,kappaHigh])
+                    normlist.add(asympows[n])
+
+        # Conditional should be FALSE (I checked this - I think it normalizes each x slice to 1 independently)
+        # Last two arguments are the same values used by Combine
+        shape_FVIHP = FastVerticalInterpHistPdf2D2(process+'_'+region+suffix+'_FVIHP', process+'_'+region+suffix+'_FVIHP', xvar, yvar, False, pdfList, coefList, 1, 0)
+        shape_TH2 = shape_FVIHP.createHistogram(process+'_'+region+suffix+'_signal',xvar,RooFit.Binning(x_nbins,x_low,x_high),RooFit.YVar(yvar,RooFit.Binning(y_nbins,y_low,y_high)))
+
+
+    # Otherwise just grab the nominal histogram
+    else:
+        shape_TH2 = copyHistWithNewXbounds(dists['nominal_unblinded'],process+'_'+region+suffix+'_presignal',x_binWidth,sigstart,sigend)
+
+
+    # Next the lnN normalization contribution can just be grabbed from w
+    try:
+        thislnNNorm = w.function('n_exp_bin'+region+suffix+'_proc_'+process)
+        allVars.append(thislnNNorm)
+        normlist.add(thislnNNorm)
+    except:
+        print 'MESSAGE: n_exp_bin'+region+suffix+'_proc_'+process + ' does not exist. Assuming no lnN uncertainties for this.'
+
+    full_norm_name = process+'_'+region+suffix+'_fullNorm'
+    full_norm = RooProduct(full_norm_name, full_norm_name, normlist)
+    allVars.append(full_norm)
+
+    shape_TH2.Scale(abs(full_norm.getValV()))
+    return shape_TH2
 
 # Right after I wrote this I realized it's obsolete... It's cool parentheses parsing though so I'm keeping it
 def separateXandYfromFitString(fitForm):

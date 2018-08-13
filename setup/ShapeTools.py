@@ -13,9 +13,9 @@ class ShapeBuilder(ModelBuilder):
         if options.libs:
             for lib in options.libs:
                 ROOT.gSystem.Load(lib)
-    	self.wspnames = {}
-    	self.wsp = None
-	self.norm_rename_map = {}
+        self.wspnames = {}
+        self.wsp = None
+        self.norm_rename_map = {}
     ## ------------------------------------------
     ## -------- ModelBuilder interface ----------
     ## ------------------------------------------
@@ -65,7 +65,8 @@ class ShapeBuilder(ModelBuilder):
                 extranorm = self.getExtraNorm(b,p)
                 if extranorm:
                     prodset = ROOT.RooArgList(self.out.function("n_exp_bin%s_proc_%s" % (b,p)))
-                    for X in extranorm: prodset.add(self.out.function(X))
+                    for X in extranorm: 
+                        prodset.add(self.out.function(X))
                     prodfunc = ROOT.RooProduct("n_exp_final_bin%s_proc_%s" % (b,p), "", prodset)
                     self.out._import(prodfunc)
                     coeff = self.out.function("n_exp_final_bin%s_proc_%s" % (b,p))                    
@@ -245,7 +246,7 @@ class ShapeBuilder(ModelBuilder):
                         self.doVar("CMS_fakeObs[0,1]");
                         self.out.var("CMS_fakeObs").setBins(1);
                         self.doSet("CMS_fakeObsSet","CMS_fakeObs");
-			self.doVar("CMS_fakeWeight[0,1]");self.out.var("CMS_fakeWeight").removeRange()
+                        self.doVar("CMS_fakeWeight[0,1]");self.out.var("CMS_fakeWeight").removeRange()
                         shapeObs["CMS_fakeObsSet"] = self.out.set("CMS_fakeObsSet")
                     if p == self.options.dataname:
                         self.pdfModes[b] = 'binned'
@@ -367,10 +368,10 @@ class ShapeBuilder(ModelBuilder):
         if bentry.has_key(process): names = bentry[process]
         elif bentry.has_key("*"):   names = bentry["*"]
         elif self.DC.shapeMap.has_key("*"):
-	    if self.DC.shapeMap["*"].has_key(process): names = self.DC.shapeMap["*"][process]
+            if self.DC.shapeMap["*"].has_key(process): names = self.DC.shapeMap["*"][process]
             elif self.DC.shapeMap["*"].has_key("*"):     names = self.DC.shapeMap["*"]["*"]
         else: 
-	    print self.DC.shapeMap
+            print self.DC.shapeMap
             raise KeyError, "Shape map has no entry for process '%s', channel '%s'" % (process,channel)
         if len(names) == 1 and names[0] == "FAKE": return None
         if syst != "": 
@@ -392,8 +393,8 @@ class ShapeBuilder(ModelBuilder):
         if ":" in objname: # workspace:obj or ttree:xvar or th1::xvar
             (wname, oname) = objname.split(":")
             if (file,wname) not in self.wspnames : 
-		self.wspnames[(file,wname)] = file.Get(wname)
-	    self.wsp = self.wspnames[(file,wname)]
+                self.wspnames[(file,wname)] = file.Get(wname)
+            self.wsp = self.wspnames[(file,wname)]
             if not self.wsp: raise RuntimeError, "Failed to find %s in file %s (from pattern %s, %s)" % (wname,finalNames[0],names[1],names[0])
             if self.wsp.ClassName() == "RooWorkspace":
                 ret = self.wsp.data(oname)
@@ -409,14 +410,14 @@ class ShapeBuilder(ModelBuilder):
                 if not syst:
                   normname = "%s_norm" % (oname)
                   norm = self.wsp.arg(normname)
-		  if norm==None: 
-			if normname in self.norm_rename_map.keys(): norm = self.wsp.arg(self.norm_rename_map[normname])
+                  if norm==None: 
+                        if normname in self.norm_rename_map.keys(): norm = self.wsp.arg(self.norm_rename_map[normname])
                   if norm: 
                     if normname in self.DC.flatParamNuisances: 
                         self.DC.flatParamNuisances[normname] = False # don't warn if not found
                         norm.setAttribute("flatParam")
                     norm.SetName("shape%s_%s_%s%s_norm" % (postFix,process,channel, "_"))
-		    self.norm_rename_map[normname]=norm.GetName()
+                    self.norm_rename_map[normname]=norm.GetName()
                     self.out._import(norm, ROOT.RooFit.RecycleConflictNodes()) 
                 if self.options.verbose > 2: print "import (%s,%s) -> %s\n" % (finalNames[0],objname,ret.GetName())
                 return ret;
@@ -465,7 +466,7 @@ class ShapeBuilder(ModelBuilder):
         nominalPdf = self.shape2Pdf(shapeNominal,channel,process) if (self.options.useHistPdf == "always" or shapeNominal == None) else shapeNominal
         if shapeNominal == None: return nominalPdf # no point morphing a fake shape
         morphs = []; shapeAlgo = None
-	channelBinParFlag = channel in self.DC.binParFlags.keys()
+        channelBinParFlag = channel in self.DC.binParFlags.keys()
         for (syst,nofloat,pdf,args,errline) in self.DC.systs:
             if not "shape" in pdf: continue
             if errline[channel][process] == 0: continue
@@ -479,8 +480,8 @@ class ShapeBuilder(ModelBuilder):
                 raise RuntimeError, errmsg+" One can use only one morphing algorithm for a given shape";
             if errline[channel][process] != 0:
                 if allowNoSyst and not self.isShapeSystematic(channel,process,syst): continue
-		systShapeName = syst
-		if (syst,channel,process) in self.DC.systematicsShapeMap.keys(): systShapeName = self.DC.systematicsShapeMap[(syst,channel,process)]
+                systShapeName = syst
+                if (syst,channel,process) in self.DC.systematicsShapeMap.keys(): systShapeName = self.DC.systematicsShapeMap[(syst,channel,process)]
                 shapeUp   = self.getShape(channel,process,systShapeName+"Up")
                 shapeDown = self.getShape(channel,process,systShapeName+"Down")
                 if shapeUp.ClassName()   != shapeNominal.ClassName(): raise RuntimeError, "Mismatched shape types for channel %s, process %s, syst %s" % (channel,process,syst)
@@ -565,18 +566,17 @@ class ShapeBuilder(ModelBuilder):
                 histpdf =  nominalPdf if nominalPdf.InheritsFrom("RooDataHist") else nominalPdf.dataHist()
                 xvar = histpdf.get().first()
 
-		# Custom code starts here - Lucas Corcodilos
-		histpdfSubset = histpdf.get().Clone()
+                # Custom code starts here - Lucas Corcodilos
+                histpdfSubset = histpdf.get().Clone()
                 histpdfSubset.remove(xvar)
                 if histpdfSubset.first() != False:
-                    histpdfSubset.Print()
                     yvar = histpdfSubset.first() # y is a little more complex
                     rhp = ROOT.FastVerticalInterpHistPdf2D2("shape%s_%s_%s_morph" % (postFix,channel,process), "", xvar, yvar, False, pdfs, coeffs, qrange, qalgo)
                 else:
                     rhp = ROOT.FastVerticalInterpHistPdf2("shape%s_%s_%s_morph" % (postFix,channel,process), "", xvar, pdfs, coeffs, qrange, qalgo)
-		# Custom code ends
+                # Custom code ends
 
-		# rhp = ROOT.FastVerticalInterpHistPdf2D2("shape%s_%s_%s_morph" % (postFix,channel,process), "", xvar,yvar,false, pdfs, coeffs, qrange, qalgo)
+                # rhp = ROOT.FastVerticalInterpHistPdf2D2("shape%s_%s_%s_morph" % (postFix,channel,process), "", xvar,yvar,false, pdfs, coeffs, qrange, qalgo)
                 _cache[(channel,process)] = rhp
                 return rhp
             else:
@@ -587,7 +587,7 @@ class ShapeBuilder(ModelBuilder):
                     pdflist.add(self.shape2Pdf(shapeUp,channel,process))
                     pdflist.add(self.shape2Pdf(shapeDown,channel,process))
                 pdfs = pdflist
-		
+                
         if "2a" in shapeAlgo: # old shape2
             if not nominalPdf.InheritsFrom("RooHistPdf"):  raise RuntimeError, "Algorithms 'shape2', 'shapeL2', shapeN2' only work with histogram templates"
             if nominalPdf.dataHist().get().getSize() != 1: raise RuntimeError, "Algorithms 'shape2', 'shapeL2', shapeN2' only work in one dimension"
@@ -602,8 +602,8 @@ class ShapeBuilder(ModelBuilder):
             _cache[(channel,process)] = ROOT.VerticalInterpPdf("shape%s_%s_%s_morph" % (postFix,channel,process), "", pdfs, coeffs, qrange, qalgo)
         return _cache[(channel,process)]
     def isShapeSystematic(self,channel,process,syst):
-    	systShapeName = syst
-	if (syst,channel,process) in self.DC.systematicsShapeMap.keys(): systShapeName = self.DC.systematicsShapeMap[(syst,channel,process)]
+        systShapeName = syst
+        if (syst,channel,process) in self.DC.systematicsShapeMap.keys(): systShapeName = self.DC.systematicsShapeMap[(syst,channel,process)]
         shapeUp = self.getShape(channel,process,systShapeName+"Up",allowNoSyst=True)    
         return shapeUp != None
     def getExtraNorm(self,channel,process):
@@ -631,8 +631,8 @@ class ShapeBuilder(ModelBuilder):
             if "shape" not in pdf: continue
             if errline[channel][process] != 0:
                 if pdf[-1] == "?" and not self.isShapeSystematic(channel,process,syst): continue
-		systShapeName = syst
-	        if (syst,channel,process) in self.DC.systematicsShapeMap.keys(): systShapeName = self.DC.systematicsShapeMap[(syst,channel,process)]
+                systShapeName = syst
+                if (syst,channel,process) in self.DC.systematicsShapeMap.keys(): systShapeName = self.DC.systematicsShapeMap[(syst,channel,process)]
                 shapeUp   = self.getShape(channel,process,systShapeName+"Up")
                 shapeDown = self.getShape(channel,process,systShapeName+"Down")
                 if shapeUp.ClassName()   != shapeNominal.ClassName(): raise RuntimeError, "Mismatched shape types for channel %s, process %s, syst" % (channel,process,syst)
@@ -645,7 +645,8 @@ class ShapeBuilder(ModelBuilder):
                 if not kappaUp > 0: raise RuntimeError, "Bogus norm %r for channel %s, process %s, systematic %s Up" % (kappaUp, channel,process,syst)
                 if not kappaDown > 0: raise RuntimeError, "Bogus norm %r for channel %s, process %s, systematic %s Down" % (kappaDown, channel,process,syst)
                 kappaUp /=normNominal; kappaDown /= normNominal
-                if abs(kappaUp-1) < 1e-3 and abs(kappaDown-1) < 1e-3: continue
+                if abs(kappaUp-1) < 1e-3 and abs(kappaDown-1) < 1e-3:
+                    continue
                 # if errline[channel][process] == <x> it means the gaussian should be scaled by <x> before doing pow
                 # for convenience, we scale the kappas
                 kappasScaled = [ pow(x, errline[channel][process]) for x in kappaDown,kappaUp ]
@@ -672,9 +673,9 @@ class ShapeBuilder(ModelBuilder):
                     rdh.set(obs, self.DC.obs[channel])
                     _cache[name] = rdh
                 else:
-		    obs.add(self.out.var("CMS_fakeWeight"))
+                    obs.add(self.out.var("CMS_fakeWeight"))
                     rds = ROOT.RooDataSet(name, name, obs,"CMS_fakeWeight")
-		    obs.setRealValue("CMS_fakeWeight", self.DC.obs[channel])
+                    obs.setRealValue("CMS_fakeWeight", self.DC.obs[channel])
                     rds.add(obs, self.DC.obs[channel])
                     _cache[name] = rds
             return _cache[name]
@@ -690,7 +691,7 @@ class ShapeBuilder(ModelBuilder):
         return _cache[shape.GetName()]
     def shape2Pdf(self,shape,channel,process,_cache={}):
         postFix="Sig" if (process in self.DC.isSignal and self.DC.isSignal[process]) else "Bkg"
-	channelBinParFlag = channel in self.DC.binParFlags.keys()
+        channelBinParFlag = channel in self.DC.binParFlags.keys()
         if shape == None:
             name = "shape%s_%s_%s" % (postFix,channel,process)
             if not _cache.has_key(name):

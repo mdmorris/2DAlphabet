@@ -21,7 +21,7 @@ import header
 from header import *
 
 
-def main(inputConfig,blinded,tag,nslices=6,sigma=3):
+def main(inputConfig,blinded,tag,nslices=6,sigma=25):
 
     # Grab everything
     file = TFile.Open(inputConfig['PROCESS']['data_obs']['FILE'])
@@ -127,7 +127,7 @@ def main(inputConfig,blinded,tag,nslices=6,sigma=3):
     print new_y_bins
 
     # new_y_bins_array = array('d',new_y_bins)
-    new_y_bins_array = array('d',[800.0, 1100.0, 1300.0, 1600.0, 2000.0, 2800.0, 4000.0])    
+    new_y_bins_array = array('d',[800.0, 1000.0, 1100.0, 1200.0, 1300.0, 1400.0, 1500.0, 1600.0, 1700.0, 1800.0, 1900.0, 2000.0, 2200.0, 2400.0, 2600.0, 2800.0, 3200.0, 4000.0])    
 
     ##############################
     #   Rebin the distributions  #
@@ -292,12 +292,15 @@ def main(inputConfig,blinded,tag,nslices=6,sigma=3):
             inputConfig['FIT'][param] = {'NOMINAL':None,'LOW':None,'HIGH':None}
             if fitResults[param] < 0:
                 inputConfig['FIT'][param]['NOMINAL'] = fitResults[param]
-                inputConfig['FIT'][param]['HIGH'] = min(fitResults[param]+sigma*fitResults[param+'err'],0)
+                inputConfig['FIT'][param]['HIGH'] = fitResults[param]+sigma*fitResults[param+'err']#min(fitResults[param]+sigma*fitResults[param+'err'],0)
                 inputConfig['FIT'][param]['LOW'] = fitResults[param]-sigma*fitResults[param+'err']
             elif fitResults[param] > 0:
                 inputConfig['FIT'][param]['NOMINAL'] = fitResults[param]
                 inputConfig['FIT'][param]['HIGH'] = fitResults[param]+sigma*fitResults[param+'err']
-                inputConfig['FIT'][param]['LOW'] = max(fitResults[param]-sigma*fitResults[param+'err'],0)
+                inputConfig['FIT'][param]['LOW'] = fitResults[param]-sigma*fitResults[param+'err']#max(fitResults[param]-sigma*fitResults[param+'err'],0)
+
+            inputConfig['FIT'][param]['ERROR'] = fitResults[param+'err']
+
             paramIndex+=1
 
     # Finally draw the surface

@@ -19,7 +19,7 @@
             "HISTFAIL":"MtwvMtFail",
             "SYSTEMATICS":["lumi","ttbar_xsec","Scale","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
             "COLOR": 2,
-            "CODE": 2
+            "CODE": 3
         },
         "singletop_t": {
             "FILE":"path/TW2Dalphabetweightedsingletop_t_Trigger_nominal_none_PSET_sideband.root",

@@ -36,49 +36,56 @@ gStyle.SetOptStat(0)
 parser = OptionParser()
 # Input and what to run
 parser.add_option('-i', '--input', metavar='FILE', type='string', action='store',
-                  default   =   '',
-                  dest      =   'input',
-                  help      =   'JSON file to be imported. Name should be "input_<tag>.json" where tag will be used to organize outputs')
+                default   =   '',
+                dest      =   'input',
+                help      =   'JSON file to be imported. Name should be "input_<tag>.json" where tag will be used to organize outputs')
 parser.add_option('-p', '--pseudo2D', action="store_true",
-                  default   =   False,
-                  dest      =   'pseudo2D',
-                  help      =   'Recalculate the fit guesses using pseudo2D method')
+                default   =   False,
+                dest      =   'pseudo2D',
+                help      =   'Recalculate the fit guesses using pseudo2D method')
 parser.add_option('-l', '--runLimits', action="store_true",
-                  default   =   False,
-                  dest      =   'runLimits',
-                  help      =   'Runs Combine limits and plots outputs')
+                default   =   False,
+                dest      =   'runLimits',
+                help      =   'Runs Combine limits and plots outputs')
 parser.add_option('-f', '--runFit', action="store_true",
-                  default   =   False,
-                  dest      =   'runFit',
-                  help      =   'Runs Combine Rp/f fit and plots outputs')
+                default   =   False,
+                dest      =   'runFit',
+                help      =   'Runs Combine Rp/f fit and plots outputs')
 
 # Plotting/drawing
 parser.add_option('-P', '--plotOnly', action="store_true",
-                  default   =   False,
-                  dest      =   'plotOnly',
-                  help      =   'Only plots if True')
+                default   =   False,
+                dest      =   'plotOnly',
+                help      =   'Only plots if True')
 parser.add_option('-u', '--plotUncerts', action="store_true",
-                  default   =   False,
-                  dest      =   'plotUncerts',
-                  help      =   'Plots shape based uncertainties')
+                default   =   False,
+                dest      =   'plotUncerts',
+                help      =   'Plots shape based uncertainties')
 parser.add_option('-d', '--draw', action="store_true",
-                  default   =   False,
-                  dest      =   'draw',
-                  help      =   'Draws canvases live')
+                default   =   False,
+                dest      =   'draw',
+                help      =   'Draws canvases live')
+parser.add_option('-v', '--verbose', metavar='FILE', type='string', action='store',
+                default   =   '',
+                dest      =   'verbose',
+                help      =   'Set Combine verbosity')
+
 
 # Configurations for the run
 parser.add_option('-s', '--signalOff', action="store_true",
-                  default   =   False,
-                  dest      =   'signalOff',
-                  help      =   'Turns off signal by using --expectSignal=0 option in Combine')
+                default   =   False,
+                dest      =   'signalOff',
+                help      =   'Turns off signal by using --expectSignal=0 option in Combine')
 parser.add_option('-b', '--batch', action="store_true",
-                  default   =   False,
-                  dest      =   'batch',
-                  help      =   'Runs limits in batch mode for multiple signals')
+                default   =   False,
+                dest      =   'batch',
+                help      =   'Runs limits in batch mode for multiple signals')
 parser.add_option('-B', '--blinded', action="store_true",
-                  default   =   False,
-                  dest      =   'blinded',
-                  help      =   'Turns off data points. Different from blinding the signal region during the fit')
+                default   =   False,
+                dest      =   'blinded',
+                help      =   'Turns off data points. Different from blinding the signal region during the fit')
+
+
 
 # 
 
@@ -263,10 +270,12 @@ for proc in input_config['PROCESS'].keys():
                 syst_option = ' -S 0'
 
 if options.runFit:
-    
+    verbosity = ''
+    if options.verbose != '':
+        verbosity = ' -v '+options.verbose
     # Run Combine
-    print 'Executing combine -M MaxLikelihoodFit '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option 
-    subprocess.call(['combine -M MaxLikelihoodFit '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option], shell=True)
+    print 'Executing combine -M MaxLikelihoodFit '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option +verbosity
+    subprocess.call(['combine -M MaxLikelihoodFit '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option + verbosity], shell=True)
 
     # Test that Combine ran successfully 
     if not os.path.isfile('MaxLikelihoodFitResult.root'):

@@ -93,6 +93,7 @@ def main(inputConfig, blinded, tag, maindir, subdir):
 
     signal_procs = [proc for proc in inputConfig['PROCESS'].keys() if proc != 'HELP' and proc != 'data_obs' and inputConfig['PROCESS'][proc]['CODE'] == 0]
     MC_bkg_procs = [proc for proc in inputConfig['PROCESS'].keys() if proc != 'HELP' and proc != 'data_obs' and (inputConfig['PROCESS'][proc]['CODE'] == 2 or inputConfig['PROCESS'][proc]['CODE'] == 3)]
+
     all_procs = [proc for proc in inputConfig['PROCESS'].keys() if proc != 'HELP' and proc != 'data_obs']
     all_procs.append('qcd')
 
@@ -112,8 +113,11 @@ def main(inputConfig, blinded, tag, maindir, subdir):
                 processCode_line += (str(MC_bkg_procs.index(proc)+1)+' ')
                 if inputConfig['PROCESS'][proc]['CODE'] == 2:       # No floating normalization
                     rate_line += '-1 '                                            
-                # elif inputConfig['PROCESS'][proc]['CODE'] == 3:     # Floating normalization        
-                #     rate_line += '1 '
+                elif inputConfig['PROCESS'][proc]['CODE'] == 3:     # Floating normalization
+                    if chan == 'pass':
+                        rate_line += '-1 '
+                    elif chan == 'fail':        
+                        rate_line += '1 '
 
             # If qcd
             if proc == 'qcd':
@@ -130,7 +134,7 @@ def main(inputConfig, blinded, tag, maindir, subdir):
                             thisVal = str(inputConfig['SYSTEMATIC'][syst_line_key]['VAL'])
                         # If asymmetric lnN...
                         elif inputConfig['SYSTEMATIC'][syst_line_key]['CODE'] == 1:
-                            thisVal = str(inputConfig['SYSTEMATIC'][syst_line_key]['VALUP']) + '/' + str(inputConfig['SYSTEMATIC'][syst_line_key]['VALDOWN'])
+                            thisVal = str(inputConfig['SYSTEMATIC'][syst_line_key]['VALDOWN']) + '/' + str(inputConfig['SYSTEMATIC'][syst_line_key]['VALUP'])
                         # If shape...
                         else:
                             thisVal = str(inputConfig['SYSTEMATIC'][syst_line_key]['SCALE'])
@@ -170,22 +174,22 @@ def main(inputConfig, blinded, tag, maindir, subdir):
     # Otherwise we float                            #
     # - Fail_bin_x-y                                #
     #################################################
-    if 'XFORM' in inputConfig['FIT'].keys() and 'YFORM' in inputConfig['FIT'].keys():
-        nxparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XFORM'])
-        nyparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YFORM'])
+    # if 'XFORM' in inputConfig['FIT'].keys() and 'YFORM' in inputConfig['FIT'].keys():
+    #     nxparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XFORM'])
+    #     nyparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YFORM'])
 
-        for nparams in [nxparams, nyparams]:
-            if nparams == nxparams:
-                thisVar = 'X'
-            else:
-                thisVar = 'Y'
-            for ip in range(1,nparams+1):
-                card_new.write(colliMate('fitParam'+thisVar+'_'+str(ip)+' flatParam\n',22))
-    elif 'FORM' in inputConfig['FIT'].keys():
-        for coeff in [key for key in inputConfig['FIT'].keys() if key != 'HELP' and key.find('FORM') == -1]:
-            if 'LOW' in inputConfig['FIT'][coeff].keys() and 'HIGH' in inputConfig['FIT'][coeff].keys():
-                lower_coeff = coeff.lower()
-                card_new.write(colliMate('polyCoeff_'+lower_coeff+suffix+' flatParam\n',22))
+    #     for nparams in [nxparams, nyparams]:
+    #         if nparams == nxparams:
+    #             thisVar = 'X'
+    #         else:
+    #             thisVar = 'Y'
+    #         for ip in range(1,nparams+1):
+    #             card_new.write(colliMate('fitParam'+thisVar+'_'+str(ip)+' flatParam\n',22))
+    # elif 'FORM' in inputConfig['FIT'].keys():
+    #     for coeff in [key for key in inputConfig['FIT'].keys() if key != 'HELP' and key.find('FORM') == -1]:
+    #         if 'LOW' in inputConfig['FIT'][coeff].keys() and 'HIGH' in inputConfig['FIT'][coeff].keys():
+    #             lower_coeff = coeff.lower()
+    #             card_new.write(colliMate('polyCoeff_'+lower_coeff+suffix+' flatParam\n',22))
 
 
     # Check if we have any renormalized MCs, store which processes, and declare the _norm as a flatParam
@@ -223,13 +227,13 @@ def main(inputConfig, blinded, tag, maindir, subdir):
             xbins = range(1,xbins_n+1)
 
         # Write the flatParams
-        for xbin in xbins:
+        # for xbin in xbins:
             # if renormFlag:
             #     card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_init flatParam\n',22))
             #     # for process in renormProcesses:
             #     #     card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_'+process+'_nominal flatParam\n',22))
             # else:
-            card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+suffix+' flatParam\n',22))
+            # card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+suffix+' flatParam\n',22))
             
        
     card_new.close()

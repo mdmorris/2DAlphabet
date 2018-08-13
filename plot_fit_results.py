@@ -1,7 +1,7 @@
 import ROOT
 from ROOT import *
 import header
-from header import getRRVs, dictStructureCopy, makeCan, copyHistWithNewXbounds, Make_up_down, RFVform2TF1
+from header import getRRVs, dictStructureCopy, makeCan, copyHistWithNewXbounds, Make_up_down, RFVform2TF1, applyFitMorph
 import pprint
 pp = pprint.PrettyPrinter(indent = 2)
 
@@ -13,7 +13,7 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
     #####################
 
     # Vars
-    x_var,y_var = getRRVs(inputConfig,False)
+    x_var,y_var = getRRVs(inputConfig)
     var_list = RooArgList(x_var,y_var)
 
     allVars.extend([x_var,y_var,var_list])
@@ -52,6 +52,9 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
     old_w = old_file.Get('w_2D')                # which is not stored in the output of Combine
                                                 # (the sum of the two is stored there)
 
+    other_file = TFile.Open('dataSidebandFewerbins_tt/MaxLikelihoodFitResult.root')
+    other_w = other_file.Get('MaxLikelihoodFitResult')
+
     # Build another dictionary that can sort and save our pdfs and RDHs
     # based upon info from the config
     new_roo_dict = dictStructureCopy(organizedDict)
@@ -59,8 +62,11 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
     # Need to add qcd to this
     new_roo_dict['qcd'] = {'pass':0,'fail':0}
 
-    # Grab the RDH for data and PDFs and normalizations for all else
-    # For each process, catagory, and distribution...
+    ##################################################################
+    # Sort through the Combine output for the basics                 #
+    # Grab the RDH for data and PDFs and normalizations for all else #
+    # For each process, catagory, and distribution...                #
+    ##################################################################
     for proc in new_roo_dict.keys():
         for cat in new_roo_dict[proc].keys():
             if cat not in ['pass','fail']:                   # Remove any keys that aren't part of catagories
@@ -88,40 +94,29 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
                 new_roo_dict[proc][cat]['NORM'] = new_w.function('n_exp_final_bin'+cat+suffix+'_proc_qcd')
 
             # Now the rest
-
             elif inputConfig['PROCESS'][proc]['CODE'] == 0:       # If signal
                 if has_shape_uncert:
+                    print 'Attempting to grab shapeSig_'+cat+suffix+'_'+proc+'_morph'
                     new_roo_dict[proc][cat]['PDF'] = new_w.pdf('shapeSig_'+cat+suffix+'_'+proc+'_morph')
                     new_roo_dict[proc][cat]['NORM'] = new_w.function('n_exp_final_bin'+cat+suffix+'_proc_'+proc)     # normalization
-                    new_roo_dict[proc][cat]['PDF'].Print()
                 else:
                     print "Attempting to grab shapeSig_"+proc+'_'+cat+suffix+'Pdf'
                     new_roo_dict[proc][cat]['PDF'] = new_w.pdf('shapeSig_'+proc+'_'+cat+suffix+'Pdf')
                     new_roo_dict[proc][cat]['NORM'] = new_w.function('n_exp_bin'+cat+suffix+'_proc_'+proc)
-                    new_roo_dict[proc][cat]['PDF'].Print()
 
             elif inputConfig['PROCESS'][proc]['CODE'] == 1:     # If data
+                print 'Attempting to grab data_obs_'+cat+suffix
                 new_roo_dict[proc][cat]['RDH'] = old_w.data('data_obs_'+cat+suffix)
 
-            elif inputConfig['PROCESS'][proc]['CODE'] == 2 or inputConfig['PROCESS'][proc]['CODE'] == 3:     # If unchanged MC bkg
+            elif inputConfig['PROCESS'][proc]['CODE'] == 2 or inputConfig['PROCESS'][proc]['CODE'] == 3:     # If other MC bkg
                 if has_shape_uncert:
                     print 'Attempting to grab shapeBkg_'+cat+suffix+'_'+proc+'_morph'
                     new_roo_dict[proc][cat]['PDF'] = new_w.pdf('shapeBkg_'+cat+suffix+'_'+proc+'_morph')
                     new_roo_dict[proc][cat]['NORM'] = new_w.function('n_exp_final_bin'+cat+suffix+'_proc_'+proc)
-                    new_roo_dict[proc][cat]['PDF'].Print()
                 else:
                     print 'Attempting to grab shapeBkg_'+proc+'_'+cat+suffix+'Pdf'
                     new_roo_dict[proc][cat]['PDF'] = new_w.pdf('shapeBkg_'+proc+'_'+cat+suffix+'Pdf')
                     new_roo_dict[proc][cat]['NORM'] = new_w.function('n_exp_bin'+cat+suffix+'_proc_'+proc)
-                    new_roo_dict[proc][cat]['PDF'].Print()
-
-            # elif inputConfig['PROCESS'][proc]['CODE'] == 3:     # If renormalized MC bkg
-            #     if has_shape_uncert:
-            #         new_roo_dict[proc][cat]['PDF'] = new_w.pdf('shapeBkg_'+cat+'_'+proc+'_morph')
-            #     else:
-            #         new_roo_dict[proc][cat]['PDF'] = new_w.pdf('shapeBkg_'+proc+'_'+cat)
-            #     new_roo_dict[proc][cat]['NORM'] = new_w.function('n_exp_final_bin'+cat+'_proc_'+proc)     # normalization
-
 
             else: 
                 print 'Process ' + proc + ' has code ' + str(inputConfig['PROCESS'][proc]['CODE']) + ' in the input configuration which is not valid. Quitting...'
@@ -129,8 +124,6 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
 
     # Get fit parameters - there's a trick here: if the params float then they're in new_w 
     #                      but if they're RooConstVars then the values need to be grabbed from inputConfig
-
-
     if 'XFORM' in inputConfig['FIT'].keys() and 'YFORM' in inputConfig['FIT'].keys():
         nxparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XFORM'])
         nyparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YFORM'])
@@ -210,23 +203,27 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
         PolyCoeffs = {}
         for coeffName in inputConfig['FIT'].keys():
             if coeffName != 'HELP' and coeffName != 'FORM':
-                PolyCoeffs[coeffName.lower()] = 0
+                PolyCoeffs[coeffName.lower()] = None
 
         # Floating parameters of the fit (store them in python list immediately)
-        RAS_rpfParams = new_w.allVars().selectByName('polyCoeff_x*y*'+suffix,True)
-        iter_params = RAS_rpfParams.createIterator()
-        RPV_par = iter_params.Next()
+        RAS_rpfParams = new_w.allVars().selectByName('polyCoeff_x*y*'+suffix,True)          # Another trick here - if suffix='', this will grab everything including those
+        if suffix == '':                                                                    # polyCoeffs with the suffix. Need to remove those by explicitely grabbing them
+            RAS_rpfParamsToRemove = new_w.allVars().selectByName('polyCoeff_x*y*_*',True)   # and using .remove(collection)
+            RAS_rpfParams.remove(RAS_rpfParamsToRemove)
+
+        # Loop over the Roo objects and store in PolyCoeffs dictionary
+        iter_params = RAS_rpfParams.createIterator()                                    
+        RPV_par = iter_params.Next()                                                    
         while RPV_par:
             coeffName = RPV_par.GetName()[RPV_par.GetName().find('x'):] # returns "x#y#"
             PolyCoeffs[coeffName] = RPV_par
             # print coeffName + ': ',
             RPV_par.Print()
-            allVars.append(RPV_par)
             RPV_par = iter_params.Next()
 
         # Get remaining constant parameters from old_w
         for coeffName in PolyCoeffs.keys():
-            if PolyCoeffs[coeffName] == 0:
+            if PolyCoeffs[coeffName] == None:
                 PolyCoeffs[coeffName] = inputConfig['FIT'][coeffName.upper()]['NOMINAL']
 
         ####################################################################
@@ -273,6 +270,7 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
                     TF2_rpf.SetParameter(param_count,PolyCoeffs['x'+str(ix)+'y'+str(iy)].getValV())
                     TF2_rpf.SetParError(param_count,PolyCoeffs['x'+str(ix)+'y'+str(iy)].getError())
                     param_out.write('x'+str(ix)+'y'+str(iy) + ': ' + str(PolyCoeffs['x'+str(ix)+'y'+str(iy)].getValV()) + ' +/- ' + str(PolyCoeffs['x'+str(ix)+'y'+str(iy)].getError())+'\n')
+                    param_out.write('x'+str(ix)+'y'+str(iy) + ': ' + str(TF2_rpf.GetParameter(param_count)) + ' +/- ' + str(TF2_rpf.GetParError(param_count))+'\n')
                 param_count += 1              
 
         param_out.close()
@@ -288,46 +286,22 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
     TF2_rpf.GetXaxis().SetTitleOffset(1.5)
     TF2_rpf.GetYaxis().SetTitleOffset(2.3)
     TF2_rpf.GetZaxis().SetTitleOffset(1.2)
-    TF2_rpf.Draw('lego')
+    TF2_rpf.Draw('pe')
     derived_rpf.Print(globalDir+'/plots/derived_rpf'+suffix+'.pdf','pdf')
 
 
-    #################################################################################
-    # Old RooPolyVar method that gave too large of errors or improperly scaled hist #
-    #################################################################################
-
-    # # Rebuild the RooPolyVar (can't just grab since we have one in each bin stored! Need something over whole space)
-    # xPolyList = RooArgList()
-    
-    # for yCoeff in range(polYO+1):
-    #     xCoeffList = RooArgList()
-
-    #     # Get each x coefficient for this y
-    #     for xCoeff in range(polXO+1):                    
-    #         xCoeffList.add(PolyCoeffs['x'+str(xCoeff)+'y'+str(yCoeff)])
-
-
-    #     # Make the RooPolyVar in x and save it to the list of x polynomials
-    #     thisXPolyVarLabel = "xPol_y_"+str(yCoeff)
-    #     xPolyVar = RooPolyVar(thisXPolyVarLabel,thisXPolyVarLabel,x_var,xCoeffList)
-    #     xPolyList.add(xPolyVar)
-    #     allVars.append(xPolyVar)
-
-    # # Now make a RooPolyVar out of the x polynomials
-    # RPV_rpf_func = RooPolyVar("FullPol","FullPol",y_var,xPolyList)
-    # allVars.append(RPV_rpf_func)
-
-    # And make a histogram from that
-    # VERY IMPORTANT NOTE: You need to call RooFit.Scaling(False) here otherwise it will scale each bin by the xBinWidth*yBinWidth and you'll get huge values. 
-    # TH2_rpf_func = RPV_rpf_func.createHistogram("TH2_rpf",x_var,RooFit.Binning(x_nbins,x_low,x_high),RooFit.YVar(y_var,RooFit.Binning(y_nbins,y_low,y_high)))#,RooFit.Scaling(False))
-
-
-
-    ###############################################
-    #   Make the blinded (closure) distributions  #
-    ###############################################
+    #################################################################################################################################################
+    # Now we need to make 2 different distributions:                                                                                                #
+    #     - Sideband or Unblinded distributions                                                                                                     #
+    #     --- These both show if the fit is converging in 2D and in 1D, it shows if alphabet is working                                             #
+    #     - Signal distributions                                                                                                                    #
+    #     --- We're going to project these for the 1D distributions                                                                                 #
+    #################################################################################################################################################
+    ################################################################################################
+    #   Make the sideband/unblinded distributions by grabbing what we have from the combine output #
+    ################################################################################################
     # If you've blinded the fit, then you'll get the x-axis sideband distributions
-    # If you haven't blinded the fit, then you'll get the full x-axis distributions
+    # If you haven't blinded the fit, then you'll get the full distributions
 
     final_hists = {}
 
@@ -339,8 +313,8 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
 
             thisDist = new_roo_dict[proc][cat]
 
+            # Make the TH2 straight from the RDHs
             if 'RDH' in thisDist.keys():
-                # thisDist['TH2'] = thisDist['RDH'].createHistogram('data_obs_'+cat,x_var,RooFit.Binning(x_nbins,x_low,x_high),RooFit.YVar(y_var,RooFit.Binning(y_nbins,y_low,y_high)))
                 thisDist['TH2'] = thisDist['RDH'].createHistogram(proc+'_'+cat,x_var,RooFit.Binning(x_nbins,x_low,x_high),RooFit.YVar(y_var,RooFit.Binning(y_nbins,y_low,y_high)))
                 makeCan(proc+'_'+cat,globalDir,[thisDist['TH2']],xtitle=x_title,ytitle=y_title,titles=[proc + ' - ' + cat])
 
@@ -348,47 +322,69 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
             else:
                 try:
                     thisDist['TH2'] = thisDist['PDF'].createHistogram(proc +'_'+cat,x_var,RooFit.Binning(x_nbins,x_low,x_high),RooFit.YVar(y_var,RooFit.Binning(y_nbins,y_low,y_high)))
+                    makeCan(proc +'_'+cat,globalDir,[thisDist['TH2']],xtitle=x_title,ytitle=y_title,titles=[proc + ' - ' + cat])
                 except:
                     print 'Could not convert ' + proc +'_'+cat +' to histogram'
-                    thisDist['TH2'] = thisDist['PDF'].createHistogram(proc +'_'+cat,x_var,RooFit.Binning(x_nbins,x_low,x_high),RooFit.YVar(y_var,RooFit.Binning(y_nbins,y_low,y_high)))
-                    continue
+                    check_in = raw_input('Would you like to continue? (y/n)')
+                    if check_in == 'y':
+                        continue
+                    else:
+                        quit()
 
-                makeCan(proc +'_'+cat,globalDir,[thisDist['TH2']],xtitle=x_title,ytitle=y_title,titles=[proc + ' - ' + cat])
+                
                 if abs(1.0-thisDist['TH2'].Integral()) > 0.001:
                     print 'ERROR: Double check PDF ' + thisDist['PDF'].GetName() + '. It integrated to ' + str(thisDist['TH2'].Integral()) + ' instead of 1'
                 
-                try:    # inputConfig['PROCESS']['qcd'] doesn't exist so need to try and except (for qcd)
-                    if inputConfig['PROCESS'][proc]['CODE'] == 0:   # If signal, need to scale by negative of norm
+                try: 
+                    if (thisDist['TH2'].Integral() < 0 and thisDist['NORM'].getValV() < 0) or (thisDist['TH2'].Integral() > 0 and thisDist['NORM'].getValV() > 0):
                         thisDist['TH2'].Scale(thisDist['NORM'].getValV())
                     else:
-                        thisDist['TH2'].Scale(thisDist['NORM'].getValV())
+                        thisDist['TH2'].Scale(-1*thisDist['NORM'].getValV())
                 except:
                     thisDist['TH2'].Scale(thisDist['NORM'].getValV())
                 makeCan(proc +'_'+cat+'_scaled',globalDir,[thisDist['TH2']],xtitle=x_title,ytitle=y_title,titles=[proc + ' - ' + cat + ' - Scaled'])
 
+        # Store with 'fitted' key
         for reg in ['pass','fail']:
             final_hists[proc][reg] = {}
-            final_hists[proc][reg]['closure'] = new_roo_dict[proc][reg]['TH2']
+            final_hists[proc][reg]['fitted'] = new_roo_dict[proc][reg]['TH2']
 
 
     #############################################
     #   Make the signal region distributions    #
     #############################################
+    # Either we can grab this directly from the Combine output if we've done an unblinded fit
+    # or we have to do a full reconstruction using the nuisance parameters and uncertainty templates
 
-    # Take all of the input processes and derive the signal region only
-    for proc in organizedDict.keys():
-        for reg in ['pass','fail']:
-            if blinded: 
-                thisUnblindedHist = organizedDict[proc][reg]['nominal_unblinded']
+    if blinded == False:
+        # Grab everything we've already got
+        for proc in final_hists.keys():
+            for reg in ['pass','fail']:
+                hist_name = final_hists[proc][reg]['fitted'].GetName()+'_signal'
+                final_hists[proc][reg]['signal'] = copyHistWithNewXbounds(final_hists[proc][reg]['fitted'],hist_name,x_binWidth,sigstart,sigend)
+
+    else:
+        # Take all of the pref-fit input processes and derive the signal region only morph
+
+        for proc in organizedDict.keys():
+            if proc == 'data_obs':
+                for reg in ['pass','fail']:
+                    hist_name = final_hists[proc][reg]['fitted'].GetName()+'_signal'
+                    final_hists[proc][reg]['signal'] = copyHistWithNewXbounds(organizedDict[proc][reg]['nominal_unblinded'],hist_name,x_binWidth,sigstart,sigend)
+
             else:
-                thisUnblindedHist = organizedDict[proc][reg]['nominal']
-            thisUnblindedHist.Sumw2()
-            thisSignalHist = copyHistWithNewXbounds(thisUnblindedHist,proc+'_'+reg+suffix+'_signalRegion',x_binWidth,sigstart,sigend)
-            final_hists[proc][reg]['signal'] = thisSignalHist
-            
+                for reg in ['pass','fail']:
+                    final_hists[proc][reg]['signal'] = applyFitMorph(proc, reg, has_shape_uncert, inputConfig, organizedDict[proc][reg], new_w, suffix)
+                    # final_hists[proc][reg]['signal'] = applyFitMorph(proc, reg, has_shape_uncert, inputConfig, organizedDict[proc][reg], other_w, suffix)
+                    temp_hist = copyHistWithNewXbounds(organizedDict[proc][reg]['nominal_unblinded'],'prefit_hist',x_binWidth,sigstart,sigend)
+                    makeCan(proc+'_'+reg+suffix+'_morphResults',
+                            globalDir,
+                            [temp_hist, final_hists[proc][reg]['signal']])
+                
 
     # Now estimate the QCD - need to rebuild from data
     qcd_estimate_fail_signal = final_hists['data_obs']['fail']['signal'].Clone('qcd_fail_signalRegion')
+    qcd_estimate_fail_signal.Sumw2()
 
     for proc in organizedDict.keys():
         this_nonqcd = final_hists[proc]['fail']['signal']
@@ -398,21 +394,15 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
             continue
         elif inputConfig['PROCESS'][proc]['CODE'] == 1: # data
             continue
-        elif inputConfig['PROCESS'][proc]['CODE'] == 2: # unchanged MC
-            qcd_estimate_fail_signal.Add(this_nonqcd,-1)
-        elif inputConfig['PROCESS'][proc]['CODE'] == 3: # renorm MC
-            this_nonqcd.Scale(new_roo_dict[proc]['fail']['NORM'].getValV())
+        elif inputConfig['PROCESS'][proc]['CODE'] == 2 or inputConfig['PROCESS'][proc]['CODE'] == 3: # MC
             qcd_estimate_fail_signal.Add(this_nonqcd,-1)
 
-    # Get the Rp/f for the signal region bins
-    # TH2_rpf_func_signal = copyHistWithNewXbounds(TH2_rpf_func,TH2_rpf_func.GetName()+'_signalRegion',x_binWidth,sigstart,sigend)
+
 
     # Multiply by the qcd fail bins to make the pass estimate
     qcd_estimate_pass_signal = qcd_estimate_fail_signal.Clone('qcd_pass'+suffix+'_signalRegion')
-    print 'Doing sumw2'
     qcd_estimate_pass_signal.Sumw2()
     qcd_estimate_pass_signal.Multiply(TF2_rpf)
-    print 'sumw2 done'
 
     final_hists['qcd']['fail']['signal'] = qcd_estimate_fail_signal
     final_hists['qcd']['pass']['signal'] = qcd_estimate_pass_signal
@@ -422,7 +412,7 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
     #   Plot on canvases    #
     #########################
 
-    for test in ['closure','signal']:
+    for test in ['fitted','signal']:
         # Simultaneously build qcd_estimate + non_qcd and data - non_qcd
         full_bkg_fail = final_hists['qcd']['fail'][test].Clone('full_bkg_fail_'+test)
         full_bkg_pass = final_hists['qcd']['pass'][test].Clone('full_bkg_pass_'+test)
@@ -436,7 +426,6 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
             elif inputConfig['PROCESS'][nonqcd]['CODE'] == 2 or inputConfig['PROCESS'][nonqcd]['CODE'] == 3:
                 full_bkg_fail.Add(final_hists[nonqcd]['fail'][test])
                 full_bkg_pass.Add(final_hists[nonqcd]['pass'][test])
-                # print 'Subtracting ' + nonqcd + ' from data to estimate QCD'
                 data_minus_nonqcd_fail.Add(final_hists[nonqcd]['fail'][test],-1)
                 data_minus_nonqcd_pass.Add(final_hists[nonqcd]['pass'][test],-1)
         
@@ -459,20 +448,28 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
         final_hists['qcd']['fail'][test].SetTitle('QCD Estimate - '+test+' - Fail'+suffix)
 
         # Plot the full and qcd comparisons in 2D
-        if not blindData:
-            makeCan('full_comparison_2D'+suffix,globalDir,
+        if not blindData or test == 'fitted':
+            makeCan('full_comparison_'+test+'_2D'+suffix,globalDir,
                 [   final_hists['data_obs']['pass'][test],
                     final_hists['data_obs']['fail'][test],    
                     full_bkg_pass,              
                     full_bkg_fail],
-                xtitle=x_title,ytitle=y_title,titles=['Data - Pass'+suffix+' - '+test, 'Data - Fail'+suffix+' - '+test, 'Full Background Estimate - Pass'+suffix+' - '+test, 'Full Background Estimate - Fail'+suffix+' - '+test])
+                    xtitle=x_title,ytitle=y_title,
+                    titles=['Data - Pass'+suffix+' - '+test, 
+                            'Data - Fail'+suffix+' - '+test, 
+                            'Full Background Estimate - Pass'+suffix+' - '+test, 
+                            'Full Background Estimate - Fail'+suffix+' - '+test])
 
-            makeCan('bkg_comparison_2D'+suffix,globalDir, 
+            makeCan('bkg_comparison_'+test+'_2D'+suffix,globalDir, 
                 [   data_minus_nonqcd_pass,
                     data_minus_nonqcd_fail,
                     final_hists['qcd']['pass'][test], 
                     final_hists['qcd']['fail'][test]],
-                xtitle=x_title,ytitle=y_title,titles=['Data minus non-QCD backgrounds - Pass'+suffix+' - '+test, 'Data minus non-QCD backgrounds - Fail'+suffix+' - '+test, 'QCD Background Estimate - Pass'+suffix+' - '+test, 'QCD Background Estimate - Fail'+suffix+' - '+test])
+                    xtitle=x_title,ytitle=y_title,
+                    titles=['Data minus non-QCD backgrounds - Pass'+suffix+' - '+test, 
+                            'Data minus non-QCD backgrounds - Fail'+suffix+' - '+test, 
+                            'QCD Background Estimate - Pass'+suffix+' - '+test, 
+                            'QCD Background Estimate - Fail'+suffix+' - '+test])
 
         # Now make 1D Projections
         data_minus_nonqcd_fail_1D = data_minus_nonqcd_fail.ProjectionY()
@@ -499,35 +496,43 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
 
         # Plot comparisons in 1D
         makeCan('full_comparison_'+test+'_1D'+suffix,globalDir,
-                [data_pass_1D],
-                [bkgs_pass_1D],colors,xtitle=y_title,dataOff=blindData, titles=['Data vs Background Estimate'])
+                [data_pass_1D],[bkgs_pass_1D],
+                colors=colors,
+                xtitle=y_title,dataOff=blindData,
+                titles=['Data vs Background Estimate'])
+        
         makeCan('full_comparison_'+test+'_1D'+suffix+'_semilog',globalDir,
-                [data_pass_1D],
-                [bkgs_pass_1D],colors=colors,
-                logy=True,xtitle=y_title,dataOff=blindData, titles=['Data vs Background Estimate - Semi-log'])       # True = semilog y
+                [data_pass_1D],[bkgs_pass_1D],
+                colors=colors,
+                logy=True,
+                xtitle=y_title,dataOff=blindData, 
+                titles=['Data vs Background Estimate - Semi-log'])       # True = semilog y
+        
         makeCan('bkg_comparison_'+test+'_1D'+suffix,globalDir, 
                 [data_minus_nonqcd_pass_1D],
-                [[qcd_pass_1D]],xtitle=y_title,dataOff=blindData, titles=['Data minus non-QCD backgrounds vs QCD Estimate'])
+                [[qcd_pass_1D]],
+                xtitle=y_title,dataOff=blindData,
+                titles=['Data minus non-QCD backgrounds vs QCD Estimate'])
 
 
         # Plot renormalized backrounds (pass, fail, before, after)
         for bkg in [bkg for bkg in inputConfig['PROCESS'] if bkg != 'HELP' and (inputConfig['PROCESS'][bkg]['CODE'] == 3 or inputConfig['PROCESS'][bkg]['CODE'] == 2)]:
             print 'Doing ' + bkg
             # Get some stuff to make copyHistWithNewXbounds call easier to read
-            if test == 'closure': 
+            if blinded:
+                if test == 'fitted': 
+                    old_dist_pass = organizedDict[bkg]['pass']['nominal']
+                    old_dist_fail = organizedDict[bkg]['fail']['nominal']
+                elif test == 'signal':
+                    old_dist_pass = copyHistWithNewXbounds(organizedDict[bkg]['pass']['nominal_unblinded'],bkg+'_pass'+suffix+'_prefit_signal',x_binWidth,sigstart,sigend)
+                    old_dist_fail = copyHistWithNewXbounds(organizedDict[bkg]['fail']['nominal_unblinded'],bkg+'_fail'+suffix+'_prefit_signal',x_binWidth,sigstart,sigend)
+
+            else:
                 old_dist_pass = organizedDict[bkg]['pass']['nominal']
-                old_dist_pass.SetTitle(bkg + ' - Pre-fit - Pass'+suffix)
                 old_dist_fail = organizedDict[bkg]['fail']['nominal']
-                old_dist_fail.SetTitle(bkg + ' - Pre-fit - Fail'+suffix)
-            elif test == 'signal':
-                if not blinded:
-                    old_dist_pass = copyHistWithNewXbounds(organizedDict[bkg]['pass']['nominal_unblinded'],bkg+'_pass_prefit_signal',x_binWidth,sigstart,sigend)
-                    old_dist_fail = copyHistWithNewXbounds(organizedDict[bkg]['fail']['nominal_unblinded'],bkg+'_fail_prefit_signal',x_binWidth,sigstart,sigend)
-                else:
-                    old_dist_pass = copyHistWithNewXbounds(organizedDict[bkg]['pass']['nominal'],bkg+'_pass_prefit_signal',x_binWidth,sigstart,sigend)
-                    old_dist_fail = copyHistWithNewXbounds(organizedDict[bkg]['fail']['nominal'],bkg+'_fail_prefit_signal',x_binWidth,sigstart,sigend)
-                old_dist_pass.SetTitle(bkg + ' - Pre-fit - Pass'+suffix)
-                old_dist_fail.SetTitle(bkg + ' - Pre-fit - Fail'+suffix)
+
+            old_dist_pass.SetTitle(bkg + ' - Pre-fit - Pass'+suffix)
+            old_dist_fail.SetTitle(bkg + ' - Pre-fit - Fail'+suffix)
 
             final_hists[bkg]['pass'][test].SetTitle(bkg + ' - Post-fit - Pass'+suffix)
             final_hists[bkg]['fail'][test].SetTitle(bkg + ' - Post-fit - Fail'+suffix)
@@ -542,41 +547,48 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
             # 1D Projections
             old_dist_pass_1D = old_dist_pass.ProjectionY()
             old_dist_fail_1D = old_dist_fail.ProjectionY()
+            old_dist_pass_1D.SetTitle('pre-fit')
+            old_dist_fail_1D.SetTitle('pre-fit')
             bkg_pass_1D = final_hists[bkg]['pass'][test].ProjectionY()
             bkg_fail_1D = final_hists[bkg]['fail'][test].ProjectionY()
+            bkg_pass_1D.SetTitle('post-fit')
+            bkg_fail_1D.SetTitle('post-fit')
 
             makeCan(bkg+'_'+test+'_distributions_1D'+suffix,globalDir,
                     [old_dist_pass_1D,old_dist_fail_1D],
-                    [[bkg_pass_1D],[bkg_fail_1D]],xtitle=x_title,ytitle=y_title, titles=['Pre-fit vs Post-fit - '+bkg+ ' - Pass'+suffix+' - ' +test,'Pre-fit vs Post-fit - '+bkg+ ' - Fail'+suffix+' - ' +test])
+                    [[bkg_pass_1D],[bkg_fail_1D]],
+                    xtitle=x_title,ytitle=y_title, 
+                    titles=['Pre-fit vs Post-fit - '+bkg+ ' - Pass'+suffix+' - ' +test,
+                            'Pre-fit vs Post-fit - '+bkg+ ' - Fail'+suffix+' - ' +test])
 
 
-        if suffix == '':
-            qcd_pass_1D_up, qcd_pass_1D_down = Make_up_down(qcd_pass_1D)
-            qcdErrCan = TCanvas('qcdErrCan','qcdErrCan',700,600)
-            qcdErrCan.cd()
+    if suffix == '':
+        qcd_pass_1D_up, qcd_pass_1D_down = Make_up_down(qcd_pass_1D)
+        qcdErrCan = TCanvas('qcdErrCan','qcdErrCan',700,600)
+        qcdErrCan.cd()
 
 
-            qcd_pass_1D_nom = qcd_pass_1D.Clone('qcd_pass_1D_nom')
+        qcd_pass_1D_nom = qcd_pass_1D.Clone('qcd_pass_1D_nom')
 
-            qcd_pass_1D_up.SetLineColor(kRed)
-            qcd_pass_1D_nom.SetLineColor(kBlack)
-            qcd_pass_1D_nom.SetFillColor(kYellow-9)
-            qcd_pass_1D_down.SetLineColor(kBlue)
+        qcd_pass_1D_up.SetLineColor(kRed)
+        qcd_pass_1D_nom.SetLineColor(kBlack)
+        qcd_pass_1D_nom.SetFillColor(kYellow-9)
+        qcd_pass_1D_down.SetLineColor(kBlue)
 
-            qcd_pass_1D_up.SetLineStyle(9)
-            qcd_pass_1D_down.SetLineStyle(9)
-            qcd_pass_1D_up.SetLineWidth(2)
-            qcd_pass_1D_down.SetLineWidth(2)
+        qcd_pass_1D_up.SetLineStyle(9)
+        qcd_pass_1D_down.SetLineStyle(9)
+        qcd_pass_1D_up.SetLineWidth(2)
+        qcd_pass_1D_down.SetLineWidth(2)
 
-            qcd_pass_1D_nom.GetYaxis().SetRangeUser(0,1.1*qcd_pass_1D_up.GetMaximum())
-            qcd_pass_1D_nom.GetXaxis().SetTitle(inputConfig['BINNING']['Y']['TITLE'])
-            qcd_pass_1D_nom.SetTitle('QCD - Fit uncertainty')
+        qcd_pass_1D_nom.GetYaxis().SetRangeUser(0,1.1*qcd_pass_1D_up.GetMaximum())
+        qcd_pass_1D_nom.GetXaxis().SetTitle(inputConfig['BINNING']['Y']['TITLE'])
+        qcd_pass_1D_nom.SetTitle('QCD - Fit uncertainty')
 
-            qcd_pass_1D_nom.Draw('hist')
-            qcd_pass_1D_up.Draw('same hist')
-            qcd_pass_1D_down.Draw('same hist')
+        qcd_pass_1D_nom.Draw('hist')
+        qcd_pass_1D_up.Draw('same hist')
+        qcd_pass_1D_down.Draw('same hist')
 
-            qcdErrCan.Print(globalDir+'UncertPlots/Uncertainty_QCD_fit.pdf','pdf')
+        qcdErrCan.Print(globalDir+'UncertPlots/Uncertainty_QCD_fit.pdf','pdf')
         
 
         # Quick thing to save out qcd estimates in a rootfile

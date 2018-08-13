@@ -12,6 +12,8 @@
 from optparse import OptionParser
 import subprocess
 import json
+import pprint
+pp = pprint.PrettyPrinter(indent = 2)
 
 import ROOT
 from ROOT import *
@@ -106,7 +108,7 @@ if not options.plotOnly:
 
     # Run Combine
     print 'Executing ' + 'combine -M MaxLikelihoodFit '+ tag+'/card_master.txt --saveWithUncertainties --saveWorkspace --rMin -5 --rMax 5'
-    subprocess.call(['combine -M MaxLikelihoodFit '+tag + '/card_master.txt --saveWithUncertainties --saveWorkspace --rMin -5 --rMax 5 -v 9'],shell=True)
+    subprocess.call(['combine -M MaxLikelihoodFit '+tag + '/card_master.txt --saveWithUncertainties --saveWorkspace --rMin -5 --rMax 5'],shell=True)
 
     subprocess.call(['mv MaxLikelihoodFitResult.root '+tag+'/'],shell=True)
     subprocess.call(['mv mlfit.root '+tag+'/'],shell=True)
