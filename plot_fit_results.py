@@ -304,6 +304,7 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
     # If you haven't blinded the fit, then you'll get the full distributions
 
     final_hists = {}
+    f_scaled_hists = TFile(globalDir+'/scaled_hists.root',"RECREATE")
 
     # All of this info is inside the Combine output so just need to grab from dictionary and scale if needed
     for proc in new_roo_dict.keys():
@@ -342,13 +343,14 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
                         thisDist['TH2'].Scale(-1*thisDist['NORM'].getValV())
                 except:
                     thisDist['TH2'].Scale(thisDist['NORM'].getValV())
+
+                thisDist['TH2'].Write()
                 makeCan(proc +'_'+cat+'_scaled',globalDir,[thisDist['TH2']],xtitle=x_title,ytitle=y_title,titles=[proc + ' - ' + cat + ' - Scaled'])
 
         # Store with 'fitted' key
         for reg in ['pass','fail']:
             final_hists[proc][reg] = {}
             final_hists[proc][reg]['fitted'] = new_roo_dict[proc][reg]['TH2']
-
 
     #############################################
     #   Make the signal region distributions    #
@@ -600,4 +602,5 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
         # qcd_pass_1D_down.Write()
         # bkg_out.Close()
 
-
+    
+    f_scaled_hists.Close()
