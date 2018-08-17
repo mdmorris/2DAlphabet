@@ -1,9 +1,13 @@
 import ROOT
 from ROOT import *
 
-c = TFile.Open('../flat1M/postfitplots.root')
-m = TFile.Open('../unit_tests/distributions/flat1M.root')
-p = TFile.Open('../flat1M/scaled_hists.root')
+gen = 'flat100kv1kBlind'
+
+c = TFile.Open('../'+gen+'/postfitshapes.root')
+m = TFile.Open('../unit_tests/distributions/flat100kv1k.root')
+p = TFile.Open('../../2DAlphabet/'+gen+'/scaled_hists.root')
+fd = TFile.Open('../'+gen+'/fitDiagnostics.root')
+ub = TFile.Open('../'+gen+'/postfitshapes_full.root')
 
 
 # Pre-fit comparisons
@@ -24,27 +28,45 @@ for thisSet in ['data_obs','signal']:
 
         can.cd(1)
         c_prefit.SetTitle('Combine Pre-fit Plotting - ' + thisSet + ', ' + thisCat)
+        c_prefit.SetMinimum(0)
         c_prefit.Draw('lego')
         can.cd(2)
         m_prefit.SetTitle('Custom Pre-fit Plotting - ' + thisSet + ', ' + thisCat)
+        m_prefit.SetMinimum(0)
         m_prefit.Draw('lego')
         can.cd(3)
         diff_prefit.SetTitle('Difference')
-        diff_prefit.Draw('surf')
+        diff_prefit.Draw('lego')
 
-        can.Print('../flat1M/2Dvalidation/prefit_'+thisSet+'_'+thisCat+'.pdf(','pdf')
+        can.Print('2DValidation_'+gen+'_prefit_'+thisSet+'_'+thisCat+'.pdf(','pdf')
 
         can2 = TCanvas('can2','can2',800,700)
-        c_prefit_projy = c_prefit.ProjectionY('e')
+        c_prefit_projy = c_prefit.ProjectionY(c_prefit.GetName()+'_py',0,-1,'e')
         c_prefit_projy.SetTitle('Combine Pre-fit Plotting Projection onto Y axis - ' + thisSet + ', ' + thisCat)
         c_prefit_projy.Draw('pe')
-        can2.Print('../flat1M/2Dvalidation/prefit_'+thisSet+'_'+thisCat+'.pdf','pdf')
+        can2.Print('2DValidation_'+gen+'_prefit_'+thisSet+'_'+thisCat+'.pdf','pdf')
 
         can3 = TCanvas('can3','can3',800,700)
-        m_prefit_projy = m_prefit.ProjectionY('e') 
+        m_prefit_projy = m_prefit.ProjectionY(m_prefit.GetName()+'_py',0,-1,'e') 
         m_prefit_projy.SetTitle('Custom Pre-fit Plotting Projection onto Y axis - ' + thisSet + ', ' + thisCat)
         m_prefit_projy.Draw('pe')
-        can3.Print('../flat1M/2Dvalidation/prefit_'+thisSet+'_'+thisCat+'.pdf)','pdf')
+        can3.Print('2DValidation_'+gen+'_prefit_'+thisSet+'_'+thisCat+'.pdf)','pdf')
+
+        # blindCan = TCanvas('blindCan','blindCan',1600,700)
+        # blindCan.Divide(3,1)
+        # blindCan.cd(1)
+
+        # unblinded_prefit = ub.Get(thisCat + '_prefit/'+thisSet)
+        # unblinded_prefit.Draw('lego')
+        # blindCan.cd(2)
+        # c_prefit.Draw('lego')
+        # blindCan.cd(3)
+        # diff_blind = unblinded_prefit.Clone()
+        # diff_blind.Add(c_prefit,-1)
+        # diff_blind.Draw('lego')
+
+
+        # blindCan.Print('2DValidation_'+gen+'_postfit_'+thisSet+'_'+thisCat+'.pdf)','pdf')
 
 
 # Post-fit comparisons
@@ -64,31 +86,85 @@ for thisSet in ['qcd','signal']:
 
         can.cd(1)
         c_postfit.SetTitle('Combine Post-fit Plotting - ' + thisSet + ', ' + thisCat)
+        c_postfit.SetMinimum(0)
         c_postfit.Draw('lego')
         can.cd(2)
         p_postfit.SetTitle('Custom Post-fit Plotting - ' + thisSet + ', ' + thisCat)
+        p_postfit.SetMinimum(0)
         p_postfit.Draw('lego')
         can.cd(3)
         diff_postfit.SetTitle('Difference')
         diff_postfit.Draw('lego')
 
-        if thisSet == 'signal':
-            for i in range(1,13):
-                for j in range(1,11):
-                    print diff_postfit.GetBinContent(i,j)
+        # if thisSet == 'signal':
+        #     for i in range(1,13):
+        #         for j in range(1,11):
+        #             print diff_postfit.GetBinContent(i,j)
 
-        can.Print('../flat1M/2Dvalidation/postfit_'+thisSet+'_'+thisCat+'.pdf(','pdf')
+        can.Print('2DValidation_'+gen+'_postfit_'+thisSet+'_'+thisCat+'.pdf(','pdf')
 
         can2 = TCanvas('can2','can2',800,700)
-        c_postfit_projy = c_postfit.ProjectionY('e')
+        c_postfit_projy = c_postfit.ProjectionY(c_postfit.GetName()+'_py',0,-1,'e')
         c_postfit_projy.SetTitle('Combine Post-fit Plotting Projection onto Y axis - ' + thisSet + ', ' + thisCat)
         c_postfit_projy.Draw('pe')
-        can2.Print('../flat1M/2Dvalidation/postfit_'+thisSet+'_'+thisCat+'.pdf','pdf')
+        can2.Print('2DValidation_'+gen+'_postfit_'+thisSet+'_'+thisCat+'.pdf','pdf')
 
         can3 = TCanvas('can3','can3',800,700)
-        p_postfit_projy = p_postfit.ProjectionY('e') 
+        p_postfit_projy = p_postfit.ProjectionY(p_postfit.GetName()+'_py',0,-1,'e') 
         p_postfit_projy.SetTitle('Custom Post-fit Plotting Projection onto Y axis - ' + thisSet + ', ' + thisCat)
         p_postfit_projy.Draw('pe')
-        can3.Print('../flat1M/2Dvalidation/postfit_'+thisSet+'_'+thisCat+'.pdf)','pdf')
+        can3.Print('2DValidation_'+gen+'_postfit_'+thisSet+'_'+thisCat+'.pdf','pdf')
 
 
+        blindCan = TCanvas('blindCan','blindCan',1600,1500)
+        blindCan.Divide(2,2)
+        blindCan.cd(1)
+
+        unblinded_postfit = ub.Get(thisCat + '_postfit/'+thisSet)
+        unblinded_postfit.SetTitle('Unblinded morph using blinded fit results')
+        unblinded_postfit.SetMinimum(0)
+        unblinded_postfit.Draw('lego')
+        blindCan.cd(2)
+        c_postfit.Draw('lego')
+        blindCan.cd(3)
+        diff_blind = unblinded_postfit.Clone()
+        diff_blind.Add(c_postfit,-1)
+        diff_blind.SetTitle('Unblinded minus Blinded Plots (sidebands should be 0)')
+        diff_blind.Draw('lego')
+        blindCan.cd(4)
+        diff_blind_zeroed = diff_blind.Clone()
+        # for i in range(1,13):
+        for j in range(1,11):
+            diff_blind_zeroed.SetBinContent(8,j,0)
+        diff_blind_zeroed.SetTitle('Difference again but signal region bins set to 0')
+        diff_blind_zeroed.Draw('lego')
+        blindCan.Print('2DValidation_'+gen+'_postfit_'+thisSet+'_'+thisCat+'.pdf)','pdf')
+
+
+
+        if thisSet == 'signal':
+            can4 = TCanvas('can4','can4',1600,1700)
+            can4.Divide(2,2)
+
+            can4.cd(1)
+            c_postfit.Draw('lego')
+            can4.cd(2)
+            c_scaled = c_postfit.Clone(c_postfit.GetName()+'_scaled')
+            tree = fd.Get('tree_fit_sb')
+            tree.GetEntry(0)
+            c_scaled.Scale(abs(tree.r))
+            c_scaled.Draw('lego')
+            can4.cd(3)
+            p_postfit.Draw('lego')
+            can4.cd(4)
+            diff_scale = c_scaled.Clone(p_postfit.GetName()+'_scale_diff')
+            diff_scale.Divide(p_postfit)
+            
+
+            for i in range(1,13):
+                for j in range(1,11):
+                    if diff_scale.GetBinContent(i,j) == 0:
+                        diff_scale.SetBinContent(i,j,1)
+            diff_scale.Draw('surf')
+
+            can4.Print('2DValidation_'+gen+'_scale_'+thisSet+'_'+thisCat+'.pdf','pdf')

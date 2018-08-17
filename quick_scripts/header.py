@@ -455,7 +455,7 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,rootf
     if rootfile:
         myCan.Print(tag+'plots/'+name+'.root','root')
     else:
-        myCan.Print(tag+'plots/'+name+'.pdf','pdf')
+        myCan.Print(tag+'plots/'+name+'.png','png')
 
 
 # Not yet integrated/used

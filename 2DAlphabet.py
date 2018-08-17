@@ -274,19 +274,22 @@ if options.runFit:
     if options.verbose != '':
         verbosity = ' -v '+options.verbose
     # Run Combine
-    print 'Executing combine -M MaxLikelihoodFit '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option +verbosity
-    subprocess.call(['combine -M MaxLikelihoodFit '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option + verbosity], shell=True)
+    print 'Executing combine -M FitDiagnostics '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option +verbosity
+    subprocess.call(['combine -M FitDiagnostics '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option + verbosity], shell=True)
 
     # Test that Combine ran successfully 
-    if not os.path.isfile('MaxLikelihoodFitResult.root'):
-        print "Combine failed and never made MaxLikelihoodFitResult.root. Quitting..."
+    if not os.path.isfile('fitDiagnostics.root'):
+        print "Combine failed and never made fitDiagnostics.root. Quitting..."
         quit()
 
-    subprocess.call(['mv MaxLikelihoodFitResult.root ' + maindir+subdir + '/'], shell=True)
-    subprocess.call(['mv higgsCombineTest.MaxLikelihoodFit.mH120.root ' + maindir+subdir + '/'], shell=True)
-    # subprocess.call(['mv mlfit.root ' + maindir+subdir + '/'], shell=True)
-
-    plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir,options.blinded)
+    subprocess.call(['mv fitDiagnostics.root ' + maindir+subdir + '/'], shell=True)
+    subprocess.call(['mv higgsCombineTest.FitDiagnostics.mH120.root ' + maindir+subdir + '/'], shell=True)
+    subprocess.call(['mv combine_logger.out ' + maindir+subdir + '/'], shell=True)
+    subprocess.call(['cp '+maindir+subdir + '/card_'+tag+'.txt ./'], shell=True)
+    print 'Executing PostFitShapes2D -d card_'+tag+'.txt -o '+maindir+subdir + '/postfitshapes.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'
+    subprocess.call(['PostFitShapes2D -d card_'+tag+'.txt -o '+maindir+subdir + '/postfitshapes.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
+    subprocess.call(['rm card_'+tag+'.txt'], shell=True)
+    # plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir,options.blinded)
 
 # if options.runDiagnostic:
     
