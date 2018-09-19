@@ -25,7 +25,7 @@
             "FILE": "path/TT2DalphabetweightedsignalLH1200_Trigger_nominal_none_PSET_default.root",
             "HISTPASS": "MttvMtPass",
             "HISTFAIL": "MttvMtFail",
-            "SYSTEMATICS":["lumi"],
+            "SYSTEMATICS":["lumi","topsf","Tpt","Trig","Pileup","pdf","jer","jes","jmr","jms"],
             "CODE": 0
         }
     },
@@ -125,9 +125,9 @@
         "X": {
             "NAME": "jetmass",
             "TITLE":"M_{t}",
-            "LOW": 50,
+            "LOW": 70,
             "HIGH": 330,
-            "NBINS": 14,
+            "NBINS": 13,
             "SIGSTART": 110,
             "SIGEND": 210,
             "BLINDED": false
@@ -135,45 +135,65 @@
         "Y": {
             "NAME": "resmass",
             "TITLE":"M_{tt}",
-            "LOW": 700,
+            "LOW": 900,
             "HIGH": 4000,
-            "NBINS": 33
+            "NBINS": 31
         }
     },
 
     "FIT": {
         "HELP": "The fit parameters of the 2D polynomial should be configured here. Note that parameters must be named x#y$ where # is the order of the parameter in the x and $ is the order of the parameter in the y.",
-        "XFORM":"(@1+@2*x+@3*x**2)",
-        "YFORM":"(@1+@2*y+@3*y**2)",
+        "XFORM":"(@1+@2*x+@3*x**2+@4*x**3+@5*x**4+@6*x**5)",
+        "YFORM":"(@1+@2*y+@3*y**2+@4*y**3)",
         "X1": {
-            "NOMINAL": 2.87543256705e-20,
+            "NOMINAL": 0.01,
             "LOW":0.0,
-            "HIGH":1e-10
+            "HIGH":1.0
         },
         "X2": {
-            "NOMINAL": 1.05941938999e-22,
-            "LOW":0.0,
-            "HIGH":1e-10
+            "NOMINAL": 0.01,
+            "LOW":-100.0,
+            "HIGH":100.0
         },
         "X3": {
-            "NOMINAL": 0.000074,
-            "LOW":0.0,
-            "HIGH":0.1
+            "NOMINAL": 0.01,
+            "LOW":-100.0,
+            "HIGH":100.0
+        },
+        "X4": {
+            "NOMINAL": 0.01,
+            "LOW":-100.0,
+            "HIGH":100.0
+        },
+        "X5": {
+            "NOMINAL": 0.01,
+            "LOW":-100.0,
+            "HIGH":100.0
+        },
+        "X6": {
+            "NOMINAL": 0.01,
+            "LOW":-100.0,
+            "HIGH":100.0
         },
         "Y1": {
-            "NOMINAL": 0.0007847,
+            "NOMINAL": 0.01,
             "LOW":0.0,
-            "HIGH":0.01
+            "HIGH":1.0
         },
         "Y2": {
-            "NOMINAL": -2.8379623401e-07,
-            "LOW":-1e-5,
-            "HIGH":0.0
+            "NOMINAL": 0.01,
+            "LOW":-100.0,
+            "HIGH":100.0
         },
         "Y3": {
-            "NOMINAL": 4.39330921414e-11,
-            "LOW":0.0,
-            "HIGH":1e-5
+            "NOMINAL": 0.01,
+            "LOW":-100.0,
+            "HIGH":100.0
+        },
+        "Y4": {
+            "NOMINAL": 0.01,
+            "LOW":-100.0,
+            "HIGH":100.0
         }
     }
 }
