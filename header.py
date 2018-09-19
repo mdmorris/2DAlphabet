@@ -282,7 +282,7 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,rootf
         padx = 3
         pady = 2
     else:
-        print 'histlist of size ' + len(histlist) + ' not currently supported'
+        print 'histlist of size ' + str(len(histlist)) + ' not currently supported'
         return 0
 
     myCan = TCanvas(name,name,width,height)
@@ -375,7 +375,7 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,rootf
 
                 # Build the stack
                 for bkg_index,bkg in enumerate(bkglist[hist_index]):     # Won't loop if bkglist is empty
-                    bkg.Sumw2()
+                    # bkg.Sumw2()
                     tot_hists[hist_index].Add(bkg)
                     bkg.SetLineColor(kBlack)
 
@@ -455,7 +455,7 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,rootf
     if rootfile:
         myCan.Print(tag+'plots/'+name+'.root','root')
     else:
-        myCan.Print(tag+'plots/'+name+'.pdf','pdf')
+        myCan.Print(tag+'plots/'+name+'.png','png')
 
 
 # Not yet integrated/used

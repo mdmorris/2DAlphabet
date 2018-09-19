@@ -21,7 +21,7 @@ import make_systematic_plots
 import get_fit_guesses
 import input_organizer
 import build_fit_workspace
-import plot_fit_results
+import plot_postfit_results
 import header
 from header import ascii_encode_dict
 
@@ -215,6 +215,12 @@ else:
     blinded = False
 
 
+# Plot only
+if options.plotOnly:
+    plot_postfit_results.main(input_config,options.blinded,maindir+subdir,subdir)
+    quit()
+
+
 #########################################################
 #            Plot the systematic uncertainties          #
 #########################################################
@@ -239,18 +245,16 @@ print 'Organizing histograms into single file...'
 organized_dict = input_organizer.main(input_config,blinded,subdir)
 print 'Done'
 
-# Plot only
-if options.plotOnly:
-    plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir,options.blinded)
-    quit()
-
 
 #########################################################
 #             Make the workspace for Combine            #
 #########################################################
 # Make the RooWorkspace - creates workspace name 'w_2D' in base.root
-workspace = build_fit_workspace.main(organized_dict,input_config,blinded,tag,subdir)
+subprocess.call(['mkdir basis_plots'],shell=True)
+zeroBins = build_fit_workspace.main(organized_dict,input_config,blinded,tag,subdir)
 subprocess.call(['mv base_'+tag+'.root ' + maindir + subdir+'/'], shell=True)
+subprocess.call(['rm -rf '+maindir + subdir+'/basis_plots'],shell=True)
+subprocess.call(['mv basis_plots '+maindir + subdir+'/'],shell=True)
 print 'Workspace built'
 
 #########################################################
@@ -258,7 +262,7 @@ print 'Workspace built'
 #########################################################
 # Make the data card - makes a text file named card_2D.txt, return 0
 print 'Making Combine card...'
-make_card.main(input_config, blinded, tag, maindir, subdir)
+make_card.main(input_config, zeroBins, blinded, tag, maindir, subdir)
 print 'Done'
 
 syst_option = ''
@@ -289,24 +293,7 @@ if options.runFit:
     print 'Executing PostFitShapes2D -d card_'+tag+'.txt -o '+maindir+subdir + '/postfitshapes.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'
     subprocess.call(['PostFitShapes2D -d card_'+tag+'.txt -o '+maindir+subdir + '/postfitshapes.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
     subprocess.call(['rm card_'+tag+'.txt'], shell=True)
-    # plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir,options.blinded)
-
-# if options.runDiagnostic:
-    
-#     # Run Combine
-#     print 'Executing combine -M FitDiagnostics '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option 
-#     subprocess.call(['combine -M FitDiagnostics '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option], shell=True)
-
-#     # Test that Combine ran successfully 
-#     if not os.path.isfile('FitDiagnostics.root'):
-#         print "Combine failed and never made FitDiagnostics.root. Quitting..."
-#         quit()
-
-#     subprocess.call(['mv FitDiagnostics.root ' + maindir+subdir + '/'], shell=True)
-#     subprocess.call(['mv higgsCombineTest.MaxLikelihoodFit.mH120.root ' + maindir+subdir + '/'], shell=True)
-#     subprocess.call(['mv mlfit.root ' + maindir+subdir + '/'], shell=True)
-
-#     plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir)
+    plot_postfit_results.main(input_config,options.blinded,maindir+subdir,subdir)
 
 
 if options.runLimits:

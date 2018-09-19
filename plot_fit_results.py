@@ -1,3 +1,9 @@
+#######################################################################################
+# OUTDATED - replaced by plot_postfit_results.py which works in conjunction with the  #
+#            Combine Harvester output for plotting in 2D                              #
+# 9/19/18                                                                             #
+#######################################################################################
+
 import ROOT
 from ROOT import *
 import header
@@ -52,8 +58,8 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
     old_w = old_file.Get('w_2D')                # which is not stored in the output of Combine
                                                 # (the sum of the two is stored there)
 
-    other_file = TFile.Open('dataSidebandFewerbins_tt/MaxLikelihoodFitResult.root')
-    other_w = other_file.Get('MaxLikelihoodFitResult')
+    # other_file = TFile.Open('dataSidebandFewerbins_tt/MaxLikelihoodFitResult.root')
+    # other_w = other_file.Get('MaxLikelihoodFitResult')
 
     # Build another dictionary that can sort and save our pdfs and RDHs
     # based upon info from the config

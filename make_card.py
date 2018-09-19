@@ -12,13 +12,15 @@ from header import colliMate
 import subprocess
 
 
-def main(inputConfig, blinded, tag, maindir, subdir):
+def main(inputConfig, zeroBins, blinded, tag, maindir, subdir):
     # Recreate file
     card_new = open('card_'+tag+'.txt','w')
     
     suffix = ''
     if subdir != '':            # Used when doing simultaneous fit and polyCoeffs and bins
         suffix = '_'+subdir[:-1]     # need different names between the spaces
+
+    print 'Suffix for card: ' + suffix
 
     globalDir = maindir+subdir
 
@@ -174,22 +176,27 @@ def main(inputConfig, blinded, tag, maindir, subdir):
     # Otherwise we float                            #
     # - Fail_bin_x-y                                #
     #################################################
-    # if 'XFORM' in inputConfig['FIT'].keys() and 'YFORM' in inputConfig['FIT'].keys():
-    #     nxparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XFORM'])
-    #     nyparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YFORM'])
+    if 'XFORM' in inputConfig['FIT'].keys() and 'YFORM' in inputConfig['FIT'].keys():
+        nxparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XFORM'])
+        nyparams = max([int(param[1:]) for param in inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YFORM'])
 
-    #     for nparams in [nxparams, nyparams]:
-    #         if nparams == nxparams:
-    #             thisVar = 'X'
-    #         else:
-    #             thisVar = 'Y'
-    #         for ip in range(1,nparams+1):
-    #             card_new.write(colliMate('fitParam'+thisVar+'_'+str(ip)+' flatParam\n',22))
-    # elif 'FORM' in inputConfig['FIT'].keys():
-    #     for coeff in [key for key in inputConfig['FIT'].keys() if key != 'HELP' and key.find('FORM') == -1]:
-    #         if 'LOW' in inputConfig['FIT'][coeff].keys() and 'HIGH' in inputConfig['FIT'][coeff].keys():
-    #             lower_coeff = coeff.lower()
-    #             card_new.write(colliMate('polyCoeff_'+lower_coeff+suffix+' flatParam\n',22))
+        for nparams in [nxparams, nyparams]:
+            if nparams == nxparams:
+                thisVar = 'X'
+            else:
+                thisVar = 'Y'
+            for ip in range(1,nparams+1):
+                card_new.write(colliMate('fitParam'+thisVar+'_'+str(ip)+' flatParam\n',22))
+    elif 'FORM' in inputConfig['FIT'].keys():
+        for coeff in [key for key in inputConfig['FIT'].keys() if key != 'HELP' and key.find('FORM') == -1]:
+            if 'LOW' in inputConfig['FIT'][coeff].keys() and 'HIGH' in inputConfig['FIT'][coeff].keys():
+                lower_coeff = coeff.lower()
+                card_new.write(colliMate('polyCoeff_'+lower_coeff+suffix+' flatParam\n',22))
+    elif 'CHEBYSHEV' in inputConfig['FIT'].keys():
+        for oX in range(0,inputConfig['FIT']['CHEBYSHEV']['XORDER']+1):
+            for oY in range(0,inputConfig['FIT']['CHEBYSHEV']['YORDER']+1):
+                chebName = 'ChebCoeff_x'+str(oX)+'y'+str(oY)+suffix
+                card_new.write(colliMate(chebName +' flatParam\n',22))
 
 
     # Check if we have any renormalized MCs, store which processes, and declare the _norm as a flatParam
@@ -227,13 +234,14 @@ def main(inputConfig, blinded, tag, maindir, subdir):
             xbins = range(1,xbins_n+1)
 
         # Write the flatParams
-        # for xbin in xbins:
+        for xbin in xbins:
             # if renormFlag:
             #     card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_init flatParam\n',22))
-            #     # for process in renormProcesses:
-            #     #     card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_'+process+'_nominal flatParam\n',22))
+            #     for process in renormProcesses:
+            #         card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_'+process+'_nominal flatParam\n',22))
             # else:
-            # card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+suffix+' flatParam\n',22))
+            if 'Fail_bin_'+str(xbin)+'-'+str(ybin)+suffix not in zeroBins:
+                card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+suffix+' flatParam\n',22))
             
        
     card_new.close()

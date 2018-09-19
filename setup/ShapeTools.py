@@ -30,8 +30,8 @@ class ShapeBuilder(ModelBuilder):
             ## then add all the others, to avoid a too long factory string
             for i,l in enumerate(self.DC.bins[5:]): self.out.binCat.defineType(l,i+5)   
             if self.options.verbose > 1: stderr.write("Will use category 'CMS_channel' to identify the %d channels\n" % self.out.binCat.numTypes())
-            self.out.obs = ROOT.RooArgSet()
-            self.out.obs.add(self.out.binVars)
+            self.out.obs = ROOT.RooArgSet(self.out.binVars)
+            # self.out.obs.add()
             self.out.obs.add(self.out.binCat)
         else:
             self.out.obs = self.out.binVars
