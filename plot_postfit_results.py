@@ -4,17 +4,18 @@ from ROOT import *
 import sys
 
 import header
-from header import makeCan
+from header import makeCan, FindCommonString
 
-def main(inputConfig, blindData, globalDir, suffix=''):
+def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
     allVars = []
 
+    subdir = ''
+    batch = False
     if len(globalDir.split('/')) > 1:
-        subdir = '_'+globalDir.split('/')[1]
-        batch = True
-    else: 
-        subdir = ''
-        batch = False
+        if globalDir.split('/')[1] != '':
+            subdir = '_'+globalDir.split('/')[1]
+            batch = True
+
 
     #####################
     #   Get everything  #
@@ -42,6 +43,7 @@ def main(inputConfig, blindData, globalDir, suffix=''):
 
     sigstart = inputConfig['BINNING']['X']['SIGSTART']
     sigend = inputConfig['BINNING']['X']['SIGEND']
+
     # Get the corresponding bin numbers with sigstart and end edges
     for xbin in range(1,x_nbins+1):
         if post_file.Get('pass'+subdir+'_prefit/data_obs').GetXaxis().GetBinLowEdge(xbin) == sigstart:
@@ -120,6 +122,32 @@ def main(inputConfig, blindData, globalDir, suffix=''):
                     elif z == 'y':
                         hist_dict[process][cat]['postfit_proj'+z+str(i)].SetTitle(process + ', ' + cat+subdir + ', ' +str(x_edges[i-1]) +'-'+ str(x_edges[i]))
 
+    # Add together processes that we want to see as one
+    process_list = hist_dict.keys() # save this real quick
+    colors = []
+    if procAddString != '':
+        for summation in procAddString.split(','):  # For each set we're add together
+            totalProcName = FindCommonString(summation.split('+'))  # Get the common name
+
+            process_list.append(totalProcName)   # add the name to a list so we can keep track
+            hist_dict[totalProcName] = {}
+            inputConfig["PROCESS"][totalProcName] = {"COLOR":inputConfig["PROCESS"][summation.split('+')[0]]["COLOR"],
+                                                     "CODE":inputConfig["PROCESS"][summation.split('+')[0]]["CODE"] }
+
+            for cat in hist_dict[summation.split('+')[0]].keys():   # for each pass/fail
+                hist_dict[totalProcName][cat] = {}
+                for reg in hist_dict[summation.split('+')[0]][cat].keys():  # and each region
+                    firstHist = hist_dict[summation.split('+')[0]][cat][reg].Clone(totalProcName+'_'+cat+'_'+reg)    # Clone the "first" histogram and give it the totalProcName
+                    for proc in summation.split('+'):   # for each process in the list of ones we're adding together
+                        if proc != summation.split('+')[0]: # not the first one since we've cloned that
+                            firstHist.Add(hist_dict[proc][cat][reg])    # add it
+                    hist_dict[totalProcName][cat][reg] = firstHist    # Put it in the hist_dict
+
+
+            for proc in summation.split('+'):
+                process_list.remove(proc)
+
+
     # Create lists for the 2D projections (ones you want to see together)
     for process in hist_dict.keys():    # Canvas
         twoDList = []         
@@ -129,12 +157,13 @@ def main(inputConfig, blindData, globalDir, suffix=''):
 
         makeCan(process+'_2D',globalDir+'/',twoDList,xtitle=x_title,ytitle=y_title)
 
+    process_list[-1],process_list[-2] = process_list[-2],process_list[-1]
 
     # Get the colors
-    process_list = hist_dict.keys()
-    colors = []
     for process in process_list:
         if process != 'data_obs':
+            if process not in inputConfig['PROCESS'].keys():
+                continue
             if (process != 'qcd' and inputConfig['PROCESS'][process]['CODE'] != 0):
                 if (process in inputConfig['PROCESS'].keys()) and ('COLOR' in inputConfig['PROCESS'][process].keys()):
                     colors.append(inputConfig['PROCESS'][process]["COLOR"])
@@ -145,6 +174,7 @@ def main(inputConfig, blindData, globalDir, suffix=''):
     for plotType in ['postfit_projx','postfit_projy']:   # Canvases
         bkgList = []
         dataList = []
+        signal_list = []
         
         for cat in ['fail','pass']: # Row 
             for regionNum in range(1,4):    # Column
@@ -153,20 +183,29 @@ def main(inputConfig, blindData, globalDir, suffix=''):
                     if process != 'data_obs':
                         if (process != 'qcd' and inputConfig['PROCESS'][process]['CODE'] != 0):
                             bkg_process_list.append(hist_dict[process][cat][plotType+str(regionNum)])
+                        elif (process != 'qcd' and inputConfig['PROCESS'][process]['CODE'] == 0):
+                            signal_list.append(hist_dict[process][cat][plotType.replace('post','pre')+str(regionNum)])
                         
                     else:
                         dataList.append(hist_dict[process][cat][plotType+str(regionNum)])
                 # print colors
                 # print bkg_process_list
                 # raw_input('waiting')
+
                 bkg_process_list.append(hist_dict['qcd'][cat][plotType+str(regionNum)]) # QCD goes last
                 colors.append(kYellow)
                 bkgList.append(bkg_process_list)
 
+        
+
+
+
         if 'x' in plotType:
-            makeCan(plotType,globalDir+'/',dataList,bkglist=bkgList,colors=colors,xtitle=x_title)
+            makeCan(plotType,globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=x_title)
+            makeCan(plotType+'_log',globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=x_title,logy=True)
         elif 'y' in plotType:
-            makeCan(plotType,globalDir+'/',dataList,bkglist=bkgList,colors=colors,xtitle=y_title)
+            makeCan(plotType,globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=y_title)
+            makeCan(plotType+'_log',globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=y_title,logy=True)
 
     ##############
     #    Rp/f    #

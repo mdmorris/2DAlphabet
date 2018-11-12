@@ -105,6 +105,7 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
 
     # Start by copying the failing distribution of data
     TH2_data_fail = dictTH2s['data_obs']['fail']['nominal']
+    TH2_data_pass = dictTH2s['data_obs']['pass']['nominal']
 
     ####################################################
     # Get the fit information and store as RooRealVars #
@@ -303,8 +304,8 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
 
 
                 # If bin content is <= 0, treat this bin as a RooConstVar at 0
-                if binContent <= 0:
-                    binRRV = RooConstVar(name, name, 0.0001)
+                if (binContent <= 0):# or (TH2_data_pass.GetBinContent(xbin,ybin) == 0):
+                    binRRV = RooConstVar(name, name, max(0.0001,binContent))
                     binListFail.add(binRRV)
                     allVars.append(binRRV)
                     zeroBins.append(name)
@@ -327,13 +328,13 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
                         # Make Fail bin directly
                         if binContent < 10:
                             print name +' ' + str(binContent)
-                            binRRV = RooRealVar(name, name, binContent, 0, 30)
+                            binRRV = RooRealVar(name, name, binContent, 0, 50)
                             if binContent-binErrDown < 0:
                                 binErrDown = binContent          # For the rare case when bin error is large relative to the content
                             
                             binRRV.setAsymError(binErrDown,binErrUp)
                             floating_vars.append(name)
-                        elif binContent < 30:             # Give larger floating range for bins with few events
+                        elif binContent < 50:             # Give larger floating range for bins with few events
                             print name +' ' + str(binContent)
                             binRRV = RooRealVar(name, name, binContent, 0, 100)
                             if binContent-binErrDown < 0:
