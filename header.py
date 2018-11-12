@@ -247,7 +247,7 @@ def printWorkspace(myfile,myworkspace):
 
 
 
-def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False):  
+def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -355,7 +355,7 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,rootf
                     mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.1, 1, 1))
                     subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 0, 0))
 
-                legends.append(TLegend(0.7,0.8,0.95,0.93))
+                legends.append(TLegend(0.65,0.6,0.95,0.93))
                 stacks.append(THStack(hist.GetName()+'_stack',hist.GetName()+'_stack'))
                 tot_hists.append(TH1F(hist.GetName()+'_tot',hist.GetName()+'_tot',hist.GetNbinsX(),hist.GetXaxis().GetXmin(),hist.GetXaxis().GetXmax()))
 
@@ -378,6 +378,8 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,rootf
                     # bkg.Sumw2()
                     tot_hists[hist_index].Add(bkg)
                     bkg.SetLineColor(kBlack)
+                    if logy:
+                        bkg.SetMinimum(1e-3)
 
                     if bkg.GetName().find('qcd') != -1:
                         bkg.SetFillColor(kYellow)
@@ -390,12 +392,10 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,rootf
 
                     stacks[hist_index].Add(bkg)
 
-                    legends[hist_index].AddEntry(bkg,bkg.GetTitle(),'f')
+                    legends[hist_index].AddEntry(bkg,bkg.GetName().split('_')[0],'f')
                     
                 # Go to main pad, set logy if needed
                 mains[hist_index].cd()
-                if logy == True:
-                    mains[hist_index].SetLogy()
 
                 # Set y max of all hists to be the same to accomodate the tallest
                 histList = [stacks[hist_index],tot_hists[hist_index],hist]
@@ -408,15 +408,29 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,rootf
                         maxHist = histList[h]
                 for h in histList:
                     h.SetMaximum(yMax*1.1)
+                    if logy == True:
+                        h.SetMaximum(yMax*10)
 
                 # Now draw the main pad
                 data_leg_title = hist.GetTitle()
                 if len(titles) > 0:
                     hist.SetTitle(titles[hist_index])
                 hist.SetTitleOffset(1.5,"xy")
+                hist.GetYaxis().SetTitle('Events')
+                if logy == True:
+                    hist.SetMinimum(1e-3)
                 hist.Draw('pe')
 
                 stacks[hist_index].Draw('same hist')
+
+                # Do the signals
+                if len(signals) > 0: 
+                    signals[hist_index].SetLineColor(kBlue)
+                    signals[hist_index].SetLineWidth(2)
+                    if logy == True:
+                        signals[hist_index].SetMinimum(1e-3)
+                    legends[hist_index].AddEntry(signals[hist_index],signals[hist_index].GetName().split('_')[0],'L')
+                    signals[hist_index].Draw('hist same')
 
                 tot_hists[hist_index].SetFillColor(kBlack)
                 tot_hists[hist_index].SetFillStyle(3354)
@@ -425,8 +439,10 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,rootf
                 legends[hist_index].Draw()
 
                 if not dataOff:
-                    legends[hist_index].AddEntry(hist,data_leg_title,'p')
+                    legends[hist_index].AddEntry(hist,'data','p')
                     hist.Draw('p e same')
+
+                gPad.RedrawAxis()
 
                 # Draw the pull
                 subs[hist_index].cd()
@@ -449,14 +465,37 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,rootf
                 pulls[hist_index].GetXaxis().SetTitleSize(LS)
 
                 pulls[hist_index].GetXaxis().SetTitle(xtitle)
-                pulls[hist_index].GetYaxis().SetTitle(ytitle)
+                pulls[hist_index].GetYaxis().SetTitle("(Data-Bkg)/#sigma")
                 pulls[hist_index].Draw('hist')
+
+                if logy == True:
+                    mains[hist_index].SetLogy()
 
     if rootfile:
         myCan.Print(tag+'plots/'+name+'.root','root')
     else:
         myCan.Print(tag+'plots/'+name+'.png','png')
 
+
+def FindCommonString(string_list):
+    to_match = ''   # initialize the string we're looking for/building
+    for s in string_list[0]:    # for each character in the first string
+        passed = True
+        for istring in range(1,len(string_list)):   # compare to_match+s against strings in string_list
+            string = string_list[istring]
+            if to_match not in string:                  # if in the string, add more
+                passed = False
+            
+        if passed == True:
+            to_match+=s
+
+    if to_match[-2] == '_':
+        return to_match[:-2] 
+    else:
+        return to_match[:-1]                # if not, return to_match minus final character
+
+    return to_match[:-2]
+        
 
 # Not yet integrated/used
 def Make_Pull_plot( DATA,BKG):
