@@ -9,7 +9,7 @@
 import ROOT
 from ROOT import *
 import header
-from header import copyHistWithNewXbounds, makeBlindedHist
+from header import copyHistWithNewXbounds, copyHistWithNewYbounds, makeBlindedHist
 import pprint
 pp = pprint.PrettyPrinter(indent = 2)
 
@@ -174,6 +174,7 @@ def main(inputConfig, blinded, subdir=''):
     newYmin = inputConfig['BINNING']['Y']['LOW']
     newYmax = inputConfig['BINNING']['Y']['HIGH']
     newYnbins = inputConfig['BINNING']['Y']['NBINS']
+    newYwidth = float(newYmax-newYmin)/float(newYnbins)
 
     # For each process, category, and dist (nominal, systUp, etc)
     for process in dictHists.keys():
@@ -194,21 +195,27 @@ def main(inputConfig, blinded, subdir=''):
                 oldYmin = thisProcessCatDict[dist].GetYaxis().GetXmin()
                 oldYmax = thisProcessCatDict[dist].GetYaxis().GetXmax()
 
-                # If the edges have changed, print an error and quit
+                # Make changes if we want new bin edges
                 if (oldXmin != newXmin) or (oldXmax != newXmax):
+                    print "Applying new X bounds: ["+str(thisProcessCatDict[dist].GetXaxis().GetXmin())+","+str(thisProcessCatDict[dist].GetXaxis().GetXmax())+"] -> ["+str(newXmin)+","+str(newXmax)+"]"
                     histWithNewXbounds = copyHistWithNewXbounds(thisProcessCatDict[dist],histname,newXwidth,newXmin,newXmax)
                     thisProcessCatDict[dist] = histWithNewXbounds
 
-                elif (oldXmin != newXmin) or (oldXmax != newXmax) or (oldYmin != newYmin) or (oldYmax != newYmax):
-                    print "Error! Bin edges in input histogram " + histname+" are different than those in the input JSON. This is not currently supported. Exiting."
-                    thisProcessCatDict[dist].Print()
-                    print '       In hist    v    In json'
-                    print 'Xmin: ' + str(oldXmin) + ' v ' + str(newXmin)
-                    print 'Xmax: ' + str(oldXmax) + ' v ' + str(newXmax)
-                    print 'Ymin: ' + str(oldYmin) + ' v ' + str(newYmin)
-                    print 'Ymax: ' + str(oldYmax) + ' v ' + str(newYmax)
+                if (oldYmin != newYmin) or (oldYmax != newYmax):
+                    print "Applying new Y bounds: ["+str(thisProcessCatDict[dist].GetYaxis().GetXmin())+","+str(thisProcessCatDict[dist].GetYaxis().GetXmax())+"] -> ["+str(newYmin)+","+str(newYmax)+"]"
+                    histWithNewYbounds = copyHistWithNewYbounds(thisProcessCatDict[dist],histname,newYwidth,newYmin,newYmax)
+                    thisProcessCatDict[dist] = histWithNewYbounds
 
-                    quit()
+                # elif (oldXmin != newXmin) or (oldXmax != newXmax) or (oldYmin != newYmin) or (oldYmax != newYmax):
+                #     print "Error! Bin edges in input histogram " + histname+" are different than those in the input JSON. This is not currently supported. Exiting."
+                #     thisProcessCatDict[dist].Print()
+                #     print '       In hist    v    In json'
+                #     print 'Xmin: ' + str(oldXmin) + ' v ' + str(newXmin)
+                #     print 'Xmax: ' + str(oldXmax) + ' v ' + str(newXmax)
+                #     print 'Ymin: ' + str(oldYmin) + ' v ' + str(newYmin)
+                #     print 'Ymax: ' + str(oldYmax) + ' v ' + str(newYmax)
+
+                #     quit()
 
                 # If the number of bins have changed, rebin
                 if thisProcessCatDict[dist].GetNbinsX() != newXnbins or thisProcessCatDict[dist].GetNbinsY() != newYnbins:
@@ -216,7 +223,6 @@ def main(inputConfig, blinded, subdir=''):
                     ratio_X = int(float(thisProcessCatDict[dist].GetNbinsX())/float(newXnbins))
                     ratio_Y = int(float(thisProcessCatDict[dist].GetNbinsY())/float(newYnbins))
                     thisProcessCatDict[dist].Rebin2D(ratio_X,ratio_Y)
-
                 
 
                 # Name the nominal histograms
@@ -225,7 +231,7 @@ def main(inputConfig, blinded, subdir=''):
 
 
                 # Now we blind the hist if needed
-                if blinded:
+                if blinded and dist.find('unblinded') == -1:
                     low_histname = process + '_' + cat + 'Low'
                     high_histname = process + '_' + cat + 'High'
                     if dist != 'nominal':                           # if not nominal dist
@@ -234,15 +240,14 @@ def main(inputConfig, blinded, subdir=''):
 
                     # Create the split histograms (do the naming for them in this step)
                     hist_to_split = dictHists[process][cat][dist]
-                    dictHists[process][cat][dist+'_unblinded'] = hist_to_split.Clone()   # Backing up the unblinded hist
-                    if process == 'ttbar':
-                        print '1'
-                        dictHists[process][cat][dist+'_unblinded'].Draw('lego')
+                    thisProcessCatDict[dist+'_unblinded'] = hist_to_split.Clone(hist_to_split.GetName()+'_unblinded')   # Backing up the unblinded hist
                     low_hist = copyHistWithNewXbounds(hist_to_split,low_histname,newXwidth,newXmin,sigStart)
                     high_hist = copyHistWithNewXbounds(hist_to_split,high_histname,newXwidth,sigEnd,newXmax)
-                    dictHists[process][cat][dist] = makeBlindedHist(hist_to_split,low_hist,high_hist)
-                    if process == 'ttbar':
-                        print '2'
-                        dictHists[process][cat][dist+'_unblinded'].Draw('lego')
+                    thisProcessCatDict[dist] = makeBlindedHist(hist_to_split,low_hist,high_hist)
+
+                if thisProcessCatDict[dist].Integral() <= 0:
+                    thisProcessCatDict[dist].Draw('lego')
+                    raw_input('WARNING: '+process+', '+cat+', '+dist+' has zero or negative events - ' + str(thisProcessCatDict[dist].Integral()))
+
 
     return dictHists

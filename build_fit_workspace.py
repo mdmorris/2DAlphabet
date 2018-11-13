@@ -29,10 +29,15 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
     if subdir != '':            # Used when doing simultaneous fit and polyCoeffs and bins
         suffix = '_'+subdir[:-1]     # need different names between the spaces
 
+    print 'Suffix for workspace: ' + suffix
+
+    floating_vars = [] # This holds the names of all of the variables that we want to float.
+                       # These are typically bins in the RPH2D 
+
     ################################
     # Establish our axis variables #
     ################################
-    x_var,y_var = getRRVs(inputConfig,False)
+    x_var,y_var = getRRVs(inputConfig)
     var_list = RooArgList(x_var,y_var)
 
     allVars.extend([x_var,y_var,var_list])
@@ -48,7 +53,6 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
     # if the process has CODE 0,1,2 and a PDF with a normalization if the CODE is 3
 
     Roo_dict = dictCopy(dictTH2s)
-    rateParam_lines = []
 
     # For procees, cat, dict...
     for process in Roo_dict.keys():
@@ -58,33 +62,49 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
         #     Roo_dict[process]['NORM'] = RooRealVar(process+'_norm',process+'_norm',0.0,2.0)
         for cat in ['pass','fail']:
             for dist in Roo_dict[process][cat].keys():
+                if dist.find('unblinded') == -1:
+                    if inputConfig["PROCESS"][process]["CODE"] != 3:
+                        Roo_dict[process][cat][dist] = {}
+                        if dictTH2s[process][cat][dist].Integral() <= 0:
+                            raw_input('WARNING: '+process+', '+cat+', '+dist+' has zero or negative events - ' + str(dictTH2s[process][cat][dist].Integral()))
 
-                # if inputConfig["PROCESS"][process]["CODE"] != 3:
-                Roo_dict[process][cat][dist] = {}
-                Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],var_list)
+                        Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],var_list)
 
-                # elif inputConfig["PROCESS"][process]["CODE"] == 3:
-                    # print 'Will have floating process ' + process,         
-                    # Roo_dict[process][cat][dist] = {}
-                    # Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],var_list) 
-                    # Roo_dict[process][cat][dist]['RDH'].SetName(dictTH2s[process][cat][dist].GetName()+'_RDH') 
-                    # Roo_dict[process][cat][dist]['RHP'] = makeRHP(Roo_dict[process][cat][dist]['RDH'],var_list)
-                    # Roo_dict[process][cat][dist]['RHP'].SetName(dictTH2s[process][cat][dist].GetName().replace('_RDH',''))
-                    # Roo_dict[process][cat][dist]['RHP'].Print()
+                    # Code 3 means major non-QCD MC that we need to float as its own RPH2D
+                    elif inputConfig["PROCESS"][process]["CODE"] == 3:
+                        # print 'Will have floating process ' + process,  
+                        Roo_dict[process][cat][dist] = {}   # 
+                        if (cat == 'pass' or dist != 'nominal'):
+                            Roo_dict[process][cat][dist]['RDH'] = makeRDH(dictTH2s[process][cat][dist],var_list)    
 
-                    # # Make normalization
-                    # norm_name = Roo_dict[process][cat][dist]['RHP'].GetName() + '_norm'
-                    # norm_start = RooConstVar(norm_name+'_start',norm_name+'_start',float(dictTH2s[process][cat][dist].Integral()))
-                    # allVars.append(norm_start)
+                        # Fail is done once we have the RPH2D built
 
-                    # norm = RooProduct(norm_name,norm_name,RooArgList(Roo_dict[process]['NORM'],norm_start))
-                    # Roo_dict[process][cat][dist]['NORM'] = norm
+                else:
+                    Roo_dict[process][cat].pop(dist)   # The unblinded hists are going to leak in here from dictTH2s so get rid of them while you can
 
+                        # RPH2D won't be initialized here. Instead, we want to keep a record
+                        # Roo_dict[process][cat][dist]['RPH2D'] = makeRDH(dictTH2s[process][cat][dist],var_list) 
+                        # Roo_dict[process][cat][dist]['RDH'].SetName(dictTH2s[process][cat][dist].GetName()+'_RDH') 
+                        # Roo_dict[process][cat][dist]['RHP'] = makeRHP(Roo_dict[process][cat][dist]['RDH'],var_list)
+                        # Roo_dict[process][cat][dist]['RHP'].SetName(dictTH2s[process][cat][dist].GetName().replace('_RDH',''))
+                        # Roo_dict[process][cat][dist]['RHP'].Print()
+
+                        # # Make normalization
+                        # norm_name = Roo_dict[process][cat][dist]['RHP'].GetName() + '_norm'
+                        # norm_start = RooConstVar(norm_name+'_start',norm_name+'_start',float(dictTH2s[process][cat][dist].Integral()))
+                        # allVars.append(norm_start)
+
+                        # norm = RooProduct(norm_name,norm_name,RooArgList(Roo_dict[process]['NORM'],norm_start))
+                        # Roo_dict[process][cat][dist]['NORM'] = norm
 
 
 #############################################################################################
 # Everything from here on is only dealing with the QCD estimate - everything else is done   #
 #############################################################################################
+
+    # Start by copying the failing distribution of data
+    TH2_data_fail = dictTH2s['data_obs']['fail']['nominal']
+    TH2_data_pass = dictTH2s['data_obs']['pass']['nominal']
 
     ####################################################
     # Get the fit information and store as RooRealVars #
@@ -117,6 +137,12 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
                     thisHigh = input_param_vals['HIGH']
                     print name
                     fitParamRRVs['fitParam'+thisVar+'_'+str(ip)] = RooRealVar(name,name,thisNom,thisLow,thisHigh)
+
+                    if 'ERROR_UP' in input_param_vals.keys() and 'ERROR_DOWN' in input_param_vals.keys():
+                        fitParamRRVs['fitParam'+thisVar+'_'+str(ip)].setAsymError(input_param_vals['ERROR_DOWN'],input_param_vals['ERROR_UP'])
+                    elif 'ERROR' in input_param_vals.keys():
+                        fitParamRRVs['fitParam'+thisVar+'_'+str(ip)].setError(input_param_vals['ERROR'])
+
                 else:
                     input_break = raw_input('WARNING: Upper and lower bounds on global fit parameter ' +thisVar+str(ip) + ' not defined. Please type "N" if you would like to quit or enter if you would like to treat the parameter as constant')
                     if input_break == 'N':
@@ -154,6 +180,12 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
                     thisLow = input_param_vals['LOW']
                     thisHigh = input_param_vals['HIGH']
                     PolyCoeffs['x'+str(xi)+'y'+str(yi)] = RooRealVar(name,name,thisNom,thisLow,thisHigh)
+
+                    if 'ERROR_UP' in input_param_vals.keys() and 'ERROR_DOWN' in input_param_vals.keys():
+                        PolyCoeffs['x'+str(xi)+'y'+str(yi)].setAsymError(input_param_vals['ERROR_DOWN'],input_param_vals['ERROR_UP'])
+                    elif 'ERROR' in input_param_vals.keys():
+                        PolyCoeffs['x'+str(xi)+'y'+str(yi)].setError(input_param_vals['ERROR'])
+
                 else:
                     input_break = raw_input('WARNING: Upper and lower bounds on fit parameter ' + 'x'+str(xi)+'y'+str(yi) + ' not defined. Please type "N" if you would like to quit or enter if you would like to treat the parameter as constant')
                     if input_break == 'N':
@@ -162,17 +194,39 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
                         PolyCoeffs['x'+str(xi)+'y'+str(yi)] = RooConstVar(name,name,thisNom)
                 allVars.append(PolyCoeffs['x'+str(xi)+'y'+str(yi)])
 
+    elif "CHEBYSHEV" in inputConfig['FIT'].keys():
+        chebBasis = chebyshevBasis('chebBasis','chebBasis',inputConfig['FIT']['CHEBYSHEV']['XORDER'],inputConfig['FIT']['CHEBYSHEV']['YORDER'],TH2_data_fail)
+        chebBasis.drawBasis('basis_plots/basis_shapes.root')
+        chebCoeffs = {}
+
+        for oX in range(0,inputConfig['FIT']['CHEBYSHEV']['XORDER']+1):
+            for oY in range(0,inputConfig['FIT']['CHEBYSHEV']['YORDER']+1):
+                chebName = 'ChebCoeff_x'+str(oX)+'y'+str(oY)+suffix
+                chebKey = 'x'+str(oX)+'y'+str(oY)
+                chebCoeffs[chebKey] = RooRealVar(chebName,chebName,0.001,-5,5)
+
+                
     ######################################
     # Build the RooParametricHist2D bins #
     ######################################
-
-    # Start by copying the failing distribution of data
-    TH2_data_fail = dictTH2s['data_obs']['fail']['nominal']
-
     Roo_dict['qcd'] = {}
 
     binListFail = RooArgList()
     binListPass = RooArgList()
+
+    zeroBins = []
+
+    # Setup for having Major MC that will shift in the fit
+    if 3 in [inputConfig['PROCESS'][process]['CODE'] for process in inputConfig['PROCESS'] if process != 'HELP']:
+        hasMMC = True
+        # Create dictionary to store RALs that contain every bin (key is process name)
+        MMC_RALs = {}
+        for process in inputConfig['PROCESS']:
+            if process != 'HELP':
+                if inputConfig['PROCESS'][process]['CODE'] == 3:
+                    MMC_RALs[process] = RooArgList()
+    else:
+        hasMMC = False
 
     # Get each bin
     for ybin in range(1,TH2_data_fail.GetNbinsY()+1):
@@ -194,10 +248,16 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
             # 1) Have a negligible number of events but NOT zero (will break Combine)
             # 2) Have no dependence on the Rp/f (otherwise they will influence the Rp/f shape)
             if blinded and (upperEdge_in_sig or lowerEdge_in_sig):
-                print "Blinding bin " + name
                 binRRV = RooConstVar(name, name, 0.0001)
                 binListFail.add(binRRV)
                 allVars.append(binRRV)
+
+                if hasMMC:
+                    for process in dictTH2s.keys():
+                        if inputConfig['PROCESS'][process]['CODE'] == 3:
+                            MMC_RRV = RooConstVar(process+'_fail_bin_'+str(xbin)+'-'+str(ybin)+suffix,process+'_fail_bin_'+str(xbin)+'-'+str(ybin)+suffix,0.0001)
+                            MMC_RALs[process].add(MMC_RRV)
+                            allVars.append(MMC_RRV)
 
                 thisBinPass = RooConstVar('Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix, 'Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix, 0.0001)
                 binListPass.add(thisBinPass)
@@ -205,11 +265,15 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
 
             # Otherwise
             else:
-                # Initialize contents
+                # Initialize contents by subtracting minor non-QCD components (code 2)
                 binContent = TH2_data_fail.GetBinContent(xbin,ybin)
                 binErrUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)*3
                 binErrDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)*3
                 
+                # if hasMMC, create a RooArgList to store each for this bin
+                if hasMMC:
+                    MMC_to_sub = RooArgList('MMC_to_sub_'+str(xbin)+'-'+str(ybin)+suffix)
+
                 # Now subtract away the parts that we don't want
                 for process in dictTH2s.keys():
                     thisTH2 = dictTH2s[process]['fail']['nominal']
@@ -219,28 +283,83 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
                         continue
                     elif inputConfig['PROCESS'][process]['CODE'] == 1: # data
                         continue
-                    elif inputConfig['PROCESS'][process]['CODE'] == 2: # unchanged MC
+                    elif inputConfig['PROCESS'][process]['CODE'] == 2: # minor MC (mMC)
                         binContent  = binContent    - thisTH2.GetBinContent(xbin,ybin)
-                        binErrUp    = binErrUp      - thisTH2.GetBinContent(xbin,ybin) + thisTH2.GetBinErrorUp(xbin,ybin)*3             # Just propagator errors normally
-                        binErrDown  = binErrDown    - thisTH2.GetBinContent(xbin,ybin) - thisTH2.GetBinErrorLow(xbin,ybin)*3
-                    # OUT OF DATE AND NOT SUPPORTED
-                    # elif inputConfig['PROCESS'][process]['CODE'] == 3: # renorm MC
-                    #     binErrUp    = binContent                                               # Err up is no MC subtraction
-                    #     binErrDown  = binContent    - 2.0 * thisTH2.GetBinContent(xbin,ybin)   # Err down is double MC subtraction
-                    #     binContent  = binContent    - thisTH2.GetBinContent(xbin,ybin)         # Nominal is nominal MC subtraction
+                        binErrUp    = binErrUp      - thisTH2.GetBinContent(xbin,ybin) + thisTH2.GetBinErrorUp(xbin,ybin)             # Just propagator errors normally
+                        binErrDown  = binErrDown    - thisTH2.GetBinContent(xbin,ybin) - thisTH2.GetBinErrorLow(xbin,ybin)
+
+                    elif inputConfig['PROCESS'][process]['CODE'] == 3: # Major MC (MMC)
+                        if thisTH2.GetBinContent(xbin,ybin) <= 0:
+                            MMC_RRV = RooConstVar(process+'_fail_bin_'+str(xbin)+'-'+str(ybin)+suffix,process+'_fail_bin_'+str(xbin)+'-'+str(ybin)+suffix,0.0001)
+                        else:
+                            MMC_RRV = RooRealVar(process+'_fail_bin_'+str(xbin)+'-'+str(ybin)+suffix,process+'_fail_bin_'+str(xbin)+'-'+str(ybin)+suffix,thisTH2.GetBinContent(xbin,ybin),0,3*thisTH2.GetBinContent(xbin,ybin))     # Create the RRV for the background in this bin
+                            MMC_RRV.setAsymError(thisTH2.GetBinErrorLow(xbin,ybin),thisTH2.GetBinErrorUp(xbin,ybin))
+                        MMC_RALs[process].add(MMC_RRV)                                                                  # Add it to the RAL for RPH2D creation
+                        MMC_to_sub.add(MMC_RRV)                                                                         # Add it to the RAL for subtracting
+                        floating_vars.append(process+'_fail_bin_'+str(xbin)+'-'+str(ybin)+suffix)                       # Make sure it floats
+                        allVars.append(MMC_RRV)
+
 
                 # If bin content is <= 0, treat this bin as a RooConstVar at 0
-                if binContent <= 0:
-                    binRRV = RooConstVar(name, name, 0.0001)
+                if (binContent <= 0):# or (TH2_data_pass.GetBinContent(xbin,ybin) == 0):
+                    binRRV = RooConstVar(name, name, max(0.0001,binContent))
                     binListFail.add(binRRV)
                     allVars.append(binRRV)
+                    zeroBins.append(name)
+
+                    if hasMMC:
+                        for process in dictTH2s.keys():
+                            if inputConfig['PROCESS'][process]['CODE'] == 3:
+                                MMC_RRV = RooConstVar(process+'_fail_bin_'+str(xbin)+'-'+str(ybin)+suffix,process+'_fail_bin_'+str(xbin)+'-'+str(ybin)+suffix,0.0001)
+                                MMC_RALs[process].add(MMC_RRV)
+                                allVars.append(MMC_RRV)
 
                     thisBinPass = RooConstVar('Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix, 'Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix, 0.0001)
                     binListPass.add(thisBinPass)
                     allVars.append(thisBinPass)
 
                 else:
-                    binRRV = RooRealVar(name, name, binContent, max(binErrDown,0), max(binErrUp,0))
+                    # Create the fail bin
+                    # If there are no MMCs
+                    if not hasMMC:
+                        # Make Fail bin directly
+                        if binContent < 10:
+                            print name +' ' + str(binContent)
+                            binRRV = RooRealVar(name, name, binContent, 0, 50)
+                            if binContent-binErrDown < 0:
+                                binErrDown = binContent          # For the rare case when bin error is large relative to the content
+                            
+                            binRRV.setAsymError(binErrDown,binErrUp)
+                            floating_vars.append(name)
+                        elif binContent < 50:             # Give larger floating range for bins with few events
+                            print name +' ' + str(binContent)
+                            binRRV = RooRealVar(name, name, binContent, 0, 100)
+                            if binContent-binErrDown < 0:
+                                binErrDown = binContent          # For the rare case when bin error is large relative to the content
+                            
+                            binRRV.setAsymError(binErrDown,binErrUp)
+                            floating_vars.append(name)
+                        else:
+                            binRRV = RooRealVar(name, name, binContent, 0, 2*binContent)
+                            binRRV.setAsymError(binErrDown,binErrUp)
+                            floating_vars.append(name)
+                    # If there are MMCs
+                    else:
+                        # Setup data-mMCs
+                        prebinRRV = RooRealVar('PreMMCsub_bin_'+str(xbin)+'-'+str(ybin)+suffix, 'PreMMCsub_bin_'+str(xbin)+'-'+str(ybin)+suffix, binContent, 0, 2*binContent)
+                        prebinRRV.setAsymError(binErrDown,binErrUp)
+                        allVars.append(prebinRRV)
+                        floating_vars.append('PreMMCsub_bin_'+str(xbin)+'-'+str(ybin)+suffix)
+                        # Add it to the RAL
+                        MMC_to_sub.add(prebinRRV)
+
+                        # Create the formula string
+                        MMC_formula = '@'+str(MMC_to_sub.getSize()-1)  # Puts the prebinRRV first
+                        for i in range(MMC_to_sub.getSize()-1):
+                            MMC_formula+='-@'+str(i)
+
+                        # Create the fail bin
+                        binRRV = RooFormulaVar(name, name, MMC_formula, MMC_to_sub)
 
                     # Store the bin
                     binListFail.add(binRRV)
@@ -250,8 +369,11 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
                     xCenter = TH2_data_fail.GetXaxis().GetBinCenter(xbin)
                     yCenter = TH2_data_fail.GetYaxis().GetBinCenter(ybin)
 
-                    xConst = RooConstVar("ConstVar_x_"+str(xbin)+'_'+str(ybin)+suffix,"ConstVar_x_"+str(xbin)+'_'+str(ybin)+suffix,xCenter)
-                    yConst = RooConstVar("ConstVar_y_"+str(xbin)+'_'+str(ybin)+suffix,"ConstVar_y_"+str(xbin)+'_'+str(ybin)+suffix,yCenter)
+                    xCenterMapped = (xCenter - inputConfig['BINNING']['X']['LOW'])/(inputConfig['BINNING']['X']['HIGH'] - inputConfig['BINNING']['X']['LOW'])
+                    yCenterMapped = (yCenter - inputConfig['BINNING']['Y']['LOW'])/(inputConfig['BINNING']['Y']['HIGH'] - inputConfig['BINNING']['Y']['LOW'])
+
+                    xConst = RooConstVar("ConstVar_x_"+str(xbin)+'_'+str(ybin)+suffix,"ConstVar_x_"+str(xbin)+'_'+str(ybin)+suffix,xCenterMapped)
+                    yConst = RooConstVar("ConstVar_y_"+str(xbin)+'_'+str(ybin)+suffix,"ConstVar_y_"+str(xbin)+'_'+str(ybin)+suffix,yCenterMapped)
 
                     allVars.append(xConst)
                     allVars.append(yConst)
@@ -281,7 +403,7 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
 
                         # Finally make the pass distribution
                         formulaArgList = RooArgList(binRRV,fullFormulaVar)
-                        thisBinPass = RooFormulaVar('Pass_bin_'+str(xbin)+'-'+str(ybin),'Pass_bin_'+str(xbin)+'-'+str(ybin),"@0*@1",formulaArgList)
+                        thisBinPass = RooFormulaVar('Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix,'Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix,"@0*@1",formulaArgList)
                         binListPass.add(thisBinPass)
                         allVars.append(thisBinPass)
 
@@ -295,21 +417,33 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
                                 xCoeffList.add(PolyCoeffs['x'+str(xCoeff)+'y'+str(yCoeff)])
 
                             # Make the polynomial and save it to the list of x polynomials
-                            thisXPolyVarLabel = "xPol_y_"+str(yCoeff)+"_Bin_"+str(int(xbin))+"_"+str(int(ybin))
+                            thisXPolyVarLabel = "xPol_y_"+str(yCoeff)+"_Bin_"+str(int(xbin))+"_"+str(int(ybin))+suffix
                             xPolyVar = RooPolyVar(thisXPolyVarLabel,thisXPolyVarLabel,xConst,xCoeffList)
                             xPolyList.add(xPolyVar)
                             allVars.append(xPolyVar)
 
                         # Now make a polynomial out of the x polynomials
-                        thisYPolyVarLabel = "FullPol_Bin_"+str(int(xbin))+"_"+str(int(ybin))
+                        thisYPolyVarLabel = "FullPol_Bin_"+str(int(xbin))+"_"+str(int(ybin))+suffix
                         thisFullPolyVar = RooPolyVar(thisYPolyVarLabel,thisYPolyVarLabel,yConst,xPolyList)
 
                         allVars.append(thisFullPolyVar)
 
                         formulaArgList = RooArgList(binRRV,thisFullPolyVar)
-                        thisBinPass = RooFormulaVar('Pass_bin_'+str(xbin)+'-'+str(ybin),'Pass_bin_'+str(xbin)+'-'+str(ybin),"@0*@1",formulaArgList)
+                        thisBinPass = RooFormulaVar('Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix,'Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix,"@0*@1",formulaArgList)
                         binListPass.add(thisBinPass)
                         allVars.append(thisBinPass)
+
+                    elif "CHEBYSHEV" in inputConfig['FIT'].keys():
+                        # chebBasis.getBinVal() returns a RooAddition with the proper construction to be the sum of the shapes with floating coefficients
+                        thisRPF = chebBasis.getBinVal(xCenter,yCenter)
+                        allVars.append(thisRPF)
+
+                        # Make pass bin
+                        formulaArgList = RooArgList(binRRV,thisRPF)
+                        thisBinPass = RooFormulaVar('Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix,'Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix,"@0*@1",formulaArgList)
+                        binListPass.add(thisBinPass)
+                        allVars.append(thisBinPass)
+
 
     print "Making RPH2Ds"
     Roo_dict['qcd']['fail'] = {}
@@ -320,6 +454,11 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
     Roo_dict['qcd']['pass']['RPH2D'] = RooParametricHist2D('qcd_pass'+suffix,'qcd_pass'+suffix,x_var, y_var, binListPass, TH2_data_fail)
     Roo_dict['qcd']['pass']['norm']  = RooAddition('qcd_pass'+suffix+'_norm','qcd_pass'+suffix+'_norm',binListPass)
 
+    # Make RPH2Ds for each MMC
+    if hasMMC:
+        for process in MMC_RALs.keys():
+            Roo_dict[process]['fail']['RPH2D'] = RooParametricHist2D(process+'_fail'+suffix,process+'_fail'+suffix,x_var,y_var,MMC_RALs[process],TH2_data_fail)
+            Roo_dict[process]['fail']['norm'] = RooAddition(process+'_fail'+suffix+'_norm',process+'_fail'+suffix+'_norm',MMC_RALs[process])
 
     print "Making workspace..."
     # Make workspace to save in
@@ -337,6 +476,7 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
                         print "Importing " + rooObj.GetName() + ' from ' + process + ', ' + cat + ', ' + dist
                         getattr(myWorkspace,'import')(rooObj,RooFit.RecycleConflictNodes(),RooFit.Silence())
                     except:
+                        print 'Could not import from ' + process + ', ' + cat + ', ' + dist
                         for itemkey in rooObj.keys():
                             print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat + ', ' + dist + ', ' + itemkey
                             getattr(myWorkspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes(),RooFit.Silence())
@@ -353,7 +493,9 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
     # Now save out the RooDataHists
     myWorkspace.writeToFile('base_'+tag+'.root',True)  
 
-    return myWorkspace#, rateParam_lines
+    del myWorkspace
+
+    return zeroBins#, rateParam_lines
 
 
 

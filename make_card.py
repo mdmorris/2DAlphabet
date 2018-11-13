@@ -12,7 +12,7 @@ from header import colliMate
 import subprocess
 
 
-def main(inputConfig, blinded, tag, maindir, subdir):
+def main(inputConfig, zeroBins, blinded, tag, maindir, subdir):
     # Recreate file
     card_new = open('card_'+tag+'.txt','w')
     
@@ -20,6 +20,7 @@ def main(inputConfig, blinded, tag, maindir, subdir):
     if subdir != '':            # Used when doing simultaneous fit and polyCoeffs and bins
         suffix = '_'+subdir[:-1]     # need different names between the spaces
 
+    print 'Suffix for card: ' + suffix
     globalDir = maindir+subdir
 
     #######################################################
@@ -93,6 +94,7 @@ def main(inputConfig, blinded, tag, maindir, subdir):
 
     signal_procs = [proc for proc in inputConfig['PROCESS'].keys() if proc != 'HELP' and proc != 'data_obs' and inputConfig['PROCESS'][proc]['CODE'] == 0]
     MC_bkg_procs = [proc for proc in inputConfig['PROCESS'].keys() if proc != 'HELP' and proc != 'data_obs' and (inputConfig['PROCESS'][proc]['CODE'] == 2 or inputConfig['PROCESS'][proc]['CODE'] == 3)]
+
     all_procs = [proc for proc in inputConfig['PROCESS'].keys() if proc != 'HELP' and proc != 'data_obs']
     all_procs.append('qcd')
 
@@ -112,8 +114,11 @@ def main(inputConfig, blinded, tag, maindir, subdir):
                 processCode_line += (str(MC_bkg_procs.index(proc)+1)+' ')
                 if inputConfig['PROCESS'][proc]['CODE'] == 2:       # No floating normalization
                     rate_line += '-1 '                                            
-                # elif inputConfig['PROCESS'][proc]['CODE'] == 3:     # Floating normalization        
-                #     rate_line += '1 '
+                elif inputConfig['PROCESS'][proc]['CODE'] == 3:     # Floating normalization
+                    if chan == 'pass':
+                        rate_line += '-1 '
+                    elif chan == 'fail':        
+                        rate_line += '1 '
 
             # If qcd
             if proc == 'qcd':
@@ -130,7 +135,7 @@ def main(inputConfig, blinded, tag, maindir, subdir):
                             thisVal = str(inputConfig['SYSTEMATIC'][syst_line_key]['VAL'])
                         # If asymmetric lnN...
                         elif inputConfig['SYSTEMATIC'][syst_line_key]['CODE'] == 1:
-                            thisVal = str(inputConfig['SYSTEMATIC'][syst_line_key]['VALUP']) + '/' + str(inputConfig['SYSTEMATIC'][syst_line_key]['VALDOWN'])
+                            thisVal = str(inputConfig['SYSTEMATIC'][syst_line_key]['VALDOWN']) + '/' + str(inputConfig['SYSTEMATIC'][syst_line_key]['VALUP'])
                         # If shape...
                         else:
                             thisVal = str(inputConfig['SYSTEMATIC'][syst_line_key]['SCALE'])
@@ -186,6 +191,11 @@ def main(inputConfig, blinded, tag, maindir, subdir):
             if 'LOW' in inputConfig['FIT'][coeff].keys() and 'HIGH' in inputConfig['FIT'][coeff].keys():
                 lower_coeff = coeff.lower()
                 card_new.write(colliMate('polyCoeff_'+lower_coeff+suffix+' flatParam\n',22))
+    elif 'CHEBYSHEV' in inputConfig['FIT'].keys():
+        for oX in range(0,inputConfig['FIT']['CHEBYSHEV']['XORDER']+1):
+            for oY in range(0,inputConfig['FIT']['CHEBYSHEV']['YORDER']+1):
+                chebName = 'ChebCoeff_x'+str(oX)+'y'+str(oY)+suffix
+                card_new.write(colliMate(chebName +' flatParam\n',22))
 
 
     # Check if we have any renormalized MCs, store which processes, and declare the _norm as a flatParam
@@ -226,10 +236,11 @@ def main(inputConfig, blinded, tag, maindir, subdir):
         for xbin in xbins:
             # if renormFlag:
             #     card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_init flatParam\n',22))
-            #     # for process in renormProcesses:
-            #     #     card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_'+process+'_nominal flatParam\n',22))
+            #     for process in renormProcesses:
+            #         card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+'_'+process+'_nominal flatParam\n',22))
             # else:
-            card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+suffix+' flatParam\n',22))
+            if 'Fail_bin_'+str(xbin)+'-'+str(ybin)+suffix not in zeroBins:
+                card_new.write(colliMate('Fail_bin_'+str(xbin)+'-'+str(ybin)+suffix+' flatParam\n',22))
             
        
     card_new.close()

@@ -21,7 +21,7 @@ import make_systematic_plots
 import get_fit_guesses
 import input_organizer
 import build_fit_workspace
-import plot_fit_results
+import plot_postfit_results
 import header
 from header import ascii_encode_dict
 
@@ -36,52 +36,58 @@ gStyle.SetOptStat(0)
 parser = OptionParser()
 # Input and what to run
 parser.add_option('-i', '--input', metavar='FILE', type='string', action='store',
-                  default   =   '',
-                  dest      =   'input',
-                  help      =   'JSON file to be imported. Name should be "input_<tag>.json" where tag will be used to organize outputs')
+                default   =   '',
+                dest      =   'input',
+                help      =   'JSON file to be imported. Name should be "input_<tag>.json" where tag will be used to organize outputs')
 parser.add_option('-p', '--pseudo2D', action="store_true",
-                  default   =   False,
-                  dest      =   'pseudo2D',
-                  help      =   'Recalculate the fit guesses using pseudo2D method')
+                default   =   False,
+                dest      =   'pseudo2D',
+                help      =   'Recalculate the fit guesses using pseudo2D method')
 parser.add_option('-l', '--runLimits', action="store_true",
-                  default   =   False,
-                  dest      =   'runLimits',
-                  help      =   'Runs Combine limits and plots outputs')
+                default   =   False,
+                dest      =   'runLimits',
+                help      =   'Runs Combine limits and plots outputs')
 parser.add_option('-f', '--runFit', action="store_true",
-                  default   =   False,
-                  dest      =   'runFit',
-                  help      =   'Runs Combine Rp/f fit and plots outputs')
+                default   =   False,
+                dest      =   'runFit',
+                help      =   'Runs Combine Rp/f fit and plots outputs')
 
 # Plotting/drawing
 parser.add_option('-P', '--plotOnly', action="store_true",
-                  default   =   False,
-                  dest      =   'plotOnly',
-                  help      =   'Only plots if True')
+                default   =   False,
+                dest      =   'plotOnly',
+                help      =   'Only plots if True')
 parser.add_option('-u', '--plotUncerts', action="store_true",
-                  default   =   False,
-                  dest      =   'plotUncerts',
-                  help      =   'Plots shape based uncertainties')
+                default   =   False,
+                dest      =   'plotUncerts',
+                help      =   'Plots shape based uncertainties')
 parser.add_option('-d', '--draw', action="store_true",
-                  default   =   False,
-                  dest      =   'draw',
-                  help      =   'Draws canvases live')
+                default   =   False,
+                dest      =   'draw',
+                help      =   'Draws canvases live')
+parser.add_option('-v', '--verbose', metavar='FILE', type='string', action='store',
+                default   =   '',
+                dest      =   'verbose',
+                help      =   'Set Combine verbosity')
+parser.add_option('-a', '--add', metavar='FILE', type='string', action='store',
+                default   =   '',
+                dest      =   'add',
+                help      =   'Add together these processes when plotting (ex. "proc1+proc2,proc3+proc4")')
+
 
 # Configurations for the run
 parser.add_option('-s', '--signalOff', action="store_true",
-                  default   =   False,
-                  dest      =   'signalOff',
-                  help      =   'Turns off signal by using --expectSignal=0 option in Combine')
+                default   =   False,
+                dest      =   'signalOff',
+                help      =   'Turns off signal by using --expectSignal=0 option in Combine')
 parser.add_option('-b', '--batch', action="store_true",
-                  default   =   False,
-                  dest      =   'batch',
-                  help      =   'Runs limits in batch mode for multiple signals')
+                default   =   False,
+                dest      =   'batch',
+                help      =   'Runs limits in batch mode for multiple signals')
 parser.add_option('-B', '--blinded', action="store_true",
-                  default   =   False,
-                  dest      =   'blinded',
-                  help      =   'Turns off data points. Different from blinding the signal region during the fit')
-
-# 
-
+                default   =   False,
+                dest      =   'blinded',
+                help      =   'Turns off data points. Different from blinding the signal region during the fit') 
 
 (options, args) = parser.parse_args()
 
@@ -208,6 +214,13 @@ else:
     blinded = False
 
 
+# Plot only
+if options.plotOnly:
+    get_fit_guesses.main(input_config,blinded, maindir+subdir)
+    plot_postfit_results.main(input_config,options.blinded,maindir+subdir,subdir,options.add)
+    
+    quit()
+
 #########################################################
 #            Plot the systematic uncertainties          #
 #########################################################
@@ -218,11 +231,16 @@ if options.plotUncerts:
 #########################################################
 #             Get new fit parameter guesses             #
 #########################################################
-if options.pseudo2D == True:
+if False:#options.pseudo2D == True:
     input_config = get_fit_guesses.main(input_config,blinded, maindir+subdir)
     fInput_config_new_fit_guesses = open(maindir+subdir + 'input_'+tag+'_new_fit_guesses.json', 'w')
     json.dump(input_config,fInput_config_new_fit_guesses,indent=2, sort_keys=True)
     fInput_config_new_fit_guesses.close()
+
+#########################################################
+#                Make the prefit Rp/f                   #
+#########################################################
+get_fit_guesses.main(input_config,blinded, maindir+subdir)
 
 #########################################################
 #               Organize input histograms               #
@@ -232,18 +250,16 @@ print 'Organizing histograms into single file...'
 organized_dict = input_organizer.main(input_config,blinded,subdir)
 print 'Done'
 
-# Plot only
-if options.plotOnly:
-    plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir,options.blinded)
-    quit()
-
-
 #########################################################
 #             Make the workspace for Combine            #
 #########################################################
 # Make the RooWorkspace - creates workspace name 'w_2D' in base.root
-workspace = build_fit_workspace.main(organized_dict,input_config,blinded,tag,subdir)
+subprocess.call(['mkdir basis_plots'],shell=True)
+zeroBins = build_fit_workspace.main(organized_dict,input_config,blinded,tag,subdir)
+
 subprocess.call(['mv base_'+tag+'.root ' + maindir + subdir+'/'], shell=True)
+subprocess.call(['rm -rf '+maindir + subdir+'/basis_plots'],shell=True)
+subprocess.call(['mv basis_plots '+maindir + subdir+'/'],shell=True)
 print 'Workspace built'
 
 #########################################################
@@ -251,7 +267,7 @@ print 'Workspace built'
 #########################################################
 # Make the data card - makes a text file named card_2D.txt, return 0
 print 'Making Combine card...'
-make_card.main(input_config, blinded, tag, maindir, subdir)
+make_card.main(input_config, zeroBins, blinded, tag, maindir, subdir)
 print 'Done'
 
 syst_option = ''
@@ -263,39 +279,41 @@ for proc in input_config['PROCESS'].keys():
                 syst_option = ' -S 0'
 
 if options.runFit:
-    
+    verbosity = ''
+    if options.verbose != '':
+        verbosity = ' -v '+options.verbose
     # Run Combine
-    print 'Executing combine -M MaxLikelihoodFit '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option 
-    subprocess.call(['combine -M MaxLikelihoodFit '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option], shell=True)
+    print 'Executing combine -M FitDiagnostics '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option +verbosity
+    subprocess.call(['combine -M FitDiagnostics '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option + verbosity], shell=True)
 
     # Test that Combine ran successfully 
-    if not os.path.isfile('MaxLikelihoodFitResult.root'):
-        print "Combine failed and never made MaxLikelihoodFitResult.root. Quitting..."
+    if not os.path.isfile('fitDiagnostics.root'):
+        print "Combine failed and never made fitDiagnostics.root. Quitting..."
         quit()
 
-    subprocess.call(['mv MaxLikelihoodFitResult.root ' + maindir+subdir + '/'], shell=True)
-    subprocess.call(['mv higgsCombineTest.MaxLikelihoodFit.mH120.root ' + maindir+subdir + '/'], shell=True)
-    # subprocess.call(['mv mlfit.root ' + maindir+subdir + '/'], shell=True)
+    subprocess.call(['mv fitDiagnostics.root ' + maindir+subdir + '/'], shell=True)
+    subprocess.call(['mv higgsCombineTest.FitDiagnostics.mH120.root ' + maindir+subdir + '/'], shell=True)
+    subprocess.call(['mv combine_logger.out ' + maindir+subdir + '/'], shell=True)
 
-    plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir,options.blinded)
+    # Need to make an unblinded workspace and card
+    if not options.batch:
+        organized_dict_unblinded = input_organizer.main(input_config,False,subdir)
+        zeroBins_unblinded = build_fit_workspace.main(organized_dict_unblinded,input_config,False,tag+'Unblinded',subdir)
+        make_card.main(input_config, zeroBins_unblinded, False, tag+'Unblinded', maindir, subdir)
 
-# if options.runDiagnostic:
-    
-#     # Run Combine
-#     print 'Executing combine -M FitDiagnostics '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option 
-#     subprocess.call(['combine -M FitDiagnostics '+maindir+subdir + '/card_'+tag+'.txt --saveWithUncertainties --saveWorkspace' + syst_option + sig_option], shell=True)
+        subprocess.call(['mv base_'+tag+'Unblinded.root '+maindir+subdir], shell=True)
+        subprocess.call(['cp '+maindir+subdir + '/card_'+tag+'Unblinded.txt ./'], shell=True)
+        print 'Executing PostFitShapes2D -d card_'+tag+'Unblinded.txt -o '+maindir+subdir + '/postfitshapes.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'
+        subprocess.call(['PostFitShapes2D -d card_'+tag+'Unblinded.txt -o '+maindir+subdir + '/postfitshapes.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
+        subprocess.call(['rm card_'+tag+'Unblinded.txt'], shell=True)
+        plot_postfit_results.main(input_config,options.blinded,maindir+subdir,subdir,options.add)
 
-#     # Test that Combine ran successfully 
-#     if not os.path.isfile('FitDiagnostics.root'):
-#         print "Combine failed and never made FitDiagnostics.root. Quitting..."
-#         quit()
-
-#     subprocess.call(['mv FitDiagnostics.root ' + maindir+subdir + '/'], shell=True)
-#     subprocess.call(['mv higgsCombineTest.MaxLikelihoodFit.mH120.root ' + maindir+subdir + '/'], shell=True)
-#     subprocess.call(['mv mlfit.root ' + maindir+subdir + '/'], shell=True)
-
-#     plot_fit_results.main(input_config,organized_dict,blinded,tag,maindir+subdir)
-
+    else:
+        subprocess.call(['cp '+maindir+subdir + '/card_'+tag+'.txt ./'], shell=True)
+        print 'Executing PostFitShapes2D -d card_'+tag+'.txt -o '+maindir+subdir + '/postfitshapes.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'
+        subprocess.call(['PostFitShapes2D -d card_'+tag+'.txt -o '+maindir+subdir + '/postfitshapes.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
+        subprocess.call(['rm card_'+tag+'.txt'], shell=True)
+        plot_postfit_results.main(input_config,options.blinded,maindir+subdir,subdir,options.add)
 
 if options.runLimits:
     # If running with the wrapper that processes multiple signals (for limits), we'll write out the command for the wrapper script

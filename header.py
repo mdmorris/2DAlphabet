@@ -10,7 +10,7 @@ def ascii_encode_dict(data):
     ascii_encode = lambda x: x.encode('ascii') if isinstance(x, unicode) else x 
     return dict(map(ascii_encode, pair) for pair in data.items())
 
-def getRRVs(inputConfig, blinded):
+def getRRVs(inputConfig):#, blinded):
     xname = inputConfig['BINNING']['X']['NAME']
     xlowname = xname + '_Low'
     xhighname = xname + '_High'
@@ -25,16 +25,16 @@ def getRRVs(inputConfig, blinded):
     xRRV = RooRealVar(xname,xname,xlow,xhigh)
     yRRV = RooRealVar(yname,yname,ylow,yhigh)
 
-    if blinded:
-        xSigStart = inputConfig['BINNING']['X']['SIGSTART']
-        xSigEnd = inputConfig['BINNING']['X']['SIGEND']
-        xLowRRV = RooRealVar(xlowname,xlowname,xlow,xSigStart)
-        xHighRRV = RooRealVar(xhighname,xhighname,xSigEnd,xhigh)
+    # if blinded:
+    #     xSigStart = inputConfig['BINNING']['X']['SIGSTART']
+    #     xSigEnd = inputConfig['BINNING']['X']['SIGEND']
+    #     xLowRRV = RooRealVar(xlowname,xlowname,xlow,xSigStart)
+    #     xHighRRV = RooRealVar(xhighname,xhighname,xSigEnd,xhigh)
 
-        return xRRV,xLowRRV,xHighRRV,yRRV
+    #     return xRRV,xLowRRV,xHighRRV,yRRV
     
-    else:
-        return xRRV,yRRV
+    # else:
+    return xRRV,yRRV
 
 def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHigh):
     # Make a copy with the same Y bins but new X bins
@@ -42,7 +42,9 @@ def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHi
     yBinsLow = thisHist.GetYaxis().GetXmin()
     yBinsHigh = thisHist.GetYaxis().GetXmax()
     nNewBinsX = int((xNewBinsHigh-xNewBinsLow)/float(newBinWidthX))
-    histCopy = TH2F(copyName,copyName,nNewBinsX,xNewBinsLow,xNewBinsHigh,nBinsY,yBinsLow,yBinsHigh)
+    # Use copyName with _temp to avoid overwriting if thisHist has the same name
+    # We can do this at the end but not before we're finished with thisHist
+    histCopy = TH2F(copyName+'_temp',copyName+'_temp',nNewBinsX,xNewBinsLow,xNewBinsHigh,nBinsY,yBinsLow,yBinsHigh)
     histCopy.Sumw2()
     
     histCopy.GetXaxis().SetName(thisHist.GetXaxis().GetName())
@@ -69,6 +71,46 @@ def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHi
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             histCopy.SetBinContent(newBinX,binY,newBinContent)
             histCopy.SetBinError(newBinX,binY,sqrt(newBinErrorSq))
+
+    # Will now set the copyName which will overwrite thisHist if it has the same name
+    histCopy.SetName(copyName)
+    histCopy.SetTitle(copyName)
+
+    return histCopy
+
+def copyHistWithNewYbounds(thisHist,copyName,newBinWidthY,yNewBinsLow,yNewBinsHigh):
+    # Make a copy with the same Y bins but new X bins
+    nBinsX = thisHist.GetNbinsX()
+    xBinsLow = thisHist.GetXaxis().GetXmin()
+    xBinsHigh = thisHist.GetXaxis().GetXmax()
+    nNewBinsY = int((yNewBinsHigh-yNewBinsLow)/float(newBinWidthY))
+    histCopy = TH2F(copyName,copyName,nBinsX,xBinsLow,xBinsHigh,nNewBinsY,yNewBinsLow,yNewBinsHigh)
+    histCopy.Sumw2()
+    
+    histCopy.GetXaxis().SetName(thisHist.GetXaxis().GetName())
+    histCopy.GetYaxis().SetName(thisHist.GetYaxis().GetName())
+
+
+    # Loop through the old bins
+    for binX in range(1,nBinsX+1):
+        # print 'Bin y: ' + str(binY)
+        for newBinY in range(1,nNewBinsY+1):
+            newBinContent = 0
+            newBinErrorSq = 0
+            newBinYlow = histCopy.GetYaxis().GetBinLowEdge(newBinY)
+            newBinYhigh = histCopy.GetYaxis().GetBinUpEdge(newBinY)
+
+            # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
+            for oldBinY in range(1,thisHist.GetNbinsY()+1):
+                if thisHist.GetYaxis().GetBinLowEdge(oldBinY) >= newBinYlow and thisHist.GetYaxis().GetBinUpEdge(oldBinY) <= newBinYhigh:
+                    # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
+                    # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
+                    newBinContent += thisHist.GetBinContent(binX,oldBinY)
+                    newBinErrorSq += thisHist.GetBinError(binX,oldBinY)**2
+
+            # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
+            histCopy.SetBinContent(binX,newBinY,newBinContent)
+            histCopy.SetBinError(binX,newBinY,sqrt(newBinErrorSq))
 
     return histCopy
 
@@ -241,7 +283,7 @@ def printWorkspace(myfile,myworkspace):
 
 
 
-def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=False,xtitle='',ytitle='',dataOff=False):  
+def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -276,7 +318,7 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=
         padx = 3
         pady = 2
     else:
-        print 'histlist of size ' + len(histlist) + ' not currently supported'
+        print 'histlist of size ' + str(len(histlist)) + ' not currently supported'
         return 0
 
     myCan = TCanvas(name,name,width,height)
@@ -344,11 +386,12 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=
                 if not dataOff:
                     mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.3, 1, 1))
                     subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 1, 0.3))
+
                 else:
                     mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.1, 1, 1))
                     subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 0, 0))
 
-                legends.append(TLegend(0.7,0.8,0.95,0.93))
+                legends.append(TLegend(0.65,0.6,0.95,0.93))
                 stacks.append(THStack(hist.GetName()+'_stack',hist.GetName()+'_stack'))
                 tot_hists.append(TH1F(hist.GetName()+'_tot',hist.GetName()+'_tot',hist.GetNbinsX(),hist.GetXaxis().GetXmin(),hist.GetXaxis().GetXmax()))
 
@@ -368,9 +411,11 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=
 
                 # Build the stack
                 for bkg_index,bkg in enumerate(bkglist[hist_index]):     # Won't loop if bkglist is empty
-                    bkg.Sumw2()
+                    # bkg.Sumw2()
                     tot_hists[hist_index].Add(bkg)
                     bkg.SetLineColor(kBlack)
+                    if logy:
+                        bkg.SetMinimum(1e-3)
 
                     if bkg.GetName().find('qcd') != -1:
                         bkg.SetFillColor(kYellow)
@@ -383,12 +428,10 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=
 
                     stacks[hist_index].Add(bkg)
 
-                    legends[hist_index].AddEntry(bkg,bkg.GetName()[:bkg.GetName().find('__')],'f')
+                    legends[hist_index].AddEntry(bkg,bkg.GetName().split('_')[0],'f')
                     
                 # Go to main pad, set logy if needed
                 mains[hist_index].cd()
-                if logy == True:
-                    mains[hist_index].SetLogy()
 
                 # Set y max of all hists to be the same to accomodate the tallest
                 histList = [stacks[hist_index],tot_hists[hist_index],hist]
@@ -401,14 +444,29 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=
                         maxHist = histList[h]
                 for h in histList:
                     h.SetMaximum(yMax*1.1)
+                    if logy == True:
+                        h.SetMaximum(yMax*10)
 
                 # Now draw the main pad
+                data_leg_title = hist.GetTitle()
                 if len(titles) > 0:
                     hist.SetTitle(titles[hist_index])
                 hist.SetTitleOffset(1.5,"xy")
+                hist.GetYaxis().SetTitle('Events')
+                if logy == True:
+                    hist.SetMinimum(1e-3)
                 hist.Draw('pe')
 
                 stacks[hist_index].Draw('same hist')
+
+                # Do the signals
+                if len(signals) > 0: 
+                    signals[hist_index].SetLineColor(kBlue)
+                    signals[hist_index].SetLineWidth(2)
+                    if logy == True:
+                        signals[hist_index].SetMinimum(1e-3)
+                    legends[hist_index].AddEntry(signals[hist_index],signals[hist_index].GetName().split('_')[0],'L')
+                    signals[hist_index].Draw('hist same')
 
                 tot_hists[hist_index].SetFillColor(kBlack)
                 tot_hists[hist_index].SetFillStyle(3354)
@@ -417,7 +475,10 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=
                 # legends[hist_index].Draw()
 
                 if not dataOff:
+                    legends[hist_index].AddEntry(hist,'data','p')
                     hist.Draw('p e same')
+
+                gPad.RedrawAxis()
 
                 # Draw the pull
                 subs[hist_index].cd()
@@ -440,14 +501,37 @@ def makeCan(name, tag, histlist, bkglist=[],colors=[],titles=[],logy=False,root=
                 pulls[hist_index].GetXaxis().SetTitleSize(LS)
 
                 pulls[hist_index].GetXaxis().SetTitle(xtitle)
-                pulls[hist_index].GetYaxis().SetTitle(ytitle)
+                pulls[hist_index].GetYaxis().SetTitle("(Data-Bkg)/#sigma")
                 pulls[hist_index].Draw('hist')
 
-    if root:
+                if logy == True:
+                    mains[hist_index].SetLogy()
+
+    if rootfile:
         myCan.Print(tag+'plots/'+name+'.root','root')
     else:
-        myCan.Print(tag+'plots/'+name+'.pdf','pdf')
+        myCan.Print(tag+'plots/'+name+'.png','png')
 
+
+def FindCommonString(string_list):
+    to_match = ''   # initialize the string we're looking for/building
+    for s in string_list[0]:    # for each character in the first string
+        passed = True
+        for istring in range(1,len(string_list)):   # compare to_match+s against strings in string_list
+            string = string_list[istring]
+            if to_match not in string:                  # if in the string, add more
+                passed = False
+            
+        if passed == True:
+            to_match+=s
+
+    if to_match[-2] == '_':
+        return to_match[:-2] 
+    else:
+        return to_match[:-1]                # if not, return to_match minus final character
+
+    return to_match[:-2]
+        
 
 # Not yet integrated/used
 def Make_Pull_plot( DATA,BKG):
@@ -609,6 +693,104 @@ def Inter(g1,g2):
             inters.append(0.5*(xpoint+xpoint1))
         
     return inters
+
+def applyFitMorph(process, region ,has_shape_uncert, inputConfig, dists, w, suffix=''):
+    # This function will apply the findings of the blinded fit to the signal region 
+    # This is necessary because Combine knows NOTHING about this region
+
+    # dists - dictionary with distributions (nominal, syst_up, syst_down,...) for this process and region
+    # w - workspace output from combine fit
+
+    # Hack
+    allVars = []
+
+    # Setup the axes
+    xvar,yvar = getRRVs(inputConfig)
+    allVars.extend([xvar,yvar])
+    x_low = inputConfig['BINNING']['X']['LOW']
+    x_high = inputConfig['BINNING']['X']['HIGH']
+    x_nbins = inputConfig['BINNING']['X']['NBINS']
+    x_binWidth = float(x_high-x_low)/float(x_nbins)
+    sigstart = inputConfig['BINNING']['X']['SIGSTART']
+    sigend = inputConfig['BINNING']['X']['SIGEND']
+    y_low = inputConfig['BINNING']['Y']['LOW']
+    y_high = inputConfig['BINNING']['Y']['HIGH']
+    y_nbins = inputConfig['BINNING']['Y']['NBINS']
+
+    normlist = RooArgList() # Stores ALL norms for RooProduct at the end
+    allVars.append(normlist)
+
+
+    # Morph only if we had shape based systematics
+    if has_shape_uncert:
+        # Storage for the pre-fit signal region for nominal and each systematic shape
+        signal_hists = {}
+        for dist in dists.keys():
+            if dist.find('_unblinded') != -1:
+                newkey = dist[:dist.find('_unblinded')]
+                if dist[:dist.find('_unblinded')] != 'nominal':
+                    hist_name = process+'_'+region+suffix+'_'+newkey+'_presignal'
+                else:
+                    hist_name = process+'_'+region+suffix+'_presignal'
+                signal_hists[newkey] = copyHistWithNewXbounds(dists[dist],hist_name,x_binWidth,sigstart,sigend)
+
+        # Build the pieces for the FVIHP2D2 along with the AsymPow (normalization) pieces
+        # Get TList with pdfs and RooArgList with RooRealVars for FVIHP2D2 construction
+        coefList = RooArgList()                                     # RAL is ordered [a,b,c,...]
+        pdfList = TList()                                           # TList is ordered [nom, a_hi, a_lo, b_hi, b_lo,...]
+        pdfList.Add(signal_hists['nominal'])
+        asympows = {}
+        for n in inputConfig['PROCESS'][process]['SYSTEMATICS']:
+            if inputConfig['SYSTEMATIC'][n]['CODE'] > 1: # 2 or 3
+                thisVar = w.var(n)
+                if not thisVar:
+                    continue
+                allVars.append(thisVar)
+                # FVIHP2D2 pieces
+                coefList.add(thisVar)
+                allVars.append(thisVar)
+                thisTH2up = signal_hists[n+'Up']
+                thisTH2down = signal_hists[n+'Down']
+                pdfList.Add(thisTH2up)
+                pdfList.Add(thisTH2down)
+                # AsymPow pieces
+                # for su in inputConfig['PROCESS'][process]['SYSTEMATICS']:
+                kappaLowVal = thisTH2down.Integral()/signal_hists['nominal'].Integral()
+                kappaHighVal = thisTH2up.Integral()/signal_hists['nominal'].Integral()
+                if abs(kappaHighVal-1) > 1e-3 and abs(kappaLowVal-1) > 1e-3:    # Combine won't count the systematic unless this condition is satisfied so we shouldn't either
+                    kappaLow = RooConstVar(process+'_'+region+suffix+'_'+n+'_kappaLow',process+'_'+region+suffix+'_'+n+'_kappaLow',kappaLowVal)
+                    kappaHigh = RooConstVar(process+'_'+region+suffix+'_'+n+'_kappaHigh',process+'_'+region+suffix+'_'+n+'_kappaHigh',kappaHighVal)
+                    allVars.extend([kappaLow,kappaHigh])
+                    asympows[n] = AsymPow('systeff_'+region+suffix+'_'+process+'_'+n, 'systeff_'+region+suffix+'_'+process+'_'+n, kappaLow, kappaHigh, thisVar)
+                    allVars.extend([kappaLow,kappaHigh])
+                    normlist.add(asympows[n])
+
+        # Conditional should be FALSE (I checked this - I think it normalizes each x slice to 1 independently)
+        # Last two arguments are the same values used by Combine
+        shape_FVIHP = FastVerticalInterpHistPdf2D2(process+'_'+region+suffix+'_FVIHP', process+'_'+region+suffix+'_FVIHP', xvar, yvar, False, pdfList, coefList, 1, 0)
+        shape_TH2 = shape_FVIHP.createHistogram(process+'_'+region+suffix+'_signal',xvar,RooFit.Binning(x_nbins,x_low,x_high),RooFit.YVar(yvar,RooFit.Binning(y_nbins,y_low,y_high)))
+
+
+    # Otherwise just grab the nominal histogram
+    else:
+        shape_TH2 = copyHistWithNewXbounds(dists['nominal_unblinded'],process+'_'+region+suffix+'_presignal',x_binWidth,sigstart,sigend)
+
+
+    # Next the lnN normalization contribution can just be grabbed from w
+    try:
+        thislnNNorm = w.function('n_exp_bin'+region+suffix+'_proc_'+process)
+        allVars.append(thislnNNorm)
+        normlist.add(thislnNNorm)
+    except:
+        print 'MESSAGE: n_exp_bin'+region+suffix+'_proc_'+process + ' does not exist. Assuming no lnN uncertainties for this.'
+
+    full_norm_name = process+'_'+region+suffix+'_fullNorm'
+    full_norm = RooProduct(full_norm_name, full_norm_name, normlist)
+    allVars.append(full_norm)
+
+    shape_TH2.Scale(abs(full_norm.getValV()))
+    return shape_TH2
+
 
 # Right after I wrote this I realized it's obsolete... It's cool parentheses parsing though so I'm keeping it
 def separateXandYfromFitString(fitForm):
