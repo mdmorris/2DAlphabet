@@ -45,7 +45,6 @@ parser.add_option('-p', '--plotOnly', action="store_true",
                 dest      =   'plotOnly',
                 help      =   'Only plots. Does not run anything else (assumes that has already been done')
 
-
 (options, args) = parser.parse_args()
 
 # Basic exiting if the inputs are not formatted correctly
@@ -71,7 +70,6 @@ if not options.plotOnly:
 
     for cfg in sideband_cfg_strings:
         combine_calls.append('python 2DAlphabet.py -i '+cfg+' --batch')
-
 
     for c in combine_calls:
         print 'Executing ' + c

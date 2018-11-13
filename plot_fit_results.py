@@ -105,6 +105,7 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
                     print 'Attempting to grab shapeSig_'+cat+suffix+'_'+proc+'_morph'
                     new_roo_dict[proc][cat]['PDF'] = new_w.pdf('shapeSig_'+cat+suffix+'_'+proc+'_morph')
                     new_roo_dict[proc][cat]['NORM'] = new_w.function('n_exp_final_bin'+cat+suffix+'_proc_'+proc)     # normalization
+
                 else:
                     print "Attempting to grab shapeSig_"+proc+'_'+cat+suffix+'Pdf'
                     new_roo_dict[proc][cat]['PDF'] = new_w.pdf('shapeSig_'+proc+'_'+cat+suffix+'Pdf')
@@ -119,6 +120,7 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
                     print 'Attempting to grab shapeBkg_'+cat+suffix+'_'+proc+'_morph'
                     new_roo_dict[proc][cat]['PDF'] = new_w.pdf('shapeBkg_'+cat+suffix+'_'+proc+'_morph')
                     new_roo_dict[proc][cat]['NORM'] = new_w.function('n_exp_final_bin'+cat+suffix+'_proc_'+proc)
+
                 else:
                     print 'Attempting to grab shapeBkg_'+proc+'_'+cat+suffix+'Pdf'
                     new_roo_dict[proc][cat]['PDF'] = new_w.pdf('shapeBkg_'+proc+'_'+cat+suffix+'Pdf')
@@ -220,6 +222,7 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
         # Loop over the Roo objects and store in PolyCoeffs dictionary
         iter_params = RAS_rpfParams.createIterator()                                    
         RPV_par = iter_params.Next()                                                    
+
         while RPV_par:
             coeffName = RPV_par.GetName()[RPV_par.GetName().find('x'):] # returns "x#y#"
             PolyCoeffs[coeffName] = RPV_par
@@ -306,6 +309,7 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
     ################################################################################################
     #   Make the sideband/unblinded distributions by grabbing what we have from the combine output #
     ################################################################################################
+
     # If you've blinded the fit, then you'll get the x-axis sideband distributions
     # If you haven't blinded the fit, then you'll get the full distributions
 
@@ -338,7 +342,6 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
                     else:
                         quit()
 
-                
                 if abs(1.0-thisDist['TH2'].Integral()) > 0.001:
                     print 'ERROR: Double check PDF ' + thisDist['PDF'].GetName() + '. It integrated to ' + str(thisDist['TH2'].Integral()) + ' instead of 1'
                 
@@ -349,6 +352,7 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
                         thisDist['TH2'].Scale(-1*thisDist['NORM'].getValV())
                 except:
                     thisDist['TH2'].Scale(thisDist['NORM'].getValV())
+
 
                 thisDist['TH2'].Write()
                 makeCan(proc +'_'+cat+'_scaled',globalDir,[thisDist['TH2']],xtitle=x_title,ytitle=y_title,titles=[proc + ' - ' + cat + ' - Scaled'])
@@ -545,6 +549,7 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
             final_hists[bkg]['pass'][test].SetTitle(bkg + ' - Post-fit - Pass'+suffix)
             final_hists[bkg]['fail'][test].SetTitle(bkg + ' - Post-fit - Fail'+suffix)
 
+
             makeCan(bkg+'_'+test+'_distributions'+suffix,globalDir,
                     [   old_dist_pass,
                         old_dist_fail,
@@ -587,6 +592,7 @@ def main(inputConfig, organizedDict, blinded, tag, globalDir, blindData, suffix=
         qcd_pass_1D_down.SetLineStyle(9)
         qcd_pass_1D_up.SetLineWidth(2)
         qcd_pass_1D_down.SetLineWidth(2)
+
 
         qcd_pass_1D_nom.GetYaxis().SetRangeUser(0,1.1*qcd_pass_1D_up.GetMaximum())
         qcd_pass_1D_nom.GetXaxis().SetTitle(inputConfig['BINNING']['Y']['TITLE'])

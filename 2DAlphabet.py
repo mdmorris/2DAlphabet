@@ -87,12 +87,7 @@ parser.add_option('-b', '--batch', action="store_true",
 parser.add_option('-B', '--blinded', action="store_true",
                 default   =   False,
                 dest      =   'blinded',
-                help      =   'Turns off data points. Different from blinding the signal region during the fit')
-
-
-
-# 
-
+                help      =   'Turns off data points. Different from blinding the signal region during the fit') 
 
 (options, args) = parser.parse_args()
 
@@ -226,7 +221,6 @@ if options.plotOnly:
     
     quit()
 
-
 #########################################################
 #            Plot the systematic uncertainties          #
 #########################################################
@@ -256,13 +250,13 @@ print 'Organizing histograms into single file...'
 organized_dict = input_organizer.main(input_config,blinded,subdir)
 print 'Done'
 
-
 #########################################################
 #             Make the workspace for Combine            #
 #########################################################
 # Make the RooWorkspace - creates workspace name 'w_2D' in base.root
 subprocess.call(['mkdir basis_plots'],shell=True)
 zeroBins = build_fit_workspace.main(organized_dict,input_config,blinded,tag,subdir)
+
 subprocess.call(['mv base_'+tag+'.root ' + maindir + subdir+'/'], shell=True)
 subprocess.call(['rm -rf '+maindir + subdir+'/basis_plots'],shell=True)
 subprocess.call(['mv basis_plots '+maindir + subdir+'/'],shell=True)
@@ -320,8 +314,6 @@ if options.runFit:
         subprocess.call(['PostFitShapes2D -d card_'+tag+'.txt -o '+maindir+subdir + '/postfitshapes.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
         subprocess.call(['rm card_'+tag+'.txt'], shell=True)
         plot_postfit_results.main(input_config,options.blinded,maindir+subdir,subdir,options.add)
-
-
 
 if options.runLimits:
     # If running with the wrapper that processes multiple signals (for limits), we'll write out the command for the wrapper script

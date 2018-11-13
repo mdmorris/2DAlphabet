@@ -21,7 +21,6 @@ def main(inputConfig, zeroBins, blinded, tag, maindir, subdir):
         suffix = '_'+subdir[:-1]     # need different names between the spaces
 
     print 'Suffix for card: ' + suffix
-
     globalDir = maindir+subdir
 
     #######################################################

@@ -114,6 +114,42 @@ def copyHistWithNewYbounds(thisHist,copyName,newBinWidthY,yNewBinsLow,yNewBinsHi
 
     return histCopy
 
+def copyHistWithNewYbounds(thisHist,copyName,newBinWidthY,yNewBinsLow,yNewBinsHigh):
+    # Make a copy with the same Y bins but new X bins
+    nBinsX = thisHist.GetNbinsX()
+    xBinsLow = thisHist.GetXaxis().GetXmin()
+    xBinsHigh = thisHist.GetXaxis().GetXmax()
+    nNewBinsY = int((yNewBinsHigh-yNewBinsLow)/float(newBinWidthY))
+    histCopy = TH2F(copyName,copyName,nBinsX,xBinsLow,xBinsHigh,nNewBinsY,yNewBinsLow,yNewBinsHigh)
+    histCopy.Sumw2()
+    
+    histCopy.GetXaxis().SetName(thisHist.GetXaxis().GetName())
+    histCopy.GetYaxis().SetName(thisHist.GetYaxis().GetName())
+
+
+    # Loop through the old bins
+    for binX in range(1,nBinsX+1):
+        # print 'Bin y: ' + str(binY)
+        for newBinY in range(1,nNewBinsY+1):
+            newBinContent = 0
+            newBinErrorSq = 0
+            newBinYlow = histCopy.GetYaxis().GetBinLowEdge(newBinY)
+            newBinYhigh = histCopy.GetYaxis().GetBinUpEdge(newBinY)
+
+            # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
+            for oldBinY in range(1,thisHist.GetNbinsY()+1):
+                if thisHist.GetYaxis().GetBinLowEdge(oldBinY) >= newBinYlow and thisHist.GetYaxis().GetBinUpEdge(oldBinY) <= newBinYhigh:
+                    # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
+                    # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
+                    newBinContent += thisHist.GetBinContent(binX,oldBinY)
+                    newBinErrorSq += thisHist.GetBinError(binX,oldBinY)**2
+
+            # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
+            histCopy.SetBinContent(binX,newBinY,newBinContent)
+            histCopy.SetBinError(binX,newBinY,sqrt(newBinErrorSq))
+
+    return histCopy
+
 def rebinY(thisHist,name,tag,new_y_bins_array):
     xnbins = thisHist.GetNbinsX()
     xmin = thisHist.GetXaxis().GetXmin()
@@ -436,7 +472,7 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                 tot_hists[hist_index].SetFillStyle(3354)
 
                 tot_hists[hist_index].Draw('e2 same')
-                legends[hist_index].Draw()
+                # legends[hist_index].Draw()
 
                 if not dataOff:
                     legends[hist_index].AddEntry(hist,'data','p')
@@ -754,6 +790,7 @@ def applyFitMorph(process, region ,has_shape_uncert, inputConfig, dists, w, suff
 
     shape_TH2.Scale(abs(full_norm.getValV()))
     return shape_TH2
+
 
 # Right after I wrote this I realized it's obsolete... It's cool parentheses parsing though so I'm keeping it
 def separateXandYfromFitString(fitForm):

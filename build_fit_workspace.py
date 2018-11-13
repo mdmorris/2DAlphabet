@@ -98,7 +98,6 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
                         # Roo_dict[process][cat][dist]['NORM'] = norm
 
 
-
 #############################################################################################
 # Everything from here on is only dealing with the QCD estimate - everything else is done   #
 #############################################################################################
@@ -249,7 +248,6 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
             # 1) Have a negligible number of events but NOT zero (will break Combine)
             # 2) Have no dependence on the Rp/f (otherwise they will influence the Rp/f shape)
             if blinded and (upperEdge_in_sig or lowerEdge_in_sig):
-                # print "Blinding bin " + name
                 binRRV = RooConstVar(name, name, 0.0001)
                 binListFail.add(binRRV)
                 allVars.append(binRRV)
@@ -261,7 +259,6 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
                             MMC_RALs[process].add(MMC_RRV)
                             allVars.append(MMC_RRV)
 
-
                 thisBinPass = RooConstVar('Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix, 'Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix, 0.0001)
                 binListPass.add(thisBinPass)
                 allVars.append(thisBinPass)
@@ -270,8 +267,8 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir=''):
             else:
                 # Initialize contents by subtracting minor non-QCD components (code 2)
                 binContent = TH2_data_fail.GetBinContent(xbin,ybin)
-                binErrUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)
-                binErrDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)
+                binErrUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)*3
+                binErrDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)*3
                 
                 # if hasMMC, create a RooArgList to store each for this bin
                 if hasMMC:
