@@ -218,6 +218,8 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
     sample_size = 100
     # First figure out the names of parameters and their form so we can evaluate them as we sample
     if 'FORM' in inputConfig['FIT'].keys():
+        polXO = 0
+        polYO = 0
         for param_name in [key for key in inputConfig['FIT'].keys() if key != 'HELP' and key != 'FORM']:
             # Assuming poly order is a single digit (pretty reasonable I think...)
             tempXorder = int(param_name[param_name.find('X')+1])
