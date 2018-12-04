@@ -70,7 +70,7 @@
     The second step is to copy several files from the 2D Alphabet release to your Combine directory and re-compile Combine so it can use a new class - RooParametricHist2D - and new plotting code that gives Combine 2D capabilites. You can accomplish this by using the following commands
     \begin{itemize}
         \item \verb"cd $CMSSW_BASE/src/2DAlphabet/setup"
-        \item \verb"source run_setup.csh"
+        \item \verb"source run_setup.csh" (tcsh on cmslpc) or \verb"sh run_setup.sh" (bash on lxplus)
     \end{itemize}
 
     It's a good idea to make sure there are no errors in this step! (copy or compile related) Run \verb"combine --help" again and try to call RooParametricHist2D in interactive python if you're feeling uneasy and to ensure everything is working. 
