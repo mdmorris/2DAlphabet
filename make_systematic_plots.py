@@ -69,10 +69,10 @@ def main(inputConfig,tag):
                     h.SetMaximum(yMax*1.1)
 
                 passNom.SetXTitle(inputConfig['BINNING']['Y']['TITLE'])
-                passUp.SetXTitle(inputConfig['BINNING']['Y']['TITLE'])
-                passDown.SetXTitle(inputConfig['BINNING']['Y']['TITLE'])
+                # passUp.SetXTitle(inputConfig['BINNING']['Y']['TITLE'])
+                # passDown.SetXTitle(inputConfig['BINNING']['Y']['TITLE'])
                 passNom.SetTitle(proc + ' - ' + syst + ' uncertainty')
-
+                passNom.SetTitleOffset(1.2,"X")
 
                 passNom.Draw('hist')
                 passUp.Draw('same hist')

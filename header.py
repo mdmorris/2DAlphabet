@@ -156,32 +156,50 @@ def rebinY(thisHist,name,tag,new_y_bins_array):
     xmax = thisHist.GetXaxis().GetXmax()
 
     rebinned = TH2F(name,name,xnbins,xmin,xmax,len(new_y_bins_array)-1,new_y_bins_array)
+    print new_y_bins_array
     rebinned.Sumw2()
 
     for xbin in range(1,xnbins+1):
         newBinContent = 0
         newBinErrorSq = 0
         rebinHistYBin = 1
+        nybins = 0
         for ybin in range(1,thisHist.GetNbinsY()+1):
             # If upper edge of old Rpf ybin is < upper edge of rebinHistYBin then add the Rpf bin to the count
             if thisHist.GetYaxis().GetBinUpEdge(ybin) < rebinned.GetYaxis().GetBinUpEdge(rebinHistYBin):
                 newBinContent += thisHist.GetBinContent(xbin,ybin)
                 newBinErrorSq += thisHist.GetBinError(xbin,ybin)**2
+                nybins+=1
             # If ==, add to newBinContent, assign newBinContent to current rebinHistYBin, move to the next rebinHistYBin, and restart newBinContent at 0
             elif thisHist.GetYaxis().GetBinUpEdge(ybin) == rebinned.GetYaxis().GetBinUpEdge(rebinHistYBin):
                 newBinContent += thisHist.GetBinContent(xbin,ybin)
                 newBinErrorSq += thisHist.GetBinError(xbin,ybin)**2
-                rebinned.SetBinContent(xbin, rebinHistYBin, newBinContent)
-                rebinned.SetBinError(xbin, rebinHistYBin, sqrt(newBinErrorSq))# NEED TO SET BIN ERRORS
+                nybins+=1
+                rebinned.SetBinContent(xbin, rebinHistYBin, newBinContent/float(nybins))
+                rebinned.SetBinError(xbin, rebinHistYBin, sqrt(newBinErrorSq)/float(nybins))# NEED TO SET BIN ERRORS
                 rebinHistYBin += 1
                 newBinContent = 0
                 newBinErrorSq = 0
+                nybins = 0
             else:
-                print 'ERROR when doing psuedo-2D fit approximation. Slices do not line up on y bin edges'
+                print 'ERROR when doing psuedo-2D y rebin approximation. Slices do not line up on y bin edges'
+                print 'Input bin upper edge = '+str(thisHist.GetYaxis().GetBinUpEdge(ybin))
+                print 'Rebin upper edge = '+str(rebinned.GetYaxis().GetBinUpEdge(rebinHistYBin))
                 quit()
 
     makeCan(name+'_rebin_compare',tag,[rebinned,thisHist])
     return rebinned
+
+def remapToUnity(hist):
+
+    remap = TH2F(hist.GetName()+'_unit',hist.GetName()+'_unit',hist.GetNbinsX(),0,1,hist.GetNbinsY(),0,1)
+
+    for xbin in range(hist.GetNbinsX()+1):
+        for ybin in range(hist.GetNbinsY()+1):
+            remap.SetBinContent(xbin,ybin,hist.GetBinContent(xbin,ybin))
+            remap.SetBinError(xbin,ybin,hist.GetBinError(xbin,ybin))
+
+    return remap
 
 def makeBlindedHist(nomHist,lowHist,highHist):
     # Grab stuff to make it easier to read

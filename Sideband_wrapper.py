@@ -165,16 +165,16 @@ if input_config['BINNING']['X']['BLINDED'] == True:
         subprocess.call([c],shell=True)
 
     subprocess.call(['cp '+tag + '/card_plotmaster.txt ./'], shell=True)
-    print 'Executing PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling --print'
-    subprocess.call(['PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
+    print 'Executing PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling'
+    subprocess.call(['PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling'], shell=True)
     subprocess.call(['rm card_plotmaster.txt'], shell=True)
 
     plot_postfit_results.main(input_config,options.blinded,tag,'')
 
 else:
     subprocess.call(['cp '+tag + '/card_master.txt ./'], shell=True)
-    print 'Executing PostFitShapes2D -d card_master.txt -o '+tag + '/postfitshapes.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling --print'
-    subprocess.call(['PostFitShapes2D -d card_master.txt -o '+tag + '/postfitshapes.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
+    print 'Executing PostFitShapes2D -d card_master.txt -o '+tag + '/postfitshapes.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling'
+    subprocess.call(['PostFitShapes2D -d card_master.txt -o '+tag + '/postfitshapes.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling'], shell=True)
     subprocess.call(['rm card_master.txt'], shell=True)
 
     plot_postfit_results.main(input_config,options.blinded,tag,'')
