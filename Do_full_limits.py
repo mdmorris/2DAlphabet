@@ -6,11 +6,11 @@
 # This is the wrapper of 2DAlphabet.py that can run limits for multiple signals in the current      #
 # session (condor support is in development)                                                        #
 # Afterwards, the limits are plotted on a traditional 'Brazilian flag' limit plot.                  #
-# This is NOT generic and requires some work from the user. The user must use the CL options        #
-# to define a config file template, a file containing the list of signal names on the top line and  #
-# the list of cross sections for each signal (in the same order as the signal name list and both    #
-# comma separated), and the placeholder in the config template that will be replaced with the       #
-# signal names (default is TEMPLATE).                                                               #
+# This is NOT generic and requires some work from the user. The user must use the command line      #
+# options to define a config file template, a file containing the list of signal names on the top   #
+# line and the list of cross sections for each signal on the next line (in the same order as the    #
+# signal name listand both comma separated), and the placeholder in the config template that will   #
+# be replaced with the signal names (default is TEMPLATE).                                          #
 #                                                                                                   #
 #                                                                                                   #
 # WARNING AFTER CONDOR IS SUPPORTED: In order to use condor, this script requires some prep by the  #
@@ -58,37 +58,37 @@ gROOT.SetBatch(kTRUE)
 parser = OptionParser()
 
 parser.add_option('-t', '--template', metavar='FILE', type='string', action='store',
-                  default   =   '',
-                  dest      =   'template',
-                  help      =   'JSON template file to be changed for each signal. Name should be "input_<tag>_template.json" where tag will be used to organize outputs')
+                default   =   '',
+                dest      =   'template',
+                help      =   'JSON template file to be changed for each signal. Name should be "input_<tag>_template.json" where tag will be used to organize outputs')
 parser.add_option('-d', '--dummy', metavar='FILE', type='string', action='store',
-                  default   =   'TEMPLATE',
-                  dest      =   'dummy',
-                  help      =   'Dummy name to be replaced in the template with the signal names')
+                default   =   'TEMPLATE',
+                dest      =   'dummy',
+                help      =   'Dummy name to be replaced in the template with the signal names')
 parser.add_option('-s', '--signals', metavar='FILE', type='string', action='store',
-                  default   =   '',
-                  dest      =   'signals',
-                  help      =   'Text file containing the signal names and their corresponding cross sections')
+                default   =   '',
+                dest      =   'signals',
+                help      =   'Text file containing the signal names and their corresponding cross sections')
 parser.add_option('-P', '--plotOnly', action="store_true",
-                  default   =   False,
-                  dest      =   'plotOnly',
-                  help      =   'Only plots if True')
+                default   =   False,
+                dest      =   'plotOnly',
+                help      =   'Only plots if True')
 parser.add_option('-e', '--envString', metavar='FILE', type='string', action='store',
-                  default   =   'xrdcp root://cmseos.fnal.gov//store/user/lcorcodi/2DAlpha_env.tgz ./ ; tar -xvzf 2DAlpha_env.tgz ; cd CMSSW_7_4_7_patch2/src/ ; scram b ProjectRename ; scram b -j 10 ; cmsenv ; cd 2DAlphabet ;',
-                  dest      =   'envString',
-                  help      =   'Same argument given to `./development/runManySections.py --createCommandFile` to setup the condor environment')
+                default   =   'xrdcp root://cmseos.fnal.gov//store/user/lcorcodi/2DAlpha_env.tgz ./ ; tar -xvzf 2DAlpha_env.tgz ; cd CMSSW_7_4_7_patch2/src/ ; scram b ProjectRename ; scram b -j 10 ; cmsenv ; cd 2DAlphabet ;',
+                dest      =   'envString',
+                help      =   'Same argument given to `./development/runManySections.py --createCommandFile` to setup the condor environment')
 parser.add_option('-u', '--unblind', action="store_true",
-                  default   =   False,
-                  dest      =   'unblind',
-                  help      =   'Only plot observed limit if true')
+                default   =   False,
+                dest      =   'unblind',
+                help      =   'Only plot observed limit if true')
 parser.add_option('-l', '--lumi', metavar='F', type='string', action='store',
-                  default       =       '35851',
-                  dest          =       'lumi',
-                  help          =       'Luminosity option')
+                default       =       '35851',
+                dest          =       'lumi',
+                help          =       'Luminosity option')
 parser.add_option('-H', '--hand', metavar='F', type='string', action='store',
-                  default       =       '',
-                  dest          =       'hand',
-                  help          =       'LH,RH,VL')
+                default       =       '',
+                dest          =       'hand',
+                help          =       'LH,RH,VL')
 
 (options, args) = parser.parse_args()
 

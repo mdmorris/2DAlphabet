@@ -66,9 +66,27 @@
 
     "FIT": {
         "HELP": "The fit parameters of the 2D polynomial should be configured here. Note that parameters must be named x#y$ where # is the order of the parameter in the x and $ is the order of the parameter in the y.",
-        "CHEBYSHEV":{
-            "XORDER": 2,
-            "YORDER": 2
+        "XFORM":"(@1+@2*x)",
+        "YFORM":"(@1+@2*y)",
+        "X1": {
+            "NOMINAL": 1.0,
+            "LOW":0.0,
+            "HIGH":4.0
+        },
+        "X2": {
+            "NOMINAL": 1.1,
+            "LOW":-100.0,
+            "HIGH":100.0
+        },
+        "Y1": {
+            "NOMINAL": 1.0,
+            "LOW":0.0,
+            "HIGH":4.0
+        },
+        "Y2": {
+            "NOMINAL": 1.0,
+            "LOW":-100.0,
+            "HIGH":100.0
         }
     }
 }

@@ -39,8 +39,8 @@ parser.add_option('-i', '--input', metavar='FILE', type='string', action='store'
                 default   =   '',
                 dest      =   'input',
                 help      =   'JSON file to be imported. Name should be "input_<tag>.json" where tag will be used to organize outputs')
-parser.add_option('-p', '--pseudo2D', action="store_true",
-                default   =   False,
+parser.add_option('-g', '--pseudo2D', metavar='FILE', type='string', action='store',
+                default   =   'off',
                 dest      =   'pseudo2D',
                 help      =   'Recalculate the fit guesses using pseudo2D method')
 parser.add_option('-l', '--runLimits', action="store_true",
@@ -51,6 +51,10 @@ parser.add_option('-f', '--runFit', action="store_true",
                 default   =   False,
                 dest      =   'runFit',
                 help      =   'Runs Combine Rp/f fit and plots outputs')
+parser.add_option('--freezeFail', action="store_true",
+                default   =   False,
+                dest      =   'freezeFail',
+                help      =   'Freeze all failing bins')
 
 # Plotting/drawing
 parser.add_option('-P', '--plotOnly', action="store_true",
@@ -113,11 +117,13 @@ with open(options.input) as fInput_config:
     #     print "Input configuration is not in JSON format. Quitting..."
     #     quit()
 
-sig_option = ' --rMin -5 --rMax 5'
+sig_option = ' --rMin 0 --rMax 5'
 sig_tag = ''
 if options.signalOff:
     sig_option = '  --rMin 0 --rMax 0'
     sig_tag = '_nosig'
+if options.freezeFail:
+    sig_tag += '_ff'
 
 # If input has form input_<tag>_<sig>.json...
 if len(options.input.split('_')) == 3 and options.batch:
@@ -140,6 +146,8 @@ else:
     try:
         subprocess.call(['mkdir ' + tag], shell=True)
         subprocess.call(['mkdir ' + tag + '/plots'], shell=True)
+        subprocess.call(['mkdir ' + tag + '/plots/fit_s'], shell=True)
+        subprocess.call(['mkdir ' + tag + '/plots/fit_b'], shell=True)
         subprocess.call(['mkdir ' + tag + '/UncertPlots'], shell=True)
     except:
         print 'dir ' + tag + '/ already exists'
@@ -214,10 +222,27 @@ else:
     blinded = False
 
 
+#########################################################
+#             Get new fit parameter guesses             #
+#########################################################
+if options.pseudo2D != 'off':
+    input_config = get_fit_guesses.main(input_config,blinded, maindir+subdir,nslices=int(options.pseudo2D))
+    fInput_config_new_fit_guesses = open(maindir+subdir + 'input_'+tag+'_new_fit_guesses.json', 'w')
+    json.dump(input_config,fInput_config_new_fit_guesses,indent=2, sort_keys=True)
+    fInput_config_new_fit_guesses.close()
+elif options.batch:
+    input_config = get_fit_guesses.main(input_config,blinded, maindir+subdir,nslices=6)
+    fInput_config_new_fit_guesses = open(maindir+subdir + 'input_'+tag+'_new_fit_guesses.json', 'w')
+    json.dump(input_config,fInput_config_new_fit_guesses,indent=2, sort_keys=True)
+    fInput_config_new_fit_guesses.close()
+
 # Plot only
 if options.plotOnly:
-    get_fit_guesses.main(input_config,blinded, maindir+subdir)
-    plot_postfit_results.main(input_config,options.blinded,maindir+subdir,subdir,options.add)
+    # input_config = get_fit_guesses.main(input_config,blinded, maindir+subdir)
+    plot_postfit_results.main(input_config,options.blinded,maindir+subdir,'b',subdir,options.add)
+    plot_postfit_results.main(input_config,options.blinded,maindir+subdir,'s',subdir,options.add)
+    subprocess.call(['mv '+maindir+subdir + '/plots/*fits* '+maindir+subdir + '/plots/fit_s'], shell=True)
+    subprocess.call(['mv '+maindir+subdir + '/plots/*fitb* '+maindir+subdir + '/plots/fit_b'], shell=True)
     
     quit()
 
@@ -228,19 +253,12 @@ if options.plotUncerts:
     make_systematic_plots.main(input_config,maindir+subdir)
 
 
-#########################################################
-#             Get new fit parameter guesses             #
-#########################################################
-if False:#options.pseudo2D == True:
-    input_config = get_fit_guesses.main(input_config,blinded, maindir+subdir)
-    fInput_config_new_fit_guesses = open(maindir+subdir + 'input_'+tag+'_new_fit_guesses.json', 'w')
-    json.dump(input_config,fInput_config_new_fit_guesses,indent=2, sort_keys=True)
-    fInput_config_new_fit_guesses.close()
 
 #########################################################
 #                Make the prefit Rp/f                   #
 #########################################################
-get_fit_guesses.main(input_config,blinded, maindir+subdir)
+# input_config = get_fit_guesses.main(input_config,blinded, maindir+subdir)
+# quit()
 
 #########################################################
 #               Organize input histograms               #
@@ -255,7 +273,7 @@ print 'Done'
 #########################################################
 # Make the RooWorkspace - creates workspace name 'w_2D' in base.root
 subprocess.call(['mkdir basis_plots'],shell=True)
-zeroBins = build_fit_workspace.main(organized_dict,input_config,blinded,tag,subdir)
+zeroBins = build_fit_workspace.main(organized_dict,input_config,blinded,tag,subdir,freezeFailBins=options.freezeFail)
 
 subprocess.call(['mv base_'+tag+'.root ' + maindir + subdir+'/'], shell=True)
 subprocess.call(['rm -rf '+maindir + subdir+'/basis_plots'],shell=True)
@@ -303,17 +321,24 @@ if options.runFit:
 
         subprocess.call(['mv base_'+tag+'Unblinded.root '+maindir+subdir], shell=True)
         subprocess.call(['cp '+maindir+subdir + '/card_'+tag+'Unblinded.txt ./'], shell=True)
-        print 'Executing PostFitShapes2D -d card_'+tag+'Unblinded.txt -o '+maindir+subdir + '/postfitshapes.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'
-        subprocess.call(['PostFitShapes2D -d card_'+tag+'Unblinded.txt -o '+maindir+subdir + '/postfitshapes.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
+        print 'Executing PostFitShapes2D -d card_'+tag+'Unblinded.txt -o '+maindir+subdir + '/postfitshapes_b.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_b --postfit --sampling --print'
+        subprocess.call(['PostFitShapes2D -d card_'+tag+'Unblinded.txt -o '+maindir+subdir + '/postfitshapes_b.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_b --postfit --sampling --print'], shell=True)
+        print 'Executing PostFitShapes2D -d card_'+tag+'Unblinded.txt -o '+maindir+subdir + '/postfitshapes_s.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'
+        subprocess.call(['PostFitShapes2D -d card_'+tag+'Unblinded.txt -o '+maindir+subdir + '/postfitshapes_s.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
         subprocess.call(['rm card_'+tag+'Unblinded.txt'], shell=True)
-        plot_postfit_results.main(input_config,options.blinded,maindir+subdir,subdir,options.add)
 
     else:
         subprocess.call(['cp '+maindir+subdir + '/card_'+tag+'.txt ./'], shell=True)
-        print 'Executing PostFitShapes2D -d card_'+tag+'.txt -o '+maindir+subdir + '/postfitshapes.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'
-        subprocess.call(['PostFitShapes2D -d card_'+tag+'.txt -o '+maindir+subdir + '/postfitshapes.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
+        print 'Executing PostFitShapes2D -d card_'+tag+'.txt -o '+maindir+subdir + '/postfitshapes_b.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_b --postfit --sampling --print'
+        subprocess.call(['PostFitShapes2D -d card_'+tag+'.txt -o '+maindir+subdir + '/postfitshapes_b.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_b --postfit --sampling --print'], shell=True)
+        print 'Executing PostFitShapes2D -d card_'+tag+'.txt -o '+maindir+subdir + '/postfitshapes_s.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'
+        subprocess.call(['PostFitShapes2D -d card_'+tag+'.txt -o '+maindir+subdir + '/postfitshapes_s.root -f '+maindir+subdir + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
         subprocess.call(['rm card_'+tag+'.txt'], shell=True)
-        plot_postfit_results.main(input_config,options.blinded,maindir+subdir,subdir,options.add)
+    
+    plot_postfit_results.main(input_config,options.blinded,maindir+subdir,'b',subdir,options.add)
+    plot_postfit_results.main(input_config,options.blinded,maindir+subdir,'s',subdir,options.add)
+    subprocess.call(['mv '+maindir+subdir + '/plots/*fits* '+maindir+subdir + '/plots/fit_s'], shell=True)
+    subprocess.call(['mv '+maindir+subdir + '/plots/*fitb* '+maindir+subdir + '/plots/fit_b'], shell=True)
 
 if options.runLimits:
     # If running with the wrapper that processes multiple signals (for limits), we'll write out the command for the wrapper script

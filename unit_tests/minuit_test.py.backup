@@ -1,0 +1,167 @@
+import ROOT
+from ROOT import *
+
+import math
+import ctypes
+import array 
+from array import array
+
+# infile = TFile.Open('distributions/lin100kv10k.root')
+
+# data_failHist = infile.Get('data_obs_fail')
+# data_passHist = infile.Get('data_obs_pass')
+
+# rpf = data_passHist.Clone('rpf')
+# rpf.Divide(data_failHist)
+# rpf.Draw('lego')
+# # raw_input('waiting')
+
+# orderX = 1#iflag.split(',')[0]
+# orderY = 1#iflag.split(',')[1]
+
+def fcn(npar, gin, f, par, iflag):
+    # npar = number of currently variable parameters
+    # gin = vector of first derivatives (optional)
+    # f = reference to calculated function value
+    # par = vector of constant and variable parameters
+    # iflag indicates what is to be calculated
+
+    # npar indexed as [x0y0, x1y0, x2y0, x0y1,...]
+    lnL = 0
+    # for xbinf in range(1,data_failHist.GetNbinsX()+1):
+    #     for ybinf in range(1,data_failHist.GetNbinsY()+1):
+    #         xval = data_failHist.GetXaxis().GetBinCenter(xbinf)
+    #         yval = data_failHist.GetYaxis().GetBinCenter(ybinf)
+
+    #         # xunit = (xval-data_failHist.GetXaxis().GetXmin())/(data_failHist.GetXaxis().GetXmax()-data_failHist.GetXaxis().GetXmin())
+    #         # yunit = (yval-data_failHist.GetYaxis().GetXmin())/(data_failHist.GetYaxis().GetXmax()-data_failHist.GetYaxis().GetXmin())
+
+    #         rpf = 0
+    #         for oy in range(orderY+1):
+    #             for ox in range(orderX+1):
+    #                 rpf += par[(orderX+1)*oy+ox]*(xval**ox)*(yval**oy)
+
+    #         if rpf <= 0:
+    #             continue
+
+    #         failbin = data_failHist.GetBinContent(xbinf,ybinf)
+    #         passbin = data_passHist.GetBinContent(xbinf,ybinf)
+    #         passest = failbin*rpf
+
+    #         # print str(failbin)+'*'+str(max(rpf,0))+' = ' + str(passest)+ ' ?= ' + str(passbin)
+    #         lnL += (passest - passbin*math.log(passest) + math.log(math.factorial(passbin)))
+    #         # lnL += (failbin - failbin*math.log(failbin) + math.log(math.factorial(failbin)))
+
+    failbin = 10000
+    passbin = 1000
+
+    rpf = par[0]
+    # for oy in range(orderY+1):
+    #     for ox in range(orderX+1):
+    #         rpf += par[(orderX+1)*oy+ox]*(1**ox)*(1**oy)
+
+    # if rpf <= 0:
+    #     f = 2*f
+    #     return
+
+    passest = failbin*rpf
+    lnL = passest - passbin*TMath.Log(passest) + passbin*TMath.Log(passbin)-passbin
+
+    print lnL
+    print '\t 10000 * ' + str(rpf) + ' = ' + str(passest)
+
+    f = 2*lnL
+
+    
+    # return f
+
+# def chisq(npar, gin, f, par, iflag):
+#     failbin = 10000
+#     passbin = 1000
+
+#     rpf = par[0]
+
+#     passest = failbin*rpf
+#     chisq = (passbin - passest)**2/passest
+#     if rpf <= 0:
+#         chisq *= -1*math.exp(-1*rpf)
+
+#     f = chisq
+
+#     print f
+#     print '\t'+str(rpf)
+
+if __name__ == "__main__":
+
+    # Manual scans of each coeff
+    # scanFile = TFile('scans.root','RECREATE')
+    # for oy in range(orderY+1):
+    #     for ox in range(orderX+1):
+    #         i = (orderX+1)*oy+ox
+    #         print i
+    # thisScan = TH1F('polX'+str(ox)+'Y'+str(oy),'polX'+str(ox)+'Y'+str(oy),100,0,0.5)
+    # for scanVal in [x/1000.0 for x in range(500)]:
+    #     paramList = []
+    #     for oy2 in range(orderY+1):
+    #         for ox2 in range(orderX+1):
+    #             if 'polX'+str(ox2)+'Y'+str(oy2) != 'polX'+str(ox)+'Y'+str(oy):
+    #                 if ox2 == 1 and oy2 == 1:
+    #                     paramList.append(0.1)
+    #                 else:
+    #                     paramList.append(0.0)
+    #             else:
+    #                 paramList.append(scanVal)
+
+    #     lnnVal = 0
+    #     lnnVal = fcn(0,0,lnnVal,paramList,0)
+    #     # print str(scanVal) +','+str(lnnVal)
+    #     thisScan.Fill(scanVal,lnnVal)
+
+    #         thisScan.Write()
+
+    # scanFile.Close()
+
+    # arglist[1] = 0.000000001
+
+    minuit = TVirtualFitter.Fitter(0,1)
+    minuit.SetFCN(fcn)
+    # for oy in range(orderY+1):
+    #     for ox in range(orderX+1):
+    #         i = (orderX+1)*oy+ox
+    #         if ox == 1 and oy == 1:
+    minuit.SetParameter(0,'polX2Y2', 0.11, 0.01,0.,0.)
+            # else:
+            #     minuit.SetParameter(i,'polX'+str(ox)+'Y'+str(oy), 0.0, 0.,0.,0.)
+
+    arglist = array('d',2*[0.])
+    arglist[0] = 10000
+    minuit.ExecuteCommand("MIGRAD", arglist,0)
+    # minuit.mnscan()
+    # minuit.SetErrorDef(1.0)
+
+    # arglist[0] = 0.
+    # minuit.ExecuteCommand("MINOS", arglist, 0);
+
+    # ierflg = ctypes.c_int(1982)
+
+    # minuit = TMinuit(4)
+    # minuit.SetFCN(chisq)
+    # minuit.mnparm(0,'polX2Y2', 0.11, 0.01, 0, 0, ierflg)
+    # for oy in range(orderY+1):
+    #     for ox in range(orderX+1):
+    #         i = (orderX+1)*oy+ox
+    #         if ox == 1 and oy == 1:
+    #             minuit.mnparm(i,'polX'+str(ox)+'Y'+str(oy), 0.11, 0.01, 0, 0, ierflg)
+    #         else:
+    #             minuit.mnparm(i,'polX'+str(ox)+'Y'+str(oy), 0.0, 0, 0, 0, ierflg)
+
+    # minuit.SetPrintLevel(1)
+    # minuit.mnexcm("MIGRAD", arglist,2,ierflg)
+    # minuit.SetErrorDef(1.0)
+
+    # arglist[0] = 1.0
+
+    # minuit.SetFCN(fcn)
+    # minuit.mnexcm("MINOS", arglist, 2,ierflg)
+
+

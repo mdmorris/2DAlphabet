@@ -1,7 +1,7 @@
 {
     "GLOBAL": {
         "HELP": "The 'global' item can be used to set global variables inside of this json configuration file. This is the only place where you can customize the keys of dictionaries. For example, you could store 'dir': 'path/to/my/files/' and then later use 'dir' instead of writing the same file path multiple times",
-        "path": "unit_tests/distributions/flat100kv1k.root"
+        "path": "unit_tests/distributions/lin1Mv10k.root"
     },
 
     "PROCESS": {
@@ -17,7 +17,7 @@
             "FILE":"path",
             "HISTPASS":"signal_pass",
             "HISTFAIL":"signal_fail",
-            "SYSTEMATICS":["sym","asym"],
+            "SYSTEMATICS":["asym","sym"],
             "CODE": 0
         }
     },
@@ -51,8 +51,8 @@
             "LOW": 0,
             "HIGH": 24,
             "NBINS": 12,
-            "SIGSTART": 10,
-            "SIGEND": 20,
+            "SIGSTART": 14,
+            "SIGEND": 16,
             "BLINDED": false
         },
         "Y": {
@@ -69,22 +69,22 @@
         "XFORM":"(@1+@2*x)",
         "YFORM":"(@1+@2*y)",
         "X1": {
-            "NOMINAL": 0.01,
+            "NOMINAL": 0.000001,
             "LOW":0.0,
-            "HIGH":5.0
+            "HIGH":1.0
         },
         "X2": {
-            "NOMINAL": 0.01,
+            "NOMINAL": 1.0,
             "LOW":-100.0,
             "HIGH":100.0
         },
         "Y1": {
-            "NOMINAL": 0.01,
+            "NOMINAL": 0.000001,
             "LOW":0.0,
             "HIGH":1.0
         },
         "Y2": {
-            "NOMINAL": 0.01,
+            "NOMINAL": 1.0,
             "LOW":-100.0,
             "HIGH":100.0
         }

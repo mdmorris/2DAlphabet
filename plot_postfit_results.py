@@ -2,11 +2,15 @@ import ROOT
 from ROOT import *
 
 import sys
+import os.path
+
+import pprint 
+pp = pprint.PrettyPrinter(indent=4)
 
 import header
-from header import makeCan, FindCommonString
+from header import makeCan, FindCommonString, copyHistWithNewXbounds, makeBlindedHist
 
-def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
+def main(inputConfig, blindData, globalDir, fittype='s', suffix='',procAddString=''):
     allVars = []
 
     subdir = ''
@@ -23,12 +27,14 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
 
     # File with histograms and RooFitResult parameters
     if not batch:
-        post_file = TFile.Open(globalDir+'/postfitshapes.root')
-        fit_result = TFile.Open(globalDir+'/fitDiagnostics.root').Get('fit_s')
+        post_file = TFile.Open(globalDir+'/postfitshapes_'+fittype+'.root')
+        fd_file = TFile.Open(globalDir+'/fitDiagnostics.root')
 
     else:
-        post_file = TFile.Open(globalDir.split('/')[0]+'/postfitshapes.root')
-        fit_result = TFile.Open(globalDir.split('/')[0]+'/fitDiagnostics.root').Get('fit_s')
+        post_file = TFile.Open(globalDir.split('/')[0]+'/postfitshapes_'+fittype+'.root')
+        fd_file = TFile.Open(globalDir.split('/')[0]+'/fitDiagnostics.root')
+
+    fit_result = fd_file.Get('fit_'+fittype)
 
     # Binning
     x_low = inputConfig['BINNING']['X']['LOW']
@@ -71,6 +77,11 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
     y_tail_beginningVal = str(int(post_file.Get('pass'+subdir+'_prefit/data_obs').GetYaxis().GetBinLowEdge(y_tail_beginningBin)))
  
 
+    # Final fit signal strength
+    tree_fit_sb = fd_file.Get('tree_fit_sb')
+    tree_fit_sb.GetEntry(0)
+    signal_strength = tree_fit_sb.r
+
     #####################
     #    Data vs Bkg    #
     #####################
@@ -83,8 +94,25 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
         for cat in ['fail','pass']:
             hist_dict[process][cat] = {}
 
-            hist_dict[process][cat]['prefit_2D'] = post_file.Get(cat +subdir+ '_prefit/'+process)#.Clone()
-            hist_dict[process][cat]['postfit_2D'] = post_file.Get(cat +subdir+ '_postfit/'+process)#.Clone()
+            if blindData and process == 'data_obs' and cat == 'pass':
+                prefull2D = post_file.Get(cat +subdir+ '_prefit/'+process).Clone()
+                postfull2D = post_file.Get(cat +subdir+ '_postfit/'+process).Clone()
+
+                lowPre = copyHistWithNewXbounds(prefull2D,'lowPre',x_binWidth,x_low,sigstart)
+                lowPost = copyHistWithNewXbounds(postfull2D,'lowPost',x_binWidth,x_low,sigstart)
+                
+                highPre = copyHistWithNewXbounds(prefull2D,'highPre',x_binWidth,sigend,x_high)
+                highPost = copyHistWithNewXbounds(postfull2D,'highPost',x_binWidth,sigend,x_high)
+
+                blindedPre = makeBlindedHist(prefull2D,lowPre,highPre)
+                blindedPost = makeBlindedHist(postfull2D,lowPost,highPost)
+
+                hist_dict[process][cat]['prefit_2D'] = blindedPre
+                hist_dict[process][cat]['postfit_2D'] = blindedPost
+
+            else:
+                hist_dict[process][cat]['prefit_2D'] = post_file.Get(cat +subdir+ '_prefit/'+process).Clone()
+                hist_dict[process][cat]['postfit_2D'] = post_file.Get(cat +subdir+ '_postfit/'+process).Clone()
 
             hist_dict[process][cat]['prefit_2D'].SetMinimum(0)
             hist_dict[process][cat]['postfit_2D'].SetMinimum(0)
@@ -110,7 +138,6 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
             hist_dict[process][cat]['postfit_projy2'] = hist_dict[process][cat]['postfit_2D'].ProjectionY(base_proj_name_post+'projy_'+str(sigstart)+'-'+str(sigend),            sigstart_bin,           sigend_bin,'e')
             hist_dict[process][cat]['postfit_projy3'] = hist_dict[process][cat]['postfit_2D'].ProjectionY(base_proj_name_post+'projy_'+str(sigend)+'-'+str(x_high),              sigend_bin+1,           x_nbins,'e')
 
-
             x_edges = [x_low,sigstart,sigend,x_high]
             y_edges = [y_low,y_turnon_endVal,y_tail_beginningVal,y_high]
 
@@ -121,6 +148,8 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
                         hist_dict[process][cat]['postfit_proj'+z+str(i)].SetTitle(process + ', ' + cat+subdir + ', ' +str(y_edges[i-1]) +'-'+ str(y_edges[i]))
                     elif z == 'y':
                         hist_dict[process][cat]['postfit_proj'+z+str(i)].SetTitle(process + ', ' + cat+subdir + ', ' +str(x_edges[i-1]) +'-'+ str(x_edges[i]))
+
+    post_file.Close()
 
     # Add together processes that we want to see as one
     process_list = hist_dict.keys() # save this real quick
@@ -147,15 +176,22 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
             for proc in summation.split('+'):
                 process_list.remove(proc)
 
-
     # Create lists for the 2D projections (ones you want to see together)
     for process in hist_dict.keys():    # Canvas
+        isSignal = (process != 'qcd' and inputConfig['PROCESS'][process]['CODE'] == 0)
         twoDList = []         
         for cat in ['fail','pass']:
             for fit in ['prefit', 'postfit']:
-                twoDList.append(hist_dict[process][cat][fit+'_2D'])
+                if isSignal and fittype == 's':
+                    hist_dict[process][cat][fit+'_2D'].Scale(signal_strength)
+                    twoDList.append(hist_dict[process][cat][fit+'_2D'])
+                else:
+                    twoDList.append(hist_dict[process][cat][fit+'_2D'])
 
-        makeCan(process+'_2D',globalDir+'/',twoDList,xtitle=x_title,ytitle=y_title)
+        if isSignal and fittype != 's':
+            continue
+        else:
+            makeCan(process+'_fit'+fittype+'_2D',globalDir+'/',twoDList,xtitle=x_title,ytitle=y_title)
 
     process_list[-1],process_list[-2] = process_list[-2],process_list[-1]
 
@@ -184,7 +220,8 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
                         if (process != 'qcd' and inputConfig['PROCESS'][process]['CODE'] != 0):
                             bkg_process_list.append(hist_dict[process][cat][plotType+str(regionNum)])
                         elif (process != 'qcd' and inputConfig['PROCESS'][process]['CODE'] == 0):
-                            signal_list.append(hist_dict[process][cat][plotType.replace('post','pre')+str(regionNum)])
+                            hist_dict[process][cat][plotType+str(regionNum)].Scale(signal_strength)
+                            signal_list.append(hist_dict[process][cat][plotType+str(regionNum)])
                         
                     else:
                         dataList.append(hist_dict[process][cat][plotType+str(regionNum)])
@@ -196,24 +233,21 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
                 colors.append(kYellow)
                 bkgList.append(bkg_process_list)
 
-        
-
-
 
         if 'x' in plotType:
-            makeCan(plotType,globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=x_title)
-            makeCan(plotType+'_log',globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=x_title,logy=True)
+            makeCan(plotType+'_fit'+fittype,globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=x_title)
+            makeCan(plotType+'_fit'+fittype+'_log',globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=x_title,logy=True)
         elif 'y' in plotType:
-            makeCan(plotType,globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=y_title)
-            makeCan(plotType+'_log',globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=y_title,logy=True)
+            makeCan(plotType+'_fit'+fittype,globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=y_title)
+            makeCan(plotType+'_fit'+fittype+'_log',globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=y_title,logy=True)
 
     ##############
     #    Rp/f    #
     ##############
 
     # Need to sample the space to get the Rp/f with proper errors (1000 samples)
-    rpf_xnbins = 50
-    rpf_ynbins = 50
+    rpf_xnbins = x_nbins
+    rpf_ynbins = y_nbins
     rpf_samples = TH3F('rpf_samples','rpf_samples',rpf_xnbins, x_low, x_high, rpf_ynbins, y_low, y_high, 1000,0,1)# TH3 to store samples
     sample_size = 100
     # First figure out the names of parameters and their form so we can evaluate them as we sample
@@ -246,7 +280,6 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
         param_out.close()
 
 
-
         for i in range(sample_size):
             sys.stdout.write('\rSampling '+str(100*float(i)/float(sample_size)) + '%')
             sys.stdout.flush()
@@ -259,10 +292,15 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
                     thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
                     thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
 
+                    thisXMapped = (thisXCenter - inputConfig['BINNING']['X']['LOW'])/(inputConfig['BINNING']['X']['HIGH'] - inputConfig['BINNING']['X']['LOW'])
+                    thisYMapped = (thisYCenter - inputConfig['BINNING']['Y']['LOW'])/(inputConfig['BINNING']['Y']['HIGH'] - inputConfig['BINNING']['Y']['LOW'])
+
                     for iy in range(polYO+1):
                         for ix in range(polXO+1):
                             coeff = param_sample.find('polyCoeff_'+'x'+str(ix)+'y'+str(iy)+suffix).getValV()
-                            bin_val += coeff*(thisXCenter**ix)*(thisYCenter**iy)
+                            bin_val += coeff*(thisXMapped**ix)*(thisYMapped**iy)
+
+                    # print '['+str(thisXCenter)+','+str(thisYCenter)+'] -> ['+str(thisXMapped)+','+str(thisYMapped)+']: ' +str(bin_val)
 
                     rpf_samples.Fill(thisXCenter,thisYCenter,bin_val)
 
@@ -286,7 +324,6 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
             param_out.write(coeff_final.GetName()+': ' + str(coeff_final.getValV()) + ' +/- ' + str(coeff_final.getError())+'\n')
             coeff_final = coeffIter_final.Next()
         param_out.close()
-
 
 
         # Generate samples
@@ -316,6 +353,43 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
                         bin_valy += param_sample.find(paramName).getValV()*thisYMapped**iy
 
                     bin_val = bin_valx*bin_valy
+
+                    rpf_samples.Fill(thisXCenter,thisYCenter,bin_val)
+
+    elif 'GFORM' in inputConfig['FIT'].keys():
+        # Grab and save final coefficient values
+        param_final = fit_result.floatParsFinal()
+        coeffs_final = param_final.selectByName('gForm_coeff_*'+suffix)        # Another trick here - if suffix='', this will grab everything including those
+        if suffix == '':                                                        # polyCoeffs with the suffix. Need to remove those by explicitely grabbing them
+            coeffsToRemove_final = param_final.selectByName('gForm_coeff_*_*') # and using .remove(collection)
+            coeffs_final.remove(coeffsToRemove_final)
+
+        param_out = open(globalDir+'/rpf_params'+suffix+'.txt','w')
+        coeffIter_final = coeffs_final.createIterator()
+        coeff_final = coeffIter_final.Next()
+        while coeff_final:
+            param_out.write(coeff_final.GetName()+': ' + str(coeff_final.getValV()) + ' +/- ' + str(coeff_final.getError())+'\n')
+            coeff_final = coeffIter_final.Next()
+        param_out.close()
+
+        for i in range(sample_size):
+            sys.stdout.write('\rSampling '+str(100*float(i)/float(sample_size)) + '%')
+            sys.stdout.flush()
+            param_sample = fit_result.randomizePars()
+            funcString = RFVform2TF1(inputConfig['FIT']['FORM'],0)
+            TF2_sample = TF2('TF2_sample',funcString,0,1,0,1)
+
+            for xbin in range(1,rpf_xnbins+1):
+                for ybin in range(1,rpf_ynbins+1):
+                    bin_val = 0
+
+                    thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
+                    thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
+
+                    thisXMapped = (thisXCenter - inputConfig['BINNING']['X']['LOW'])/(inputConfig['BINNING']['X']['HIGH'] - inputConfig['BINNING']['X']['LOW'])
+                    thisYMapped = (thisYCenter - inputConfig['BINNING']['Y']['LOW'])/(inputConfig['BINNING']['Y']['HIGH'] - inputConfig['BINNING']['Y']['LOW'])
+
+                    bin_val = TF2_sample.Eval(thisXMapped,thisYMapped)
 
                     rpf_samples.Fill(thisXCenter,thisYCenter,bin_val)
 
@@ -395,7 +469,6 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
             del chebSum
 
     print '\n'
-
     rpf_final = TH2F('rpf_final','rpf_final',rpf_samples.GetNbinsX(),rpf_samples.GetXaxis().GetXmin(),rpf_samples.GetXaxis().GetXmax(),rpf_samples.GetNbinsY(),rpf_samples.GetYaxis().GetXmin(),rpf_samples.GetYaxis().GetXmax())
     # Now loop over all x,y bin in rpf_samples, project onto Z axis, 
     # get the mean and RMS and set as the bin content and error in rpf_final
@@ -405,8 +478,35 @@ def main(inputConfig, blindData, globalDir, suffix='',procAddString=''):
             rpf_final.SetBinContent(xbin,ybin,temp_projz.GetMean())
             rpf_final.SetBinError(xbin,ybin,temp_projz.GetRMS())
 
-    rpf_file = TFile(globalDir+'/plots/postfit_rpf.root','RECREATE')
-    rpf_file.cd()
-    rpf_final.Write()
-    rpf_file.Close()
+    rpf_c = TCanvas('rpf_c','Post-fit R_{P/F}',800,700)
+    rpf_final.Draw('lego')
+    rpf_c.Print(globalDir+'/plots/fit_'+fittype+'/postfit_rpf_lego.pdf','pdf')
+    rpf_final.Draw('pe')
+    rpf_c.Print(globalDir+'/plots/fit_'+fittype+'/postfit_rpf_errs.pdf','pdf')
 
+    if os.path.isfile(globalDir+'/plots/rpf_comparisons.root'):
+
+        rpf_file = TFile.Open(globalDir+'/plots/rpf_comparisons.root','UPDATE')
+
+        # Do a ratio and diff with pre-fit
+        prefit_rpf = rpf_file.Get('RpfToRemap_unit')
+
+        # Ratio
+        rpf_ratio = rpf_final.Clone('rpf_ratio_fit'+fittype)
+        rpf_ratio.Divide(prefit_rpf)
+
+        # Difference
+        rpf_diff = rpf_final.Clone('rpf_diff_fit'+fittype)
+        rpf_diff.Add(prefit_rpf,-1)
+
+
+        # rpf_ratio_c = TCanvas('rpf_ratio_c','Ratio of post-fit to pre-fit R_{P/F}',800,700)
+        # rpf_ratio.Draw('surf')
+        # rpf_ratio_c.Print(globalDir+'/plots/rpf_post-to-pre_ratio.pdf','pdf')
+
+        rpf_file.cd()
+        rpf_final.Write()
+        rpf_ratio.Write()
+        rpf_diff.Write()
+
+        rpf_file.Close()
