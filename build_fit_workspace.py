@@ -194,6 +194,36 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir='',freezeFailBins=False):
                         PolyCoeffs['x'+str(xi)+'y'+str(yi)] = RooConstVar(name,name,thisNom)
                 allVars.append(PolyCoeffs['x'+str(xi)+'y'+str(yi)])
 
+    elif "GFORM" in inputConfig['FIT'].keys():
+        coeffDict = {}
+        for c in sorted(inputConfig['FIT'].keys()):
+            if c.isdigit():
+                thisNom = inputConfig['FIT'][c]['NOMINAL']
+                if 'LOW' in inputConfig['FIT'][c].keys() and 'HIGH' in inputConfig['FIT'][c].keys():
+                    thisLow = inputConfig['FIT'][c]['LOW']
+                    thisHigh = inputConfig['FIT'][c]['HIGH']
+                    coeffDict[c] = RooRealVar('gForm_coeff_'+c+suffix, 'gForm_coeff_'+c+suffix, thisNom, thisLow, thisHigh)
+
+                    if 'ERROR_UP' in inputConfig['FIT'][c].keys() and 'ERROR_DOWN' in inputConfig['FIT'][c].keys():
+                        coeffDict[c].setAsymError(inputConfig['FIT'][c]['ERROR_DOWN'],inputConfig['FIT'][c]['ERROR_UP'])
+                    elif 'ERROR' in inputConfig['FIT'][c].keys():
+                        coeffDict[c].setError(inputConfig['FIT'][c]['ERROR'])
+
+                else:
+                    input_break = raw_input('WARNING: Upper and lower bounds on fit parameter ' + c + ' not defined. Please type "N" if you would like to quit or enter if you would like to treat the parameter as constant')
+                    if input_break == 'N':
+                        quit()
+                    else:
+                        coeffDict[c] = RooConstVar(name,name,thisNom)
+                allVars.append(coeffDict[c])
+
+        nCoeffs = max([int(param) for param in inputConfig['FIT'].keys() if param != 'GFORM'])+1
+        gFormula = inputConfig['FIT']['GFORM'].replace('+x','+@'+str(nCoeffs)).replace('+y','+@'+str(nCoeffs+1))
+        gFormula = gFormula.replace('*x','*@'+str(nCoeffs)).replace('*y','*@'+str(nCoeffs+1))
+        gFormula = gFormula.replace('-x','-@'+str(nCoeffs)).replace('-y','-@'+str(nCoeffs+1))
+        gFormula = gFormula.replace('/x','/@'+str(nCoeffs)).replace('/y','/@'+str(nCoeffs+1))
+        gFormula = gFormula.replace('(x','(@'+str(nCoeffs)).replace('(y','(@'+str(nCoeffs+1))
+
     elif "CHEBYSHEV" in inputConfig['FIT'].keys():
         chebBasis = chebyshevBasis('chebBasis','chebBasis',inputConfig['FIT']['CHEBYSHEV']['XORDER'],inputConfig['FIT']['CHEBYSHEV']['YORDER'],TH2_data_fail)
         chebBasis.drawBasis('basis_plots/basis_shapes.root')
@@ -267,8 +297,11 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir='',freezeFailBins=False):
             else:
                 # Initialize contents by subtracting minor non-QCD components (code 2)
                 binContent = TH2_data_fail.GetBinContent(xbin,ybin)
-                binErrUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)*3
-                binErrDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)*3
+                binRangeUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)*3
+                binRangeDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)*3
+                binErrUp = binContent + TH2_data_fail.GetBinErrorUp(xbin,ybin)
+                binErrDown = binContent - TH2_data_fail.GetBinErrorLow(xbin,ybin)
+
                 
                 # # if hasMMC, create a RooArgList to store each for this bin
                 # if hasMMC:
@@ -284,9 +317,11 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir='',freezeFailBins=False):
                     elif inputConfig['PROCESS'][process]['CODE'] == 1: # data
                         continue
                     elif inputConfig['PROCESS'][process]['CODE'] == 2: # MC
-                        binContent  = binContent    - thisTH2.GetBinContent(xbin,ybin)
-                        binErrUp    = binErrUp      - thisTH2.GetBinContent(xbin,ybin) + thisTH2.GetBinErrorUp(xbin,ybin)             # Just propagator errors normally
-                        binErrDown  = binErrDown    - thisTH2.GetBinContent(xbin,ybin) - thisTH2.GetBinErrorLow(xbin,ybin)
+                        binContent   = binContent    - thisTH2.GetBinContent(xbin,ybin)
+                        binRangeUp   = binRangeUp    - 0.5*thisTH2.GetBinContent(xbin,ybin)
+                        binRangeDown = binRangeDown  - 1.5*thisTH2.GetBinContent(xbin,ybin)
+                        binErrUp     = binErrUp      - thisTH2.GetBinContent(xbin,ybin) + thisTH2.GetBinErrorUp(xbin,ybin)             # Just propagator errors normally
+                        binErrDown   = binErrDown    - thisTH2.GetBinContent(xbin,ybin) - thisTH2.GetBinErrorLow(xbin,ybin)
 
                     # elif inputConfig['PROCESS'][process]['CODE'] == 3: # Major MC (MMC)
                     #     if thisTH2.GetBinContent(xbin,ybin) <= 0:
@@ -336,16 +371,16 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir='',freezeFailBins=False):
                         
                         binRRV.setAsymError(binErrDown,binErrUp)
                         floating_vars.append(name)
-                    elif binContent < 50:             # Give larger floating range for bins with few events
-                        print name +' ' + str(binContent)
-                        binRRV = RooRealVar(name, name, binContent, 0, 100)
-                        if binContent-binErrDown < 0:
-                            binErrDown = binContent          # For the rare case when bin error is large relative to the content
+                    # elif binContent < 50:             # Give larger floating range for bins with few events
+                    #     print name +' ' + str(binContent)
+                    #     binRRV = RooRealVar(name, name, binContent, 0, 100)
+                    #     if binContent-binErrDown < 0:
+                    #         binErrDown = binContent          # For the rare case when bin error is large relative to the content
                         
-                        binRRV.setAsymError(binErrDown,binErrUp)
-                        floating_vars.append(name)
+                    #     binRRV.setAsymError(binErrDown,binErrUp)
+                    #     floating_vars.append(name)
                     else:
-                        binRRV = RooRealVar(name, name, binContent, 0, 2*binContent)
+                        binRRV = RooRealVar(name, name, binContent, binRangeDown, binRangeUp)
                         binRRV.setAsymError(binErrDown,binErrUp)
                         floating_vars.append(name)
                     # # If there are MMCs
@@ -435,6 +470,22 @@ def main(dictTH2s,inputConfig,blinded,tag,subdir='',freezeFailBins=False):
 
                         formulaArgList = RooArgList(binRRV,thisFullPolyVar)
                         thisBinPass = RooFormulaVar('Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix,'Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix,"@0*@1",formulaArgList)
+                        binListPass.add(thisBinPass)
+                        allVars.append(thisBinPass)
+
+                    elif 'GFORM' in inputConfig['FIT'].keys():
+                        gFormLabel = 'gFormula_'+str(int(xbin))+"_"+str(int(ybin))+suffix
+                        gFormList = RooArgList()
+                        for c in sorted(inputConfig['FIT'].keys()):
+                            if c.isdigit():
+                                gFormList.add(coeffDict[c])
+
+                        gFormList.add(xConst)
+                        gFormList.add(yConst)
+                        gFormRFV = RooFormulaVar(gFormLabel,gFormLabel,gFormula,gFormList)
+                        allVars.append(gFormRFV)
+
+                        thisBinPass = RooFormulaVar('Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix,'Pass_bin_'+str(xbin)+'-'+str(ybin)+suffix,"@0*@1",RooArgList(binRRV,gFormRFV))
                         binListPass.add(thisBinPass)
                         allVars.append(thisBinPass)
 

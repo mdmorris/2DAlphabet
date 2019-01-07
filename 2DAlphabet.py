@@ -122,6 +122,8 @@ sig_tag = ''
 if options.signalOff:
     sig_option = '  --rMin 0 --rMax 0'
     sig_tag = '_nosig'
+if options.freezeFail:
+    sig_tag += '_ff'
 
 # If input has form input_<tag>_<sig>.json...
 if len(options.input.split('_')) == 3 and options.batch:
@@ -228,7 +230,11 @@ if options.pseudo2D != 'off':
     fInput_config_new_fit_guesses = open(maindir+subdir + 'input_'+tag+'_new_fit_guesses.json', 'w')
     json.dump(input_config,fInput_config_new_fit_guesses,indent=2, sort_keys=True)
     fInput_config_new_fit_guesses.close()
-
+elif options.batch:
+    input_config = get_fit_guesses.main(input_config,blinded, maindir+subdir,nslices=6)
+    fInput_config_new_fit_guesses = open(maindir+subdir + 'input_'+tag+'_new_fit_guesses.json', 'w')
+    json.dump(input_config,fInput_config_new_fit_guesses,indent=2, sort_keys=True)
+    fInput_config_new_fit_guesses.close()
 
 # Plot only
 if options.plotOnly:

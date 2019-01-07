@@ -191,6 +191,10 @@ def main(inputConfig, zeroBins, blinded, tag, maindir, subdir):
             if 'LOW' in inputConfig['FIT'][coeff].keys() and 'HIGH' in inputConfig['FIT'][coeff].keys():
                 lower_coeff = coeff.lower()
                 card_new.write(colliMate('polyCoeff_'+lower_coeff+suffix+' flatParam\n',22))
+    elif 'GFORM' in inputConfig['FIT'].keys():
+        for coeff in [key for key in inputConfig['FIT'].keys() if key != 'HELP' and key.find('GFORM') == -1]:
+            if 'LOW' in inputConfig['FIT'][coeff].keys() and 'HIGH' in inputConfig['FIT'][coeff].keys():
+                card_new.write(colliMate('gForm_coeff_'+coeff+suffix+' flatParam\n',22))
     elif 'CHEBYSHEV' in inputConfig['FIT'].keys():
         for oX in range(0,inputConfig['FIT']['CHEBYSHEV']['XORDER']+1):
             for oY in range(0,inputConfig['FIT']['CHEBYSHEV']['YORDER']+1):

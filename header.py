@@ -3,6 +3,8 @@ from ROOT import *
 import os
 import math
 from math import sqrt
+import array
+from array import array
 
 
 # Function stolen from https://stackoverflow.com/questions/9590382/forcing-python-json-module-to-work-with-ascii
@@ -78,41 +80,6 @@ def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHi
 
     return histCopy
 
-def copyHistWithNewYbounds(thisHist,copyName,newBinWidthY,yNewBinsLow,yNewBinsHigh):
-    # Make a copy with the same Y bins but new X bins
-    nBinsX = thisHist.GetNbinsX()
-    xBinsLow = thisHist.GetXaxis().GetXmin()
-    xBinsHigh = thisHist.GetXaxis().GetXmax()
-    nNewBinsY = int((yNewBinsHigh-yNewBinsLow)/float(newBinWidthY))
-    histCopy = TH2F(copyName,copyName,nBinsX,xBinsLow,xBinsHigh,nNewBinsY,yNewBinsLow,yNewBinsHigh)
-    histCopy.Sumw2()
-    
-    histCopy.GetXaxis().SetName(thisHist.GetXaxis().GetName())
-    histCopy.GetYaxis().SetName(thisHist.GetYaxis().GetName())
-
-
-    # Loop through the old bins
-    for binX in range(1,nBinsX+1):
-        # print 'Bin y: ' + str(binY)
-        for newBinY in range(1,nNewBinsY+1):
-            newBinContent = 0
-            newBinErrorSq = 0
-            newBinYlow = histCopy.GetYaxis().GetBinLowEdge(newBinY)
-            newBinYhigh = histCopy.GetYaxis().GetBinUpEdge(newBinY)
-
-            # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
-            for oldBinY in range(1,thisHist.GetNbinsY()+1):
-                if thisHist.GetYaxis().GetBinLowEdge(oldBinY) >= newBinYlow and thisHist.GetYaxis().GetBinUpEdge(oldBinY) <= newBinYhigh:
-                    # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
-                    # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
-                    newBinContent += thisHist.GetBinContent(binX,oldBinY)
-                    newBinErrorSq += thisHist.GetBinError(binX,oldBinY)**2
-
-            # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
-            histCopy.SetBinContent(binX,newBinY,newBinContent)
-            histCopy.SetBinError(binX,newBinY,sqrt(newBinErrorSq))
-
-    return histCopy
 
 def copyHistWithNewYbounds(thisHist,copyName,newBinWidthY,yNewBinsLow,yNewBinsHigh):
     # Make a copy with the same Y bins but new X bins
@@ -157,6 +124,7 @@ def rebinY(thisHist,name,tag,new_y_bins_array):
 
     rebinned = TH2F(name,name,xnbins,xmin,xmax,len(new_y_bins_array)-1,new_y_bins_array)
     print new_y_bins_array
+    print rebinned.GetYaxis().GetBinUpEdge(len(new_y_bins_array)-1)
     rebinned.Sumw2()
 
     for xbin in range(1,xnbins+1):
@@ -192,7 +160,9 @@ def rebinY(thisHist,name,tag,new_y_bins_array):
 
 def remapToUnity(hist):
 
-    remap = TH2F(hist.GetName()+'_unit',hist.GetName()+'_unit',hist.GetNbinsX(),0,1,hist.GetNbinsY(),0,1)
+    ybins = array('d',[(hist.GetYaxis().GetBinLowEdge(b)-hist.GetYaxis().GetXmin())/(hist.GetYaxis().GetXmax()-hist.GetYaxis().GetXmin()) for b in range(1,hist.GetNbinsY()+1)]+[1])
+    remap = TH2F(hist.GetName()+'_unit',hist.GetName()+'_unit',hist.GetNbinsX(),0,1,hist.GetNbinsY(),ybins)
+    remap.Sumw2()
 
     for xbin in range(hist.GetNbinsX()+1):
         for ybin in range(hist.GetNbinsY()+1):
@@ -200,6 +170,7 @@ def remapToUnity(hist):
             remap.SetBinError(xbin,ybin,hist.GetBinError(xbin,ybin))
 
     return remap
+
 
 def makeBlindedHist(nomHist,lowHist,highHist):
     # Grab stuff to make it easier to read
@@ -215,16 +186,19 @@ def makeBlindedHist(nomHist,lowHist,highHist):
     nomHist.SetName(blindName+'_unblinded')
 
     blindedHist = TH2F(blindName,blindName,xnbins,xlow,xhigh,ynbins,ylow,yhigh)
+    blindedHist.Sumw2()
 
     for binY in range(1,ynbins+1):
         # First fill with the lowHist bins since this is easy
         for binX in range(1,lowHist.GetNbinsX()+1):
             blindedHist.SetBinContent(binX,binY,lowHist.GetBinContent(binX,binY))
+            blindedHist.SetBinError(binX,binY,lowHist.GetBinError(binX,binY))
        
         # Now figure out how many bins we have to jump to get to highHist
         bins2jump = xnbins - highHist.GetNbinsX()
         for binX in range(1,highHist.GetNbinsX()+1):
             blindedHist.SetBinContent(binX+bins2jump,binY,highHist.GetBinContent(binX,binY))
+            blindedHist.SetBinError(binX+bins2jump,binY,highHist.GetBinError(binX,binY))
 
     return blindedHist
 
@@ -610,7 +584,7 @@ def checkFitForm(xFitForm,yFitForm):
         quit()
 
 
-def RFVform2TF1(RFVform,shift=0):
+def RFVform2TF1(RFVform,shift=0): # shift tells function how much to shift the indices of the coefficients by
     TF1form = ''
     lookingForDigit = False
     for index,char in enumerate(RFVform):
