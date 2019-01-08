@@ -146,7 +146,7 @@ def main(inputConfig,blinded,tag,nslices=0,sigma=5):
     else:
         new_y_bins = [yBinWidth*i+ymin for i in range(ynbins+1)]
 
-    new_y_bins = [1000,1200,1400,1600,1800,2000,4000]
+    # new_y_bins = [1000,1200,1400,1600,1800,2000,4000]
 
     print 'Will bin y-axis for fit guesses using bins ',
     print new_y_bins
@@ -180,10 +180,10 @@ def main(inputConfig,blinded,tag,nslices=0,sigma=5):
             finalPass = blindedPass
             finalFail = blindedFail
 
-            finalPass.SetName('finalPass')
-            finalPass.SetTitle('finalPass')
-            finalFail.SetName('finalFail')
-            finalFail.SetTitle('finalFail')
+        finalPass.SetName('finalPass')
+        finalPass.SetTitle('finalPass')
+        finalFail.SetName('finalFail')
+        finalFail.SetTitle('finalFail')
 
     # Otherwise just get the Rpf
     else:
@@ -195,10 +195,10 @@ def main(inputConfig,blinded,tag,nslices=0,sigma=5):
             finalPass = rebinnedPass
             finalFail = rebinnedFail
 
-            finalPass.SetName('finalPass')
-            finalPass.SetTitle('finalPass')
-            finalFail.SetName('finalFail')
-            finalFail.SetTitle('finalFail')
+        finalPass.SetName('finalPass')
+        finalPass.SetTitle('finalPass')
+        finalFail.SetName('finalFail')
+        finalFail.SetTitle('finalFail')
 
 
     RpfToRemap = finalPass.Clone('RpfToRemap')
@@ -262,6 +262,7 @@ def main(inputConfig,blinded,tag,nslices=0,sigma=5):
                 nyparams += 1
         yFuncString = yFuncString[:-1]
 
+
     elif 'GFORM' in inputConfig['FIT'].keys():
         # Need to take a 2D function and freeze it in one dimension for each y slice
         funcString = RFVform2TF1(inputConfig['FIT']['GFORM'],0)
@@ -304,6 +305,7 @@ def main(inputConfig,blinded,tag,nslices=0,sigma=5):
         # projX.Draw('p e')
         projX.Write()
         projX.Fit(fitResults['fitSlice_'+str(ybin)],'EM')
+        
         # projX.Draw('p e')
         projX.SetMaximum(1.1)
         projX.SetMinimum(0.0)

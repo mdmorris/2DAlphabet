@@ -123,8 +123,8 @@ def rebinY(thisHist,name,tag,new_y_bins_array):
     xmax = thisHist.GetXaxis().GetXmax()
 
     rebinned = TH2F(name,name,xnbins,xmin,xmax,len(new_y_bins_array)-1,new_y_bins_array)
-    print new_y_bins_array
-    print rebinned.GetYaxis().GetBinUpEdge(len(new_y_bins_array)-1)
+    # print new_y_bins_array
+    # print rebinned.GetYaxis().GetBinUpEdge(len(new_y_bins_array)-1)
     rebinned.Sumw2()
 
     for xbin in range(1,xnbins+1):
