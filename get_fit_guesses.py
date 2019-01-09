@@ -5,7 +5,6 @@
 # to have similar statistics per bin, fits the x-axis in each y-bin, and then fits the x-axis fit   #
 # coefficients as a function of the y-axis. This is also known as pseudo-2D Alphabet since it does  #
 # the 2D fit in slices.                                                                             #
-# OUTDATED AND NO LONGER NECESSARY - 9/19/18
 #####################################################################################################
 
 import ROOT

@@ -95,8 +95,8 @@ def main(inputConfig, blindData, globalDir, fittype='s', suffix='',procAddString
             hist_dict[process][cat] = {}
 
             if blindData and process == 'data_obs' and cat == 'pass':
-                prefull2D = post_file.Get(cat +subdir+ '_prefit/'+process).Clone()
-                postfull2D = post_file.Get(cat +subdir+ '_postfit/'+process).Clone()
+                prefull2D = post_file.Get(cat +subdir+ '_prefit/'+process).Clone('data_obs_prefull2D')
+                postfull2D = post_file.Get(cat +subdir+ '_postfit/'+process).Clone('data_obs_postfull2D')
 
                 lowPre = copyHistWithNewXbounds(prefull2D,'lowPre',x_binWidth,x_low,sigstart)
                 lowPost = copyHistWithNewXbounds(postfull2D,'lowPost',x_binWidth,x_low,sigstart)
@@ -182,7 +182,7 @@ def main(inputConfig, blindData, globalDir, fittype='s', suffix='',procAddString
         twoDList = []         
         for cat in ['fail','pass']:
             for fit in ['prefit', 'postfit']:
-                if isSignal and fittype == 's':
+                if isSignal and fittype == 's' and fit == 'postfit':
                     hist_dict[process][cat][fit+'_2D'].Scale(signal_strength)
                     twoDList.append(hist_dict[process][cat][fit+'_2D'])
                 else:
@@ -205,6 +205,13 @@ def main(inputConfig, blindData, globalDir, fittype='s', suffix='',procAddString
                     colors.append(inputConfig['PROCESS'][process]["COLOR"])
                 else:
                     colors.append(None)
+
+    # Put QCD on bottom of stack if we're plotting the sideband
+    if batch:
+        colors = [kYellow]+colors
+    # Put it on top otherwise
+    else:
+        colors.append(kYellow)
 
     # Create lists for makeCan of the projections
     for plotType in ['postfit_projx','postfit_projy']:   # Canvases
@@ -229,8 +236,13 @@ def main(inputConfig, blindData, globalDir, fittype='s', suffix='',procAddString
                 # print bkg_process_list
                 # raw_input('waiting')
 
-                bkg_process_list.append(hist_dict['qcd'][cat][plotType+str(regionNum)]) # QCD goes last
-                colors.append(kYellow)
+                # Put QCD on bottom of stack if we're plotting the sideband
+                if batch:
+                    bkg_process_list = [hist_dict['qcd'][cat][plotType+str(regionNum)]]+bkg_process_list
+                # Put it on top otherwise
+                else:
+                    bkg_process_list.append(hist_dict['qcd'][cat][plotType+str(regionNum)]) # QCD goes last
+
                 bkgList.append(bkg_process_list)
 
 

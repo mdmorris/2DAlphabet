@@ -70,7 +70,7 @@ for cfg in sideband_cfg_strings:
 
 if not options.plotOnly:
     # Run 2D Alphabet setup for combine
-    combine_calls = ['python 2DAlphabet.py -i '+options.input]    # Only call input
+    combine_calls = ['python 2DAlphabet.py -i '+options.input+' --batch']    # Only call input
 
     for cfg in sideband_cfg_strings:
         combine_calls.append('python 2DAlphabet.py -i '+cfg+' --batch')
@@ -112,11 +112,11 @@ if not options.plotOnly:
     if options.limits == True:
         print 'Executing combine -M Asymptotic '+tag +'/card_master.txt --saveWorkspace --name '+tag 
         subprocess.call(['combine -M Asymptotic '+tag +'/card_master.txt --saveWorkspace --name '+tag], shell=True)
-        subprocess.call(['mv higgsCombine'+tag+'.Asymptotic.mH120.root ' + maindir+subdir +'/'], shell=True)
+        subprocess.call(['mv higgsCombine'+tag+'.Asymptotic.mH120.root ' + tag +'/'], shell=True)
 
     else:
-        print 'Executing ' + 'combine -M FitDiagnostics '+ tag+'/card_master.txt --saveWithUncertainties --saveWorkspace --rMin -5 --rMax 5'
-        subprocess.call(['combine -M FitDiagnostics '+tag + '/card_master.txt --saveWithUncertainties --saveWorkspace --rMin -5 --rMax 5'],shell=True)
+        print 'Executing ' + 'combine -M FitDiagnostics '+ tag+'/card_master.txt --saveWithUncertainties --saveWorkspace --rMin 0 --rMax 5'
+        subprocess.call(['combine -M FitDiagnostics '+tag + '/card_master.txt --saveWithUncertainties --saveWorkspace --rMin 0 --rMax 5'],shell=True)
 
         subprocess.call(['mv fitDiagnostics.root '+tag+'/'],shell=True)
         # subprocess.call(['mv mlfit.root '+tag+'/'],shell=True)
@@ -130,7 +130,7 @@ if not options.plotOnly:
 
 if options.limits == False:
     # First get the base json
-    with open(tag+'/input_'+tag+'_vars_replaced.json') as fInput_config:
+    with open(tag+'/input_'+tag+'_new_fit_guesses.json') as fInput_config:
         input_config = json.load(fInput_config, object_hook=ascii_encode_dict)  # Converts most of the unicode to ascii
 
         for process in [proc for proc in input_config['PROCESS'].keys() if proc != 'HELP']:
@@ -177,17 +177,17 @@ if options.limits == False:
 
         subprocess.call(['cp '+tag + '/card_plotmaster.txt ./'], shell=True)
         print 'Executing PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes_b.root -f '+tag + '/fitDiagnostics.root:fit_b --postfit --sampling --print'
-        subprocess.call(['PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes_b.root -f '+tag + '/fitDiagnostics.root:fit_b --postfit --sampling --print'], shell=True)
+        # subprocess.call(['PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes_b.root -f '+tag + '/fitDiagnostics.root:fit_b --postfit --sampling --print'], shell=True)
         print 'Executing PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes_s.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling --print'
-        subprocess.call(['PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes_s.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
+        # subprocess.call(['PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes_s.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
 
         subprocess.call(['rm card_plotmaster.txt'], shell=True)
 
         plot_postfit_results.main(input_config,options.blinded,tag,'b','')
         plot_postfit_results.main(input_config,options.blinded,tag,'s','')
 
-        subprocess.call(['mv '+tag + '/plots/*fits* '+maindir+subdir + '/plots/fit_s'], shell=True)
-        subprocess.call(['mv '+tag + '/plots/*fitb* '+maindir+subdir + '/plots/fit_b'], shell=True)
+        subprocess.call(['mv '+tag + '/plots/*fits* '+tag + '/plots/fit_s'], shell=True)
+        subprocess.call(['mv '+tag + '/plots/*fitb* '+tag + '/plots/fit_b'], shell=True)
 
     else:
         subprocess.call(['cp '+tag + '/card_master.txt ./'], shell=True)
@@ -221,8 +221,11 @@ if options.limits == False:
 
 
     for string in sideband_cfg_strings:
+        subprocess.call(['mkdir '+tag+'/'+bkgName + '/plots/fit_s'], shell=True)
+        subprocess.call(['mkdir '+tag+'/'+bkgName + '/plots/fit_b'], shell=True)
+
         bkgName = cfg[cfg.find(tag)+len(tag)+1:cfg.find('.')]
-        with open(tag+'/'+bkgName+'/input_'+tag+'_'+bkgName+'_vars_replaced.json') as fInput_config:
+        with open(tag+'/'+bkgName+'/input_'+tag+'_'+bkgName+'_new_fit_guesses.json') as fInput_config:
             this_input_config = json.load(fInput_config, object_hook=ascii_encode_dict)  # Converts most of the unicode to ascii
 
             for process in [proc for proc in this_input_config['PROCESS'].keys() if proc != 'HELP']:
