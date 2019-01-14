@@ -34,6 +34,8 @@ def main(inputConfig, blindData, globalDir, fittype='s', suffix='',procAddString
         post_file = TFile.Open(globalDir.split('/')[0]+'/postfitshapes_'+fittype+'.root')
         fd_file = TFile.Open(globalDir.split('/')[0]+'/fitDiagnostics.root')
 
+    print fd_file.GetName()
+
     fit_result = fd_file.Get('fit_'+fittype)
 
     # Binning
@@ -207,11 +209,11 @@ def main(inputConfig, blindData, globalDir, fittype='s', suffix='',procAddString
                     colors.append(None)
 
     # Put QCD on bottom of stack if we're plotting the sideband
-    if batch:
-        colors = [kYellow]+colors
+    # if batch:
+    colors = [kYellow]+colors
     # Put it on top otherwise
-    else:
-        colors.append(kYellow)
+    # else:
+    #     colors.append(kYellow)
 
     # Create lists for makeCan of the projections
     for plotType in ['postfit_projx','postfit_projy']:   # Canvases
@@ -237,11 +239,11 @@ def main(inputConfig, blindData, globalDir, fittype='s', suffix='',procAddString
                 # raw_input('waiting')
 
                 # Put QCD on bottom of stack if we're plotting the sideband
-                if batch:
-                    bkg_process_list = [hist_dict['qcd'][cat][plotType+str(regionNum)]]+bkg_process_list
+                # if batch:
+                bkg_process_list = [hist_dict['qcd'][cat][plotType+str(regionNum)]]+bkg_process_list
                 # Put it on top otherwise
-                else:
-                    bkg_process_list.append(hist_dict['qcd'][cat][plotType+str(regionNum)]) # QCD goes last
+                # else:
+                #     bkg_process_list.append(hist_dict['qcd'][cat][plotType+str(regionNum)]) # QCD goes last
 
                 bkgList.append(bkg_process_list)
 

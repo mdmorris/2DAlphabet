@@ -236,6 +236,12 @@ elif options.batch:
     json.dump(input_config,fInput_config_new_fit_guesses,indent=2, sort_keys=True)
     fInput_config_new_fit_guesses.close()
 
+    organized_dict_unblinded = input_organizer.main(input_config,False,subdir)
+    zeroBins_unblinded = build_fit_workspace.main(organized_dict_unblinded,input_config,False,tag+'Unblinded',subdir)
+    make_card.main(input_config, zeroBins_unblinded, False, tag+'Unblinded', maindir, subdir)
+    subprocess.call(['mv base_'+tag+'Unblinded.root ' + maindir + subdir+'/'], shell=True)
+    subprocess.call(['mv card_'+tag+'Unblinded.root ' + maindir + subdir+'/'], shell=True)
+
 # Plot only
 if options.plotOnly:
     # input_config = get_fit_guesses.main(input_config,blinded, maindir+subdir)
@@ -314,10 +320,10 @@ if options.runFit:
     subprocess.call(['mv combine_logger.out ' + maindir+subdir + '/'], shell=True)
 
     # Need to make an unblinded workspace and card
-    if not options.batch:
-        organized_dict_unblinded = input_organizer.main(input_config,False,subdir)
-        zeroBins_unblinded = build_fit_workspace.main(organized_dict_unblinded,input_config,False,tag+'Unblinded',subdir)
-        make_card.main(input_config, zeroBins_unblinded, False, tag+'Unblinded', maindir, subdir)
+    if blinded:
+        # organized_dict_unblinded = input_organizer.main(input_config,False,subdir)
+        # zeroBins_unblinded = build_fit_workspace.main(organized_dict_unblinded,input_config,False,tag+'Unblinded',subdir)
+        # make_card.main(input_config, zeroBins_unblinded, False, tag+'Unblinded', maindir, subdir)
 
         subprocess.call(['mv base_'+tag+'Unblinded.root '+maindir+subdir], shell=True)
         subprocess.call(['cp '+maindir+subdir + '/card_'+tag+'Unblinded.txt ./'], shell=True)

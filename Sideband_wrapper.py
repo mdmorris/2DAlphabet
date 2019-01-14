@@ -19,9 +19,13 @@ import ROOT
 from ROOT import *
 
 import plot_postfit_results
+import build_fit_workspace
+import make_card
 import input_organizer
 import header
 from header import ascii_encode_dict
+
+import CombineHarvester as ch
 
 gStyle.SetOptStat(0)
 gROOT.SetBatch(kTRUE)
@@ -36,6 +40,10 @@ parser.add_option('-s', '--sidebandInputs', metavar='FILE', type='string', actio
                 default   =   '',
                 dest      =   'sidebandInputs',   # Don't have file names with more than two underscores!
                 help      =   'Comma separated list of JSON files. Name should be "input_<tag>_<bkg>.json" where tag will be used to organize outputs and bkg corresponds to the enriched background process in the config file')
+parser.add_option('-g', '--genTag', metavar='FILE', type='string', action='store',
+                default   =   '',
+                dest      =   'genTag',
+                help      =   'Used for limit setting. This is the general tag name that doesnt include anything specific to signals or backgrounds')
 parser.add_option('-l', '--limits', action="store_true",
                 default   =   False,
                 dest      =   'limits',
@@ -79,7 +87,6 @@ if not options.plotOnly:
         print 'Executing ' + c
         subprocess.call([c],shell=True)
 
-
     # Combine the cards
     commands = ['mv '+tag+'/card_'+tag+'.txt ./']
     card_call = 'combineCards.py card_'+tag+'.txt '                 # Main card
@@ -100,7 +107,7 @@ if not options.plotOnly:
 
     commands.append('mv card_'+tag+'.txt '+tag+'/')
     for bkgName in sideband_dirs.keys():
-        commands.append('mv card_'+tag+'_'+bkgName+'.txt '+tag+'/')
+        commands.append('mv card_'+tag+'_'+bkgName+'.txt '+tag+'/'+bkgName+'/')
 
     commands.append('mv card_master.txt '+tag+'/')
 
@@ -110,9 +117,72 @@ if not options.plotOnly:
 
     # Run Combine
     if options.limits == True:
-        print 'Executing combine -M Asymptotic '+tag +'/card_master.txt --saveWorkspace --name '+tag 
-        subprocess.call(['combine -M Asymptotic '+tag +'/card_master.txt --saveWorkspace --name '+tag], shell=True)
-        subprocess.call(['mv higgsCombine'+tag+'.Asymptotic.mH120.root ' + tag +'/'], shell=True)
+        if not options.blinded:
+            print 'Executing combine -M Asymptotic '+tag +'/card_master.txt --saveWorkspace --name '+tag 
+            subprocess.call(['combine -M Asymptotic '+tag +'/card_master.txt --saveWorkspace --name '+tag], shell=True)
+            subprocess.call(['mv higgsCombine'+tag+'.Asymptotic.mH120.root ' + tag +'/'], shell=True)
+        else:
+            # A blinded fit is tricky. If we did it as above, we'd only set a limit using x-axis sidebands
+            # Instead we need to repeat the above card building but for an unblinded setup and
+            # have to use the unblinded datacard to make a workspace via text2workspace.py
+            commands = ['mv '+tag+'/card_'+tag+'Unblinded.txt ./']
+            card_call = 'combineCards.py card_'+tag+'Unblinded.txt '                 # Main card
+            for bkgName in sideband_dirs.keys():
+                commands.append('mv '+sideband_dirs[bkgName]+'card_'+tag+'_'+bkgName+'Unblinded.txt ./')
+                card_call+='card_'+tag+'_'+bkgName+'Unblinded.txt '   # Each sideband card
+            card_call+='> card_masterUnblinded.txt'                                          # Send it to master
+            commands.append(card_call)
+
+            for num in range(1,len(sideband_cfg_strings)+2):
+                commands.append("sed -i 's/ch"+str(num)+"_//g' card_masterUnblinded.txt")
+
+            commands.append('mv card_'+tag+'Unblinded.txt '+tag+'/')
+            for bkgName in sideband_dirs.keys():
+                commands.append('mv card_'+tag+'_'+bkgName+'Unblinded.txt '+tag+'/'+bkgName+'/')
+
+            for c in commands:
+                print 'Executing ' + c
+                subprocess.call([c],shell=True)
+
+            print 'Executing text2workspace.py card_masterUnblinded.txt -o limitWorkspace'+tag+'.root'
+            subprocess.call(['text2workspace.py card_masterUnblinded.txt -o limitWorkspace'+tag+'.root'],shell=True)
+            print 'Executing mv card_masterUnblinded.txt '+tag+'/'
+            subprocess.call(['mv card_masterUnblinded.txt '+tag+'/'],shell=True)
+
+
+            # Now we need to take the workspace and update it with the latest from the background only fit result
+            limit_workspace_file = TFile('limitWorkspace'+tag+'.root','UPDATE')
+            limit_workspace = limit_workspace_file.Get('w')
+            lw_params = limit_workspace.allVars()
+            res = TFile(options.genTag+'/fitDiagnostics.root').Get('fit_b')
+            for i in range(res.floatParsFinal().getSize()):
+                var = res.floatParsFinal().at(i)
+                it = lw_params.find(var.GetName())
+                if lw_params.find(var.GetName()):
+                    # print 'Parameter '+str(var.GetName())+' being updated'
+                    it = lw_params.find(var.GetName())
+                    it.setVal(var.getVal())
+                    it.setAsymError(var.getErrorLo(),var.getErrorHi())
+                else:
+                    print "Parameter " + str(var.GetName()) + " is not defined"
+
+            # Save the workspace
+            limit_workspace_file.cd()
+            limit_workspace.Write()
+            limit_workspace_file.Close()
+
+            # limit_workspace_file = TFile.Open('limitWorkspace'+tag+'.root')
+            # limit_workspace = limit_workspace_file.Get('w')
+            # limit_workspace.var('topsf').Print()
+          
+
+            # Now we can run the limit with an unblinded workspace with floating variables starting at the post-fit values!
+            print 'Executing combine -M Asymptotic -d limitWorkspace'+tag+'.root --saveWorkspace --run blind --name '+tag 
+            subprocess.call(['combine -M Asymptotic -d limitWorkspace'+tag+'.root --saveWorkspace --run blind --name '+tag], shell=True)
+            print 'Executing mv higgsCombine'+tag+'.Asymptotic.mH120.root ' + tag +'/'
+            subprocess.call(['mv higgsCombine'+tag+'.Asymptotic.mH120.root ' + tag +'/'], shell=True)
+            print 'Executing mv limitWorkspace'+tag+'.root '+tag
+            subprocess.call(['mv limitWorkspace'+tag+'.root '+tag],shell=True)
 
     else:
         print 'Executing ' + 'combine -M FitDiagnostics '+ tag+'/card_master.txt --saveWithUncertainties --saveWorkspace --rMin 0 --rMax 5'
@@ -151,7 +221,7 @@ if options.limits == False:
         commands = ['mv '+tag+'Unblinded/card_'+tag+'Unblinded.txt ./']
         card_plot_call = 'combineCards.py card_'+tag+'Unblinded.txt '                 # Main card
         for bkgName in sideband_dirs.keys():
-            commands.append('mv '+tag+'/card_'+tag+'_'+bkgName+'.txt ./')
+            commands.append('mv '+tag+'/'+bkgName+'/card_'+tag+'_'+bkgName+'.txt ./')
             card_plot_call+='card_'+tag+'_'+bkgName+'.txt '   # Each sideband card
         card_plot_call+='> card_plotmaster.txt'                                          # Send it to master
 
@@ -167,21 +237,19 @@ if options.limits == False:
 
         commands.append('mv card_'+tag+'Unblinded.txt '+tag+'/')
         for bkgName in sideband_dirs.keys():
-            commands.append('mv card_'+tag+'_'+bkgName+'.txt '+tag+'/')
-
-        commands.append('mv card_plotmaster.txt '+tag+'/')
+            commands.append('mv card_'+tag+'_'+bkgName+'.txt '+tag+'/'+bkgName+'/')
 
         for c in commands:
             print 'Executing ' + c
             subprocess.call([c],shell=True)
 
-        subprocess.call(['cp '+tag + '/card_plotmaster.txt ./'], shell=True)
         print 'Executing PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes_b.root -f '+tag + '/fitDiagnostics.root:fit_b --postfit --sampling --print'
-        # subprocess.call(['PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes_b.root -f '+tag + '/fitDiagnostics.root:fit_b --postfit --sampling --print'], shell=True)
+        subprocess.call(['PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes_b.root -f '+tag + '/fitDiagnostics.root:fit_b --postfit --sampling --print'], shell=True)
         print 'Executing PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes_s.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling --print'
-        # subprocess.call(['PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes_s.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
+        subprocess.call(['PostFitShapes2D -d card_plotmaster.txt -o '+tag + '/postfitshapes_s.root -f '+tag + '/fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
 
-        subprocess.call(['rm card_plotmaster.txt'], shell=True)
+        subprocess.call(['mv card_plotmaster.txt '+tag+'/'], shell=True)
+
 
         plot_postfit_results.main(input_config,options.blinded,tag,'b','')
         plot_postfit_results.main(input_config,options.blinded,tag,'s','')

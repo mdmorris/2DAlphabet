@@ -389,7 +389,6 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
 
                 # Set margins and make these two pads primitives of the division, thisPad
                 mains[hist_index].SetBottomMargin(0.0)
-
                 mains[hist_index].SetLeftMargin(0.16)
                 mains[hist_index].SetRightMargin(0.05)
                 mains[hist_index].SetTopMargin(0.1)
@@ -439,12 +438,16 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                     if logy == True:
                         h.SetMaximum(yMax*10)
 
+                
+                mLS = 0.06
                 # Now draw the main pad
                 data_leg_title = hist.GetTitle()
                 if len(titles) > 0:
                     hist.SetTitle(titles[hist_index])
                 hist.SetTitleOffset(1.5,"xy")
                 hist.GetYaxis().SetTitle('Events')
+                hist.GetYaxis().SetLabelSize(mLS)
+                hist.GetYaxis().SetTitleSize(mLS)
                 if logy == True:
                     hist.SetMinimum(1e-3)
                 hist.Draw('pe')

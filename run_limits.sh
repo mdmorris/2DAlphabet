@@ -10,6 +10,7 @@ tar xzf tarball.tgz
 cp -r * ../CMSSW_8_1_0/src/2DAlphabet/
 cd ../CMSSW_8_1_0/src/2DAlphabet/
 eval `scramv1 runtime -sh`
+scramv1 b clean; scramv1 b
 
 echo Sideband_wrapper.py $*
 python Sideband_wrapper.py $* #-s $1 -r $2 -d $3 -n $4 -j $5
