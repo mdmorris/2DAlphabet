@@ -330,15 +330,16 @@ class TwoDAlphabet:
 
             else:
                 print 'No user bins specified. Will use binning of input histograms (data_obs_pass).'
-                temp_TH2 = TFile.Open(self.inputConfig['PROCESS']['data_obs']['FILE']).Get(self.inputConfig['PROCESS']['data_obs']['HISTPASS'])
+                temp_file = TFile.Open(self.inputConfig['PROCESS']['data_obs']['FILE'])
+                temp_TH2 = temp_file.Get(self.inputConfig['PROCESS']['data_obs']['HISTPASS'])
                 new_bins = []
                 if v == 'X':
-                    for b in temp_TH2.GetNbinsX():
+                    for b in range(1,temp_TH2.GetNbinsX()+1):
                         new_bins.append(temp_TH2.GetXaxis().GetBinLowEdge(b))
                     new_bins.append(temp_TH2.GetXaxis().GetXmax())
 
                 elif v == 'Y':
-                    for b in temp_TH2.GetNbinsY():
+                    for b in range(1,temp_TH2.GetNbinsY()+1):
                         new_bins.append(temp_TH2.GetYaxis().GetBinLowEdge(b))
                     new_bins.append(temp_TH2.GetYaxis().GetXmax())
 
@@ -993,9 +994,6 @@ class TwoDAlphabet:
 
             TH2_data_fail = self.orgFile.Get(self.organizedDict['data_obs']['fail_'+c]['nominal'])
             TH2_data_pass = self.orgFile.Get(self.organizedDict['data_obs']['pass_'+c]['nominal'])
-
-            TH2_data_fail.Draw('lego')
-            raw_input(self.organizedDict['data_obs']['fail_'+c]['nominal'])
 
             # Get each bin
             for ybin in range(1,len(self.newYbins)):
