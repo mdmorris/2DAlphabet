@@ -4,6 +4,10 @@
         "path": "/uscms_data/d3/lcorcodi/BStar13TeV/CMSSW_10_2_0/src/BStar13TeV/rootfiles"
     },
 
+    "OPTIONS": {
+        
+    },
+
     "PROCESS": {
         "HELP": "FILE is both the file path relative to the running directory. SYSTEMATICS is a list with all applicable systematic uncertainties listed with names that match those defined in SYSTEMATC. CODE can be 0 (signal), 1 (data), 2 (unchanged MC), 3 (MC to be renormalized)",
         "data_obs": {
@@ -35,8 +39,8 @@
         "X": {
             "NAME": "jetmass",
             "TITLE": "M_{t} (GeV)",
-            "LOW": 70,
-            "HIGH": 270,
+            "MIN": 70,
+            "MAX": 270,
             "NBINS": 20,
             "SIGSTART": 110,
             "SIGEND": 210,
@@ -45,19 +49,19 @@
         "Y": {
             "NAME": "resmass",
             "TITLE": "M_{tW} (GeV)",
-            "LOW": 900,
-            "HIGH": 3500,
+            "MIN": 900,
+            "MAX": 3500,
             "NBINS": 26
         }
     },
 
     "FIT": {
         "HELP": "The fit parameters of the 2D polynomial should be configured here. Note that parameters must be named x#y$ where # is the order of the parameter in the x and $ is the order of the parameter in the y.",
-        "FORM":"@1",
+        "PFORM":"@1",
         "X0Y0": {
             "NOMINAL": 0.01,
-            "LOW":0.0,
-            "HIGH":1.0
+            "MIN":0.0,
+            "MAX":1.0
         }
     }
 }

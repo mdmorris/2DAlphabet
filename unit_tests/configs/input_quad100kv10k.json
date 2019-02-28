@@ -4,6 +4,10 @@
         "path": "unit_tests/distributions/quad100kv10k.root"
     },
 
+    "OPTIONS": {
+        
+    },
+
     "PROCESS": {
         "HELP": "FILE is both the file path relative to the running directory. SYSTEMATICS is a list with all applicable systematic uncertainties listed with names that match those defined in SYSTEMATC. CODE can be 0 (signal), 1 (data), 2 (unchanged MC), 3 (MC to be renormalized)",
         "data_obs": {
@@ -48,8 +52,8 @@
         "X": {
             "NAME": "xaxis",
             "TITLE": "xaxis",
-            "LOW": 0,
-            "HIGH": 24,
+            "MIN": 0,
+            "MAX": 24,
             "NBINS": 24,
             "SIGSTART": 14,
             "SIGEND": 16,
@@ -58,59 +62,59 @@
         "Y": {
             "NAME": "yaxis",
             "TITLE": "yaxis",
-            "LOW": 0, 
-            "HIGH": 20,
+            "MIN": 0, 
+            "MAX": 20,
             "NBINS": 20
         }
     },
 
     "FIT": {
         "HELP": "The fit parameters of the 2D polynomial should be configured here. Note that parameters must be named x#y$ where # is the order of the parameter in the x and $ is the order of the parameter in the y.",
-        "FORM":"(@1+@2*x+@3*x**2)+(@4+@5*x+@6*x**2)*y+(@7+@8*x+@9*x**2)*y**2",
+        "PFORM":"(@1+@2*x+@3*x**2)+(@4+@5*x+@6*x**2)*y+(@7+@8*x+@9*x**2)*y**2",
         "X0Y0": {
             "NOMINAL": 0.01,
-            "LOW":0.0,
-            "HIGH":1.0
+            "MIN":0.0,
+            "MAX":1.0
         },
         "X1Y0": {
             "NOMINAL": 0.01,
-            "LOW":0.0,
-            "HIGH":1.0
+            "MIN":0.0,
+            "MAX":1.0
         },
         "X2Y0": {
             "NOMINAL": 0.01,
-            "LOW":0.0,
-            "HIGH":1.0
+            "MIN":0.0,
+            "MAX":1.0
         },
         "X0Y1": {
             "NOMINAL": 0.01,
-            "LOW":0.0,
-            "HIGH":1.0
+            "MIN":0.0,
+            "MAX":1.0
         },
         "X1Y1": {
             "NOMINAL": 0.01,
-            "LOW":0.0,
-            "HIGH":1.0
+            "MIN":0.0,
+            "MAX":1.0
         },
         "X2Y1": {
             "NOMINAL": 0.01,
-            "LOW":0.0,
-            "HIGH":1.0
+            "MIN":0.0,
+            "MAX":1.0
         },
         "X0Y2": {
             "NOMINAL": 0.01,
-            "LOW":0.0,
-            "HIGH":1.0
+            "MIN":0.0,
+            "MAX":1.0
         },
         "X1Y2": {
             "NOMINAL": 0.01,
-            "LOW":0.0,
-            "HIGH":1.0
+            "MIN":0.0,
+            "MAX":1.0
         },
         "X2Y2": {
             "NOMINAL": 0.01,
-            "LOW":0.0,
-            "HIGH":1.0
+            "MIN":0.0,
+            "MAX":1.0
         }
     }
 }
