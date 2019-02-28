@@ -9,7 +9,7 @@
 import ROOT
 from ROOT import *
 import header
-from header import copyHistWithNewXbounds, copyHistWithNewYbounds, makeBlindedHist
+from header import copyHistWithNewXbounds, copyHistWithNewYbounds, makeBlindedHistOld
 import pprint
 pp = pprint.PrettyPrinter(indent = 2)
 
@@ -243,7 +243,7 @@ def main(inputConfig, blinded, subdir=''):
                     thisProcessCatDict[dist+'_unblinded'] = hist_to_split.Clone(hist_to_split.GetName()+'_unblinded')   # Backing up the unblinded hist
                     low_hist = copyHistWithNewXbounds(hist_to_split,low_histname,newXwidth,newXmin,sigStart)
                     high_hist = copyHistWithNewXbounds(hist_to_split,high_histname,newXwidth,sigEnd,newXmax)
-                    thisProcessCatDict[dist] = makeBlindedHist(hist_to_split,low_hist,high_hist)
+                    thisProcessCatDict[dist] = makeBlindedHistOld(hist_to_split,low_hist,high_hist)
 
                 if thisProcessCatDict[dist].Integral() <= 0:
                     thisProcessCatDict[dist].Draw('lego')

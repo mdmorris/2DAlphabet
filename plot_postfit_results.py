@@ -8,7 +8,7 @@ import pprint
 pp = pprint.PrettyPrinter(indent=4)
 
 import header
-from header import makeCan, FindCommonString, copyHistWithNewXbounds, makeBlindedHist
+from header import makeCan, FindCommonString, copyHistWithNewXbounds, makeBlindedHistOld
 
 def main(inputConfig, blindData, globalDir, fittype='s', suffix='',procAddString=''):
     allVars = []
@@ -106,8 +106,8 @@ def main(inputConfig, blindData, globalDir, fittype='s', suffix='',procAddString
                 highPre = copyHistWithNewXbounds(prefull2D,'highPre',x_binWidth,sigend,x_high)
                 highPost = copyHistWithNewXbounds(postfull2D,'highPost',x_binWidth,sigend,x_high)
 
-                blindedPre = makeBlindedHist(prefull2D,lowPre,highPre)
-                blindedPost = makeBlindedHist(postfull2D,lowPost,highPost)
+                blindedPre = makeBlindedHistOld(prefull2D,lowPre,highPre)
+                blindedPost = makeBlindedHistOld(postfull2D,lowPost,highPost)
 
                 hist_dict[process][cat]['prefit_2D'] = blindedPre
                 hist_dict[process][cat]['postfit_2D'] = blindedPost
@@ -232,6 +232,8 @@ def main(inputConfig, blindData, globalDir, fittype='s', suffix='',procAddString
                             hist_dict[process][cat][plotType+str(regionNum)].Scale(signal_strength)
                             signal_list.append(hist_dict[process][cat][plotType+str(regionNum)])
                         
+                        
+
                     else:
                         dataList.append(hist_dict[process][cat][plotType+str(regionNum)])
                 # print colors
@@ -254,6 +256,28 @@ def main(inputConfig, blindData, globalDir, fittype='s', suffix='',procAddString
         elif 'y' in plotType:
             makeCan(plotType+'_fit'+fittype,globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=y_title)
             makeCan(plotType+'_fit'+fittype+'_log',globalDir+'/',dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=y_title,logy=True)
+
+    # Make comparisons for each background process of pre and post fit projections
+    for plotType in ['projx','projy']:
+        for process in process_list:
+            if process != 'data_obs':
+                pre_list = []
+                post_list = []
+                for cat in ['fail','pass']: # Row 
+                    for regionNum in range(1,4):    # Column
+                        pre_list.append([hist_dict[process][cat]['prefit_'+plotType+str(regionNum)]])  # in terms of makeCan these are "bkg hists"
+                        post_list.append(hist_dict[process][cat]['postfit_'+plotType+str(regionNum)])   # and these are "data hists"
+                        if process != 'qcd':
+                            if 'COLOR' in inputConfig['PROCESS'][process].keys():
+                                prepostcolors = [inputConfig['PROCESS'][process]['COLOR']]
+                            else:
+                                prepostcolors = [0]
+                        else:
+                            prepostcolors = [kYellow]
+
+                if 'x' in plotType: makeCan(process+'_'+plotType+'_fit'+fittype,globalDir+'/',post_list,bkglist=pre_list,colors=prepostcolors,xtitle=x_title)
+                if 'y' in plotType: makeCan(process+'_'+plotType+'_fit'+fittype,globalDir+'/',post_list,bkglist=pre_list,colors=prepostcolors,xtitle=y_title)
+
 
     ##############
     #    Rp/f    #

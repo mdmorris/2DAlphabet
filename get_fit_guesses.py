@@ -145,7 +145,7 @@ def main(inputConfig,blinded,tag,nslices=0,sigma=5):
     else:
         new_y_bins = [yBinWidth*i+ymin for i in range(ynbins+1)]
 
-    # new_y_bins = [1000,1200,1400,1600,1800,2000,4000]
+    new_y_bins = [1000,1400,1800,2200,2600,3500]#[1000,1200,1400,1600,1800,2000,4000]
 
     print 'Will bin y-axis for fit guesses using bins ',
     print new_y_bins
@@ -199,7 +199,8 @@ def main(inputConfig,blinded,tag,nslices=0,sigma=5):
         finalFail.SetName('finalFail')
         finalFail.SetTitle('finalFail')
 
-
+    finalPass.Sumw2()
+    finalFail.Sumw2()
     RpfToRemap = finalPass.Clone('RpfToRemap')
     RpfToRemap.Divide(finalFail)
 

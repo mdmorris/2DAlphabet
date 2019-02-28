@@ -78,10 +78,10 @@ for cfg in sideband_cfg_strings:
 
 if not options.plotOnly:
     # Run 2D Alphabet setup for combine
-    combine_calls = ['python 2DAlphabet.py -i '+options.input+' --batch']    # Only call input
+    combine_calls = ['python 2DAlphabet.py -g 7 -i '+options.input+' --batch']    # Only call input
 
     for cfg in sideband_cfg_strings:
-        combine_calls.append('python 2DAlphabet.py -i '+cfg+' --batch')
+        combine_calls.append('python 2DAlphabet.py -g 7 -i '+cfg+' --batch')
 
     for c in combine_calls:
         print 'Executing ' + c
