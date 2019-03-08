@@ -142,7 +142,8 @@ def copyHistWithNewXbins(thisHist,newXbins,copyName,oldBinWidth):
 
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             if new_bin_content > 0:
-                new_bin_content = new_bin_content/(hist_copy.GetXaxis().GetBinWidth(xbin)/oldBinWidth)
+                # new_bin_content = new_bin_content/(hist_copy.GetXaxis().GetBinWidth(xbin)/oldBinWidth)
+                # new_bin_errorsq = new_bin_errorsq/(hist_copy.GetXaxis().GetBinWidth(xbin)/oldBinWidth)
                 hist_copy.SetBinContent(xbin,ybin,new_bin_content)
                 hist_copy.SetBinError(xbin,ybin,sqrt(new_bin_errorsq))
 
@@ -192,7 +193,8 @@ def copyHistWithNewYbins(thisHist,newYbins,copyName,oldBinWidth):
 
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             if new_bin_content > 0:
-                new_bin_content = (hist_copy.GetXaxis().GetBinWidth(xbin)/oldBinWidth)*new_bin_content
+                # new_bin_content = new_bin_content/(hist_copy.GetXaxis().GetBinWidth(xbin)/oldBinWidth)
+                # new_bin_errorsq = new_bin_errorsq/(hist_copy.GetXaxis().GetBinWidth(xbin)/oldBinWidth)
                 hist_copy.SetBinContent(xbin,ybin,new_bin_content)
                 hist_copy.SetBinError(xbin,ybin,sqrt(new_bin_errorsq))
 

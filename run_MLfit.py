@@ -50,6 +50,12 @@ if len(inputConfigs) > 1:
 else:
     instance = TwoDAlphabet(inputConfigs[0])
     runMLFit([instance])
-    instance.plotFitResults('b')
-    instance.plotFitResults('s')
+    try:
+        instance.plotFitResults('b')
+    except:
+        print 'Failed to run b plots for '+instance.name
+    try:
+        instance.plotFitResults('s')
+    except:
+        print 'Failed to run s plots for '+instance.name
     

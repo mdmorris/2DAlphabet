@@ -96,10 +96,14 @@ class TwoDAlphabet:
             self.newXbins = self._readIn('newXbins')
             self.newYbins = self._readIn('newYbins')
 
+        print self.newXbins
+
         # Get one list of the x bins over the full range
         self.full_x_bins = list(self.newXbins['LOW']) # need list() to make a copy - not a reference
         for c in ['SIG','HIGH']:
             self.full_x_bins.extend(self.newXbins[c][1:])
+
+        print self.full_x_bins
 
         # Make systematic uncertainty plots
         if self.plotUncerts:
@@ -107,9 +111,7 @@ class TwoDAlphabet:
 
         # Run pseudo2D for fit guesses and make the config to actually run on
         if self.fitGuesses:
-            self.runConfig = self._makeFitGuesses()
-        else:
-            self.runConfig = self.inputConfig
+            self._makeFitGuesses()
 
         # Initialize rpf class
         if 'rpf' in self.recycle:
@@ -387,7 +389,7 @@ class TwoDAlphabet:
     def _saveOut(self):
         # runConfig
         file_out = open(self.projPath+'runConfig.json', 'w')
-        json.dump(self.runConfig,file_out,indent=2, sort_keys=True)
+        json.dump(self.inputConfig,file_out,indent=2, sort_keys=True)
         file_out.close()
 
         # bins
@@ -430,7 +432,7 @@ class TwoDAlphabet:
 
     # def _makeSystematicPlots(self):
 
-    def _makeFitGuesses(self,nslices=6,sigma=10):
+    def _makeFitGuesses(self,nslices=6,sigma=3):
         # Grab everything
         infile = TFile.Open(self.inputConfig['PROCESS']['data_obs']['FILE'])
 
@@ -475,16 +477,21 @@ class TwoDAlphabet:
             ybins_pseudo = 'auto'
 
         elif type(self.fitGuesses) == dict: # Use separate binning scheme provided by user
-            xbins_pseudo, ybins_pseudo, oldXwidth_pseudo, oldYwidth_pseudo = self._getBinning(self.fitGuesses)
-                 
+            xbins_pseudo_dict, ybins_pseudo, oldXwidth_pseudo, oldYwidth_pseudo = self._getBinning(self.fitGuesses)
+            xbins_pseudo = list(xbins_pseudo_dict['LOW']) # need list() to make a copy - not a reference
         
+            for c in ['SIG','HIGH']:
+                xbins_pseudo.extend(xbins_pseudo_dict[c][1:])
+
+        print xbins_pseudo
+        print ybins_pseudo
         ##############################
         #   Auto derive new y bins   #
         ##############################
         if self.fitGuesses == 'auto' and nslices > 0:
             # Need to figure out how to slice up the y-axis based on the total statistics (pass+fail) for each 2D bin
-            data_total = rebinned_pass.Clone('data_total')     
-            data_total.Add(rebinned_fail)
+            data_total = data_pass.Clone('data_total')     
+            data_total.Add(data_fail)
 
             # Get an average number of events per slice
             total_events = data_total.Integral()
@@ -494,7 +501,7 @@ class TwoDAlphabet:
             ysum = 0            # ysum for after we've confirmed that the next bin does not lead to a number greater than events_per_slice (for printing only)
             ysum_temp = 0       # ysum allowed to overflow (for counting)
             new_y_bins = []
-            for ybin in range(1,len(ybins)):                 # For each ybin
+            for ybin in range(1,len(self.newYbins)):                 # For each ybin
                 # If on last ybin, add the final edge to the list
                 # - - - - - - - - - - - - - - - - - - - - - - - - 
                 # There's an interesting note to make here about the number of slices that one can do. There are three important facts here:
@@ -514,12 +521,12 @@ class TwoDAlphabet:
                 # the tail and you'll "use" all of the events in the tail before you get to the 9th slice. In other words, this method naturally caps itself at a certain number of slices.
                 
                 if ybin == data_total.GetNbinsY() or len(new_y_bins) == nslices: # If final bin or max number of slices reached
-                    new_y_bins.append(ybins[-1])  # Add the final edge
+                    new_y_bins.append(self.newYbins[-1])  # Add the final edge
                     break                                                   # This final bin will most likely have more than events_per_slice in it
 
                 # Otherwise, if we're still building the slice list...
                 else:
-                    for xbin in range(1,len(xbins)):             # For each xbin
+                    for xbin in range(1,len(xbins_pseudo)):             # For each xbin
                         ysum_temp += data_total.GetBinContent(xbin,ybin)     # Add the 2D bin content to the temp sum for the ybin
 
                     # If less, set ysum and go onto the next bin
@@ -529,7 +536,7 @@ class TwoDAlphabet:
                     # Otherwise, cut off the slice at the previous ybin and restart the sum with this ybin
                     else:
                         ysum_temp = 0
-                        for xbin in range(1,len(xbins)):
+                        for xbin in range(1,len(xbins_pseudo)):
                             ysum_temp += data_total.GetBinContent(xbin,ybin)
                         new_y_bins.append(data_total.GetYaxis().GetBinLowEdge(ybin))
 
@@ -544,7 +551,8 @@ class TwoDAlphabet:
 
         rebinned_pass = header.copyHistWithNewYbins(rebinned_x_pass,ybins_pseudo,'rebinned_pass',self.oldYwidth)
         rebinned_fail = header.copyHistWithNewYbins(rebinned_x_fail,ybins_pseudo,'rebinned_fail',self.oldYwidth)
-        
+
+        header.makeCan('prefit_pass_fail',self.projPath,[rebinned_pass,rebinned_fail],xtitle=self.xVarName,ytitle=self.yVarName)
 
         ######################################################
         #   Rebin the distributions according to new y bins  #
@@ -722,7 +730,7 @@ class TwoDAlphabet:
                 param = 'X'+str(p)+'Y0'
                 pseudo2D_Rpf.SetParameter(paramIndex,fitResults[param])
                 pseudo2D_Rpf.SetParError(paramIndex,fitResults[param+'err'])
-                self.inputConfig['FIT'][str(p)] = {'NOMINAL':None,'LOW':None,'HIGH':None}
+                self.inputConfig['FIT'][str(p)] = {'NOMINAL':None,'MIN':None,'MAX':None}
                 self.inputConfig['FIT'][str(p)]['NOMINAL'] = fitResults[param]
                 self.inputConfig['FIT'][str(p)]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
                 self.inputConfig['FIT'][str(p)]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
@@ -737,7 +745,7 @@ class TwoDAlphabet:
                     param = 'X'+str(ix)+'Y'+str(iy)
                     pseudo2D_Rpf.SetParameter(paramIndex,fitResults[param])
                     pseudo2D_Rpf.SetParError(paramIndex,fitResults[param+'err'])
-                    self.inputConfig['FIT'][param] = {'NOMINAL':None,'LOW':None,'HIGH':None}
+                    self.inputConfig['FIT'][param] = {'NOMINAL':None,'MIN':None,'MAX':None}
                     self.inputConfig['FIT'][param]['NOMINAL'] = fitResults[param]
                     self.inputConfig['FIT'][param]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
                     self.inputConfig['FIT'][param]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
@@ -757,6 +765,9 @@ class TwoDAlphabet:
         # First we need to get histograms from files and store them in a new dictionary #
         #################################################################################
         dict_hists = {}
+
+        # Stores [process,cat] pairs of regions with integral of zero so we can tell the card this
+        self.integralZero = []
 
         # Grab all process names and loop through
         processes = [process for process in self.inputConfig['PROCESS'].keys() if process != "HELP"]
@@ -930,14 +941,18 @@ class TwoDAlphabet:
                             histname = histname + '_' + dist
                         print 'Making '+histname
                         finalhist = header.copyHistWithNewXbins(temp_hist,self.newXbins[c],histname,self.oldYwidth)
+
+                        # Test if histogram is non-zero
+                        if finalhist.Integral() <= 0:
+                            print 'WARNING: '+process+', '+cat+'_'+c+', '+dist+' has zero or negative events - ' + str(finalhist.Integral())
+                            self.integralZero.append([process,cat+'_'+c])
+                            # If it is, zero the bins except one to avoid Integral=0 errors in combine
+                            for b in range(1,finalhist.GetNbinsX()*finalhist.GetNbinsY()+1):
+                                finalhist.SetBinContent(b,1e-10)
+
                         finalhist.Write()
                         self.organizedDict[process][cat+'_'+c][dist] = finalhist.GetName()#header.copyHistWithNewXbins(temp_hist,self.newXbins[c],histname)
 
-                    # Check histograms integral > 0
-                    for c in ['LOW','SIG','HIGH']:
-                        testhist = self.orgFile.Get(self.organizedDict[process][cat+'_'+c][dist])
-                        if testhist.Integral() <= 0:
-                            raw_input('WARNING: '+process+', '+cat+'_'+c+', '+dist+' has zero or negative events - ' + str(testhist.Integral()))
 
     def _buildFitWorkspace(self):
         self.floatingBins = [] # This holds the names of all of the variables that we want to float.
@@ -1007,8 +1022,8 @@ class TwoDAlphabet:
 
                     # Initialize contents by subtracting minor non-QCD components (code 2)
                     bin_content    = TH2_data_fail.GetBinContent(xbin,ybin)
-                    bin_range_up   = bin_content + TH2_data_fail.GetBinErrorUp(xbin,ybin)*3
-                    bin_range_down = bin_content - TH2_data_fail.GetBinErrorLow(xbin,ybin)*3
+                    bin_range_up   = bin_content + TH2_data_fail.GetBinErrorUp(xbin,ybin)*5
+                    bin_range_down = bin_content - TH2_data_fail.GetBinErrorLow(xbin,ybin)*5
                     bin_err_up     = bin_content + TH2_data_fail.GetBinErrorUp(xbin,ybin)
                     bin_err_down   = bin_content - TH2_data_fail.GetBinErrorLow(xbin,ybin)
 
@@ -1034,6 +1049,26 @@ class TwoDAlphabet:
                         bin_list_fail.add(binRRV)
                         self.allVars.append(binRRV)
 
+                        # Then get bin center and assign it to a RooConstVar
+                        x_center = TH2_data_fail.GetXaxis().GetBinCenter(xbin)
+                        y_center = TH2_data_fail.GetYaxis().GetBinCenter(ybin)
+
+                        # Remap to [0,1]
+                        x_center_mapped = (x_center - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
+                        y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
+
+                        x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center_mapped)
+                        y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center_mapped)
+
+                        self.allVars.append(x_const)
+                        self.allVars.append(y_const)
+
+                        # And now get the Rpf function value for this bin 
+                        if self.rpf.fitType == 'cheb':
+                            this_rpf = self.rpf.evalRpf(x_center_mapped, y_center_mapped,this_full_xbin,ybin) # chebyshev class takes different input
+                        else:
+                            this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
+
                         this_bin_pass = RooConstVar(pass_bin_name, pass_bin_name, 0.0001)
                         bin_list_pass.add(this_bin_pass)
                         self.allVars.append(this_bin_pass)
@@ -1043,17 +1078,22 @@ class TwoDAlphabet:
                         if self.freezeFail:
                             binRRV = RooConstVar(fail_bin_name, fail_bin_name, bin_content)
 
+                        elif bin_content < 1: # Give larger floating to range to bins with fewer events
+                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,0.1), 0.0000001, 10)
+                            print fail_bin_name + ' < 1'
+
                         elif bin_content < 10: # Give larger floating to range to bins with fewer events
-                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, bin_content, 0, 50)
+                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,1), 0.0000001, 50)
+                            print fail_bin_name + ' < 10'
+                        else:
+                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, bin_content, max(1,bin_range_down), bin_range_up)
+
+
+                        if not self.freezeFail:
                             if bin_content - bin_err_down < 0:
-                                bin_err_down = bin_content          # For the rare case when bin error is larger than the content
+                                bin_err_down = bin_content - binRRV.getMin()     # For the rare case when bin error is larger than the content
                             
                             binRRV.setAsymError(bin_err_down,bin_err_up)
-                            self.floatingBins.append(fail_bin_name)
-
-                        else:
-                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, bin_content, bin_range_down, bin_range_up)
-                            binRRV.setAsymError(bin_err_down, bin_err_up)
                             self.floatingBins.append(fail_bin_name)
 
 
@@ -1077,7 +1117,7 @@ class TwoDAlphabet:
 
                         # And now get the Rpf function value for this bin 
                         if self.rpf.fitType == 'cheb':
-                            this_rpf = self.rpf.evalRpf(x_center, y_center,this_full_xbin,ybin) # chebyshev class takes different input
+                            this_rpf = self.rpf.evalRpf(x_center_mapped, y_center_mapped,this_full_xbin,ybin) # chebyshev class takes different input
                         else:
                             this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
 
@@ -1135,7 +1175,7 @@ class TwoDAlphabet:
         channels = []
         for r in ['pass', 'fail']:
             for c in ['LOW','SIG','HIGH']:
-                channels.append(r+'_'+c+'_'+self.name)
+                channels.append(r+'_'+c+'_'+self.name)                
 
         # Get the length of the list of all process that have CODE 2 (and ignore "HELP" key) and add 1 for qcd (which won't be in the inputConfig)
         jmax = str(len([proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and self.inputConfig['PROCESS'][proc]['CODE'] == 2]) + 1)
@@ -1212,19 +1252,23 @@ class TwoDAlphabet:
                 bin_line += (chan+' ')
                 processName_line += (proc+' ')
 
+                # If we have processes with integral of 0 in certain regions, we need to tell combine this here
+                # if proc in [p[0] for p in self.integralZero]:
+
+
                 # If signal
                 if proc in signal_procs:
                     processCode_line += (str(0-signal_procs.index(proc))+' ')
                     rate_line += ('-1 ')
 
                 # If bkg
-                if proc in MC_bkg_procs:
+                elif proc in MC_bkg_procs:
                     processCode_line += (str(MC_bkg_procs.index(proc)+1)+' ')
-                    if inputConfig['PROCESS'][proc]['CODE'] == 2:       # No floating normalization
+                    if self.inputConfig['PROCESS'][proc]['CODE'] == 2:       # No floating normalization
                         rate_line += '-1 '                                            
 
                 # If qcd
-                if proc == 'qcd':
+                elif proc == 'qcd':
                     processCode_line += (str(len(MC_bkg_procs)+2)+' ')
                     rate_line += '1 '
 
@@ -1516,14 +1560,35 @@ class TwoDAlphabet:
         for v in self.rpf.rpfVars.keys():
             coeffs_final.add(param_final.find(v))
 
-        # Save out to a text file
+        # Save out to a text file and make a re-run config
         param_out = open(self.projPath+'rpf_params_'+self.name+'.txt','w')
+        rerun_config = header.dictCopy(self.inputConfig)
         coeffIter_final = coeffs_final.createIterator()
         coeff_final = coeffIter_final.Next()
         while coeff_final:
+            # Text file
             param_out.write(coeff_final.GetName()+': ' + str(coeff_final.getValV()) + ' +/- ' + str(coeff_final.getError())+'\n')
+            # Re run config
+            for k in rerun_config['FIT'].keys():
+                if k in coeff_final.GetName():
+                    rerun_config['FIT'][k]['ERROR'] = coeff_final.getError()
+                    rerun_config['FIT'][k]['NOMINAL'] = coeff_final.getValV()
+                    if coeff_final.getValV() >= 0:
+                        rerun_config['FIT'][k]['MIN'] = coeff_final.getValV()*0.5
+                        rerun_config['FIT'][k]['MAX'] = coeff_final.getValV()*1.5
+                    else:
+                        rerun_config['FIT'][k]['MAX'] = coeff_final.getValV()*0.5
+                        rerun_config['FIT'][k]['MIN'] = coeff_final.getValV()*1.5
+
+            # Next
             coeff_final = coeffIter_final.Next()
+
+        # Close text file
         param_out.close()
+        # Write out dictionary
+        rerun_out = open(self.projPath+'rerunConfig.json', 'w')
+        json.dump(rerun_config,rerun_out,indent=2, sort_keys=True)
+        rerun_out.close()
 
         if self.rpf.fitType != 'cheb':
             # Now sample to generate the Rpf distribution
@@ -1714,10 +1779,10 @@ def runMLFit(twoDs):
             print "Combine failed and never made fitDiagnostics.root. Quitting..."
             quit()
 
-        print 'Executing PostFitShapes2D -d '+card_name+' -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print'
-        subprocess.call(['PostFitShapes2D -d '+card_name+' -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print'], shell=True)
-        print 'Executing PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print'
-        subprocess.call(['PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print'], shell=True)
+        print 'Executing PostFitShapes2D -d '+card_name+' -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
+        subprocess.call(['PostFitShapes2D -d '+card_name+' -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'], shell=True)
+        print 'Executing PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
+        subprocess.call(['PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'], shell=True)
 
 # NOT FINISHED
 def runLimit(mass):
