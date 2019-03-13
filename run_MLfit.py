@@ -1,5 +1,5 @@
 from TwoDAlphabetClass import TwoDAlphabet, runMLFit, runLimit
-import sys
+import sys, traceback
 import subprocess
 import header
 
@@ -39,11 +39,15 @@ if len(inputConfigs) > 1:
     for t in twoDinstances:
         try:
             t.plotFitResults('b',simfit=True)
-        except:
+        except Exception as exc:
+            print traceback.format_exc()
+            print exc
             print 'Failed to run b plots for '+t.name
         try:
             t.plotFitResults('s',simfit=True)
-        except:
+        except Exception as exc:
+            print traceback.format_exc()
+            print exc
             print 'Failed to run s plots for '+t.name
 
 # If single fit
@@ -52,10 +56,14 @@ else:
     runMLFit([instance])
     try:
         instance.plotFitResults('b')
-    except:
+    except Exception as exc:
+        print traceback.format_exc()
+        print exc
         print 'Failed to run b plots for '+instance.name
     try:
         instance.plotFitResults('s')
-    except:
+    except Exception as exc:
+        print traceback.format_exc()
+        print exc
         print 'Failed to run s plots for '+instance.name
     

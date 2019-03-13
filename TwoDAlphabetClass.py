@@ -75,7 +75,7 @@ class TwoDAlphabet:
         self.projPath = self._projPath()
 
         # Pickle reading if recycling
-        if self.recycle:
+        if self.recycle != False:
             self.pickleFile = pickle.load(open(self.projPath+'saveOut.p','rb'))
         
         # Dict to pickle at the end
@@ -88,6 +88,8 @@ class TwoDAlphabet:
         # Global var replacement
         if 'runConfig' not in self.recycle:
             self._configGlobalVarReplacement()
+        else:
+            self.inputConfig = self._readIn('runConfig')
 
         # Get binning for three categories
         if not ('newXbins' in self.recycle and 'newYbins' in self.recycle):
@@ -106,11 +108,11 @@ class TwoDAlphabet:
         print self.full_x_bins
 
         # Make systematic uncertainty plots
-        if self.plotUncerts:
-            self.makeSystematicPlots
+        # if self.plotUncerts:
+        #     self.makeSystematicPlots
 
         # Run pseudo2D for fit guesses and make the config to actually run on
-        if self.fitGuesses:
+        if self.fitGuesses and "runConfig" not in self.recycle:
             self._makeFitGuesses()
 
         # Initialize rpf class
@@ -142,10 +144,10 @@ class TwoDAlphabet:
         # Save out at the end
         if len(self.recycle) > 0:
             self.pickleFile.close() # Close to avoid conflicts
+        self._saveOut()
         pickle.dump(self.pickleDict, open(self.projPath+'saveOut.p','wb'))
 
         # Very last thing - get a seg fault otherwise
-        self._saveOut()
         del self.workspace
 
     # FUNCTIONS USED IN INITIALIZATION
@@ -413,26 +415,26 @@ class TwoDAlphabet:
             return header.openJSON(self.projPath+'runConfig.json')
 
         elif attrname == 'newXbins': 
-            return pickle.load(self.pickleFile)['newXbins']
+            return self.pickleFile['newXbins']
 
         elif attrname == 'newYbins':
-            return pickle.load(self.pickleFile)['newYbins']
+            return self.pickleFile['newYbins']
 
         elif attrname == 'rpf': 
-            return pickle.load(self.pickleFile)['rpf']
+            return self.pickleFile['rpf']
 
         elif attrname == 'organizedDict':
-            return pickle.load(self.pickleFile)['organizedDict']
+            return self.pickleFile['organizedDict']
 
         elif attrname == 'floatingBins':
-            return pickle.load(self.pickleFile)['floatingBins']
+            return self.pickleFile['floatingBins']
 
         elif attrname == 'workspace':
             return TFile.Open('base_'+self.name+'.root').Get('w_'+self.name)
 
     # def _makeSystematicPlots(self):
 
-    def _makeFitGuesses(self,nslices=6,sigma=3):
+    def _makeFitGuesses(self,nslices=6,sigma=5):
         # Grab everything
         infile = TFile.Open(self.inputConfig['PROCESS']['data_obs']['FILE'])
 
@@ -685,7 +687,7 @@ class TwoDAlphabet:
                 fitResults['xparam_'+str(ix)+'_vs_y'].SetBinError(ybin,fitResults['fitSlice_'+str(ybin)].GetParError(ix))
      
         if len(projXs) <= 6:
-            header.makeCan('fitSlices_0-'+str(len(projXs)),self.projPath,projXs,xtitle=self.xVarName)
+            header.makeCan('fitSlices_0-6',self.projPath,projXs,xtitle=self.xVarName)
 
         else:
             chunkedProjX = [projXs[i:i + 6] for i in xrange(0, len(projXs), 6)]
@@ -1347,6 +1349,17 @@ class TwoDAlphabet:
         # Define low, middle, high projection regions for y (x regions defined already via signal region bounds)
         y_turnon_endBin = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').ProjectionY().GetMaximumBin()
         y_tail_beginningBin = int((y_nbins - y_turnon_endBin)/2.0 + y_turnon_endBin)
+        print 'Finding start and end bin indexes of signal range'
+        for ix in range(1,post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetNbinsX()+1):
+            low_edge = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetXaxis().GetBinLowEdge(ix)
+            up_edge = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetXaxis().GetBinUpEdge(ix)
+            print str(ix)+': ['+str(low_edge)+','+str(up_edge)+']'
+            if low_edge == self.sigStart:
+                print 'Assigning start bin as '+str(ix)
+                x_sigstart_bin = ix
+            if up_edge == self.sigEnd:
+                print 'Assigning end bin as '+str(ix)
+                x_sigend_bin = ix
 
         if y_turnon_endBin > y_nbins/2.0:  # in case this isn't a distribution with a turn-on
             y_turnon_endBin = int(round(y_nbins/3.0))
@@ -1407,7 +1420,10 @@ class TwoDAlphabet:
                 hist_dict[process][cat]['prefit_projx3'] = hist_dict[process][cat]['prefit_2D'].ProjectionX(base_proj_name_pre+'projx_'+y_tail_beginningVal+'-'+str(y_high),         y_tail_beginningBin+1,  y_nbins,'e')
 
                 hist_dict[process][cat]['prefit_projy1'] = hist_dict[process][cat]['prefit_LOW'].ProjectionY(base_proj_name_pre+'projy_'+str(x_low)+'-'+str(self.sigStart),          1,                      hist_dict[process][cat]['prefit_LOW'].GetNbinsX(),'e')
-                hist_dict[process][cat]['prefit_projy2'] = hist_dict[process][cat]['prefit_SIG'].ProjectionY(base_proj_name_pre+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd),    1,                      hist_dict[process][cat]['prefit_SIG'].GetNbinsX(),'e')
+                if self.blindedPlots:
+                    hist_dict[process][cat]['prefit_projy2'] = hist_dict[process][cat]['prefit_2D'].ProjectionY(base_proj_name_pre+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd), x_sigstart_bin,           x_sigend_bin,'e')
+                else:
+                    hist_dict[process][cat]['prefit_projy2'] = hist_dict[process][cat]['prefit_SIG'].ProjectionY(base_proj_name_pre+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd),    1,                      hist_dict[process][cat]['prefit_SIG'].GetNbinsX(),'e')
                 hist_dict[process][cat]['prefit_projy3'] = hist_dict[process][cat]['prefit_HIGH'].ProjectionY(base_proj_name_pre+'projy_'+str(self.sigEnd)+'-'+str(x_high),          1,                      hist_dict[process][cat]['prefit_HIGH'].GetNbinsX(),'e')
 
                 hist_dict[process][cat]['postfit_projx1'] = hist_dict[process][cat]['postfit_2D'].ProjectionX(base_proj_name_post+'projx_'+str(y_low)+'-'+y_turnon_endVal,           1,                      y_turnon_endBin, 'e')
@@ -1783,6 +1799,8 @@ def runMLFit(twoDs):
         subprocess.call(['PostFitShapes2D -d '+card_name+' -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'], shell=True)
         print 'Executing PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
         subprocess.call(['PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'], shell=True)
+        print 'Executing python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnostics.root --abs -g nuisance_pulls.root'
+        subprocess.call(['python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnostics.root --abs -g nuisance_pulls.root'], shell=True)
 
 # NOT FINISHED
 def runLimit(mass):
