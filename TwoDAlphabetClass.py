@@ -30,13 +30,14 @@ class TwoDAlphabet:
         pass
 
     # Initialization setup to just build workspace. All other steps must be called with methods
-    def __init__ (self,jsonFileName): # jsonFileNames is a list
+    def __init__ (self,jsonFileName,quicktag=False,stringSwaps={}): # jsonFileNames is a list
         self.allVars = []    # This is a list of all RooFit objects made. It never gets used for anything but if the
                         # objects never get saved here, then the python memory management will throw them out
                         # because of conflicts with the RooFit memory management. It's a hack.
 
         # Setup config
         self.jsonFileName = jsonFileName
+        self.stringSwaps = stringSwaps
         self.inputConfig = header.openJSON(self.jsonFileName)
 
         # Setup name
@@ -46,7 +47,9 @@ class TwoDAlphabet:
             self.name = self.inputConfig['OPTIONS']['name']
         else:
             self.name = jsonFileName.split('.json')[0].split('input_')[1]
-        if 'tag' in self.inputConfig['OPTIONS'].keys():
+        if quicktag != False:
+            self.tag = quicktag
+        elif 'tag' in self.inputConfig['OPTIONS'].keys():
             self.tag = self.inputConfig['OPTIONS']['tag']
         else:
             self.tag = ''
@@ -59,7 +62,6 @@ class TwoDAlphabet:
         self.sigEnd = self.inputConfig['BINNING']['X']['SIGEND']
 
         # Setup bool options
-        # self.signalOff = self._getOption('signalOff')
         self.freezeFail = self._getOption('freezeFail')
         self.blindedPlots = self._getOption('blindedPlots')
         self.blindedFit = self._getOption('blindedFit')
@@ -75,7 +77,7 @@ class TwoDAlphabet:
         self.projPath = self._projPath()
 
         # Pickle reading if recycling
-        if self.recycle != False:
+        if self.recycle != []:
             self.pickleFile = pickle.load(open(self.projPath+'saveOut.p','rb'))
         
         # Dict to pickle at the end
@@ -84,6 +86,8 @@ class TwoDAlphabet:
         # Draw if desired
         if self.draw == False:
             gROOT.SetBatch(kTRUE)
+
+        # Replace signal with command specified
 
         # Global var replacement
         if 'runConfig' not in self.recycle:
@@ -108,17 +112,18 @@ class TwoDAlphabet:
         print self.full_x_bins
 
         # Make systematic uncertainty plots
-        # if self.plotUncerts:
-        #     self.makeSystematicPlots
+        if self.plotUncerts:
+
+            self.makeSystematicPlots
 
         # Run pseudo2D for fit guesses and make the config to actually run on
         if self.fitGuesses and "runConfig" not in self.recycle:
             self._makeFitGuesses()
 
         # Initialize rpf class
-        if 'rpf' in self.recycle:
-            self.rpf = self._readIn('rpf')
-        else:
+        if 'organizedDict' not in self.recycle:
+        #     self.rpf = self._readIn('rpf')
+        # else:
             self.rpf = RpfHandler.RpfHandler(self.inputConfig['FIT'],self.name)
 
         # Organize everything for workspace building
@@ -142,8 +147,6 @@ class TwoDAlphabet:
             self._makeCard()
 
         # Save out at the end
-        if len(self.recycle) > 0:
-            self.pickleFile.close() # Close to avoid conflicts
         self._saveOut()
         pickle.dump(self.pickleDict, open(self.projPath+'saveOut.p','wb'))
 
@@ -170,6 +173,13 @@ class TwoDAlphabet:
         # CURRENTLY ONLY SUPPORTS STRING    #
         # REPLACEMENT                       #
         #####################################
+
+        # Add possible string swaps to the 'GLOBAL' dict of the config
+        for s in self.stringSwaps.keys():
+            if s in self.inputConfig['GLOBAL'].keys():
+                print 'ERROR: A command line string replacement (%s) conflicts with one already in the configuration file. Quitting...' %(s)
+                quit()
+            self.inputConfig['GLOBAL'][s] = self.stringSwaps[s]
 
         print "Doing GLOBAL variable replacement in input json...",
         for glob_var in self.inputConfig['GLOBAL'].keys():
@@ -228,6 +238,7 @@ class TwoDAlphabet:
             if not os.path.isdir(self.tag+'/'+self.name+'/plots/'): os.mkdir(self.tag+'/'+self.name+'/plots/')
             if not os.path.isdir(self.tag+'/'+self.name+'/plots/fit_b/'): os.mkdir(self.tag+'/'+self.name+'/plots/fit_b/')
             if not os.path.isdir(self.tag+'/'+self.name+'/plots/fit_s/'): os.mkdir(self.tag+'/'+self.name+'/plots/fit_s/')
+            if self.plotUncerts and not os.path.isdir(self.tag+'/'+self.name+'/UncertPlots/'): os.mkdir(self.tag+'/'+self.name+'/UncertPlots/')
 
             dirname = self.tag+'/'+self.name+'/'
         
@@ -236,6 +247,7 @@ class TwoDAlphabet:
             if not os.path.isdir(self.name+'/plots/'): os.mkdir(self.name+'/plots/')
             if not os.path.isdir(self.name+'/plots/fit_b/'): os.mkdir(self.name+'/plots/fit_b/')
             if not os.path.isdir(self.name+'/plots/fit_s/'): os.mkdir(self.name+'/plots/fit_s/')
+            if self.plotUncerts and not os.path.isdir(self.name+'/UncertPlots/'): os.mkdir(self.name+'/UncertPlots/')
 
             elif self.overwrite:
                 subprocess.call(['rm -rf '+self.name],shell=True)
@@ -398,8 +410,8 @@ class TwoDAlphabet:
         self.pickleDict['newXbins'] = self.newXbins
         self.pickleDict['newYbins'] = self.newYbins
 
-        # rpf
-        self.pickleDict['rpf'] = self.rpf
+        # rpf - Don't do this - takes up +5 GB
+        # self.pickleDict['rpf'] = self.rpf
 
         # organizedDict
         self.pickleDict['organizedDict'] = self.organizedDict
@@ -430,9 +442,82 @@ class TwoDAlphabet:
             return self.pickleFile['floatingBins']
 
         elif attrname == 'workspace':
-            return TFile.Open('base_'+self.name+'.root').Get('w_'+self.name)
+            return TFile.Open(self.projPath+'base_'+self.name+'.root').Get('w_'+self.name)
 
-    # def _makeSystematicPlots(self):
+    def _makeSystematicPlots(self):
+        for proc in self.inputConfig['PROCESS'].keys():
+            if proc != 'HELP':
+                for syst in self.inputConfig['PROCESS'][proc]['SYSTEMATICS']:
+                    # For each systematic in each process
+
+                    print proc + '_'+syst
+
+                    # If code 2 or 3 (shape based), grab the up and down shapes for passing and project onto the Y axis
+                    if self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 2:
+                        thisFile = TFile.Open(self.inputConfig['PROCESS'][proc]['FILE'])
+                        passUp2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS_UP'])
+                        passDown2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS_DOWN'])
+                        passUp = passUp2D.ProjectionY(proc + '_'+syst,21,28)
+                        passDown = passDown2D.ProjectionY(proc + '_'+syst+'_down',21,28)
+
+                    elif self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 3:
+                        if 'FILE_UP_'+proc in self.inputConfig['SYSTEMATIC'][syst]:
+                            thisFileUp = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_UP_'+proc])
+                            thisFileDown = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_DOWN_'+proc])
+
+                        elif 'FILE_UP_*' in self.inputConfig['SYSTEMATIC'][syst]:
+                            thisFileUp = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_UP_*'].replace('*',proc))
+                            thisFileDown = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_DOWN_*'].replace('*',proc))
+
+                        else:
+                            print 'Could not identify file for ' + proc +', '+syst
+
+                        passUp = thisFileUp.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionY(proc + '_'+syst,21,28)
+                        passDown = thisFileDown.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionY(proc + '_'+syst+'_down',21,28)
+
+                    else:
+                        continue
+
+                    # Setup the nominal shape (consistent across all of the pltos)
+                    fileNom = TFile.Open(self.inputConfig['PROCESS'][proc]['FILE'])
+                    passNom = fileNom.Get(self.inputConfig['PROCESS'][proc]['HISTPASS']).ProjectionY(proc + '_'+syst+'_nom',21,28)
+
+                    thisCan = TCanvas('canvas_'+proc+'_'+syst,'canvas_'+proc+'_'+syst,700,600)
+                    thisCan.cd()
+                    passNom.SetLineColor(kBlack)
+                    passNom.SetFillColor(kYellow-9)
+                    passUp.SetLineColor(kRed)
+                    passDown.SetLineColor(kBlue)
+
+                    passUp.SetLineStyle(9)
+                    passDown.SetLineStyle(9)
+                    passUp.SetLineWidth(2)
+                    passDown.SetLineWidth(2)
+
+                    histList = [passNom,passUp,passDown]
+
+                    # Set the max of the range so we can see all three histograms on the same plot
+                    yMax = histList[0].GetMaximum()
+                    maxHist = histList[0]
+                    for h in range(1,len(histList)):
+                        if histList[h].GetMaximum() > yMax:
+                            yMax = histList[h].GetMaximum()
+                            maxHist = histList[h]
+                    for h in histList:
+                        h.SetMaximum(yMax*1.1)
+
+                    passNom.SetXTitle(self.inputConfig['BINNING']['Y']['TITLE'])
+                    # passUp.SetXTitle(inputConfig['BINNING']['Y']['TITLE'])
+                    # passDown.SetXTitle(inputConfig['BINNING']['Y']['TITLE'])
+                    passNom.SetTitle(proc + ' - ' + syst + ' uncertainty')
+                    passNom.SetTitleOffset(1.2,"X")
+
+                    passNom.Draw('hist')
+                    passUp.Draw('same hist')
+                    passDown.Draw('same hist')
+                    
+
+                    thisCan.Print(self.projPath+'/UncertPlots/Uncertainty_'+proc+'_'+syst+'.pdf','pdf')
 
     def _makeFitGuesses(self,nslices=6,sigma=5):
         # Grab everything
@@ -554,8 +639,6 @@ class TwoDAlphabet:
         rebinned_pass = header.copyHistWithNewYbins(rebinned_x_pass,ybins_pseudo,'rebinned_pass',self.oldYwidth)
         rebinned_fail = header.copyHistWithNewYbins(rebinned_x_fail,ybins_pseudo,'rebinned_fail',self.oldYwidth)
 
-        header.makeCan('prefit_pass_fail',self.projPath,[rebinned_pass,rebinned_fail],xtitle=self.xVarName,ytitle=self.yVarName)
-
         ######################################################
         #   Rebin the distributions according to new y bins  #
         ######################################################
@@ -583,6 +666,7 @@ class TwoDAlphabet:
         Rpf = header.remapToUnity(RpfToRemap)
 
         # Plot comparisons out
+        header.makeCan('prefit_pass_fail',self.projPath,[final_pass,final_fail],xtitle=self.xVarName,ytitle=self.yVarName)
         header.makeCan('prefit_rpf_lego',self.projPath,[RpfToRemap,Rpf],xtitle=self.xVarName,ytitle=self.yVarName)
 
         ###############################################
@@ -1349,15 +1433,12 @@ class TwoDAlphabet:
         # Define low, middle, high projection regions for y (x regions defined already via signal region bounds)
         y_turnon_endBin = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').ProjectionY().GetMaximumBin()
         y_tail_beginningBin = int((y_nbins - y_turnon_endBin)/2.0 + y_turnon_endBin)
-        print 'Finding start and end bin indexes of signal range'
-        for ix in range(1,post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetNbinsX()+1):
-            low_edge = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetXaxis().GetBinLowEdge(ix)
-            up_edge = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetXaxis().GetBinUpEdge(ix)
-            print str(ix)+': ['+str(low_edge)+','+str(up_edge)+']'
-            if low_edge == self.sigStart:
-                print 'Assigning start bin as '+str(ix)
-                x_sigstart_bin = ix
-            if up_edge == self.sigEnd:
+        print 'Finding start and end bin indexes of signal range. Looking for '+str(self.sigStart)+', '+str(self.sigEnd)
+        for ix,xwall in enumerate(self.full_x_bins):
+            if xwall == self.sigStart:
+                print 'Assigning start bin as '+str(ix+1)
+                x_sigstart_bin = ix+1
+            if xwall == self.sigEnd:
                 print 'Assigning end bin as '+str(ix)
                 x_sigend_bin = ix
 
@@ -1431,7 +1512,10 @@ class TwoDAlphabet:
                 hist_dict[process][cat]['postfit_projx3'] = hist_dict[process][cat]['postfit_2D'].ProjectionX(base_proj_name_post+'projx_'+y_tail_beginningVal+'-'+str(y_high),      y_tail_beginningBin+1,  y_nbins,'e')
 
                 hist_dict[process][cat]['postfit_projy1'] = hist_dict[process][cat]['postfit_LOW'].ProjectionY(base_proj_name_post+'projy_'+str(x_low)+'-'+str(self.sigStart),       1,                      hist_dict[process][cat]['postfit_LOW'].GetNbinsX(),'e')
-                hist_dict[process][cat]['postfit_projy2'] = hist_dict[process][cat]['postfit_SIG'].ProjectionY(base_proj_name_post+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd), 1,                      hist_dict[process][cat]['postfit_SIG'].GetNbinsX(),'e')
+                if self.blindedPlots:
+                    hist_dict[process][cat]['postfit_projy2'] = hist_dict[process][cat]['postfit_2D'].ProjectionY(base_proj_name_pre+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd), x_sigstart_bin,           x_sigend_bin,'e')
+                else:
+                    hist_dict[process][cat]['postfit_projy2'] = hist_dict[process][cat]['postfit_SIG'].ProjectionY(base_proj_name_post+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd), 1,                      hist_dict[process][cat]['postfit_SIG'].GetNbinsX(),'e')
                 hist_dict[process][cat]['postfit_projy3'] = hist_dict[process][cat]['postfit_HIGH'].ProjectionY(base_proj_name_post+'projy_'+str(self.sigEnd)+'-'+str(x_high),       1,                      hist_dict[process][cat]['postfit_HIGH'].GetNbinsX(),'e')
 
                 x_edges = [x_low,self.sigStart,self.sigEnd,x_high]
@@ -1741,6 +1825,31 @@ class TwoDAlphabet:
 
             rpf_file.Close()
 
+    def plotProcessesTogether(self,histDict):
+        process_list = histDict.keys()
+
+        for summation in self.plotTogether.keys():  # For each set we're add together
+            process_list.append(summation)   # add the name to a list so we can keep track
+            hist_dict[summation] = {}
+            first_process = self.plotTogether[summation][0]
+            self.inputConfig["PROCESS"][summation] = {"COLOR":inputConfig["PROCESS"][first_process]["COLOR"],
+                                                     "CODE":inputConfig["PROCESS"][first_process]["CODE"] }
+
+            for cat in hist_dict[first_process].keys():   # for each pass/fail
+                hist_dict[summation][cat] = {}
+                for reg in hist_dict[first_process][cat].keys():  # and each region
+                    first_hist = hist_dict[first_process][cat][reg].Clone(summation+'_'+cat+'_'+reg)    # Clone the "first" histogram and give it the totalProcName
+                    for proc in self.plotTogether[summation]:   # for each process in the list of ones we're adding together
+                        if proc != first_process: # not the first one since we've cloned that
+                            first_hist.Add(hist_dict[proc][cat][reg])    # add it
+                    hist_dict[summation][cat][reg] = first_hist    # Put it in the hist_dict
+
+
+            for proc in self.plotTogether[summation]:
+                process_list.remove(proc)
+
+        return histDict
+
 # WRAPPER FUNCTIONS
 def runMLFit(twoDs):
 
@@ -1774,6 +1883,7 @@ def runMLFit(twoDs):
                 blind_option += ' mask_pass_SIG_'+twoD.name+'=1'
             else:
                 blind_option += ',mask_pass_SIG_'+twoD.name+'=1'
+
     if blindedFit:
         blind_option = '--text2workspace "--channel-masks" --setParameters' + blind_option
 
@@ -1803,49 +1913,66 @@ def runMLFit(twoDs):
         subprocess.call(['python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnostics.root --abs -g nuisance_pulls.root'], shell=True)
 
 # NOT FINISHED
-def runLimit(mass):
+def runLimit(twoDs,postfitWorkspaceDir,blindData=True):
+    # Set verbosity - chosen from first of configs
+    verbose = ''
+    if twoDs[0].verbosity != False:
+        verbose = ' -v '+twoDs[0].verbosity
+
     # Set systematics
     syst_option = ''
-    for proc in self.inputConfig['PROCESS'].keys():
-        if type(self.inputConfig['PROCESS'][proc]) == dict:
-            if input_config['PROCESS'][proc]['CODE'] == 0:
-                if len(input_config['PROCESS'][proc]['SYSTEMATICS']) == 0:
-                    syst_option = ' -S 0'
+    for twoD in twoDs:
+        for proc in twoD.inputConfig['PROCESS'].keys():
+            if type(twoD.inputConfig['PROCESS'][proc]) == dict:
+                if twoD.inputConfig['PROCESS'][proc]['CODE'] == 0:
+                    if len(twoD.inputConfig['PROCESS'][proc]['SYSTEMATICS']) != 0: # If at any point there's a process
+                        syst_option = ''    
 
     # Set signal strength range
     sig_option = ' --rMin 0 --rMax 5'
-    # if self.signalOff:
-    #     sig_option = ' --rMin 0 --rMax 0'
 
-    # Use --run blind to turn off data entirely
-    # Use 
-    print 'Executing combine -M Asymptotic card_'+self.name+'.txt --saveWorkspace -m '+str(mass)+ ' ' + syst_option + sig_option 
-    subprocess.call(['combine -M Asymptotic card_'+self.name+'.txt --saveWorkspace -m '+str(mass)+ ' ' + syst_option + sig_option], shell=True)
+    # Run blind (turns off data everywhere) but don't mask (examines signal region)
+    if blindData:
+        blind_option = ' --run blind'
+
+    # Set the project directory
+    if len(twoDs) > 1:
+        projDir = twoDs[0].tag
+    else:
+        projDir = twoDs[0].projPath
+
+    # Check if we can import post-fit result made during MLfit step
+    if not os.path.isfile(postfitWorkspaceDir+'/fitDiagnostics.root'):
+        print 'ERROR: '+postfitWorkspaceDir+'/fitDiagnostics.root does not exist. Please check that run_MLfit.py finished correctly. Quitting...'
+        quit()
+
+    # Make a prefit workspace from the data card
+    print 'cd '+projDir
+    with header.cd(projDir):
+        print 'Executing text2workspace.py -b card_'+twoDs[0].tag+'.txt -o limitworkspace.root' 
+        subprocess.call(['text2workspace.py -b card_'+twoDs[0].tag+'.txt -o limitworkspace.root'], shell=True)
+
+    # Morph workspace according to imported fit result
+    prefit_file = TFile(twoDs[0].tag+'/limitworkspace.root','update')
+    postfit_w = prefit_file.Get('w')
+    fit_result_file = TFile.Open(postfitWorkspaceDir+'/fitDiagnostics.root')
+    fit_result = fit_result_file.Get("fit_b")
+    postfit_vars = fit_result.floatParsFinal()
+
+    for idx in range(postfit_vars.getSize()):
+        par_name = postfit_vars[idx].GetName()
+        if postfit_w.var(par_name):
+            print 'Setting '+par_name+' to '+str(postfit_vars[idx].getValV())+' +/- '+str(postfit_vars[idx].getError())
+            var = postfit_w.var(par_name)
+            var.setVal(postfit_vars[idx].getValV())
+            var.setError(postfit_vars[idx].getError())
+
+    prefit_file.Close()
+
+    # Run combine    
+    print 'cd '+projDir
+    with header.cd(projDir):
+        print 'Executing combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option + sig_option 
+        subprocess.call(['combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option + sig_option], shell=True)
 
 
-
-# EXTERNAL HELPER FUNCTIONS
-def plotProcessesTogether(histDict):
-    process_list = histDict.keys()
-
-    for summation in self.plotTogether.keys():  # For each set we're add together
-        process_list.append(summation)   # add the name to a list so we can keep track
-        hist_dict[summation] = {}
-        first_process = self.plotTogether[summation][0]
-        self.inputConfig["PROCESS"][summation] = {"COLOR":inputConfig["PROCESS"][first_process]["COLOR"],
-                                                 "CODE":inputConfig["PROCESS"][first_process]["CODE"] }
-
-        for cat in hist_dict[first_process].keys():   # for each pass/fail
-            hist_dict[summation][cat] = {}
-            for reg in hist_dict[first_process][cat].keys():  # and each region
-                first_hist = hist_dict[first_process][cat][reg].Clone(summation+'_'+cat+'_'+reg)    # Clone the "first" histogram and give it the totalProcName
-                for proc in self.plotTogether[summation]:   # for each process in the list of ones we're adding together
-                    if proc != first_process: # not the first one since we've cloned that
-                        first_hist.Add(hist_dict[proc][cat][reg])    # add it
-                hist_dict[summation][cat][reg] = first_hist    # Put it in the hist_dict
-
-
-        for proc in self.plotTogether[summation]:
-            process_list.remove(proc)
-
-    return histDict
