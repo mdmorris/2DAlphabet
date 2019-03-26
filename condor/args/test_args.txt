@@ -1,0 +1,1 @@
+configs/input_dataBsFull1*.json tag=fullLimCondor dataBsFull /uscms_data/d3/lcorcodi/BStar13TeV/CMSSW_10_2_0/src/BStar13TeV/rootfiles:rootfiles

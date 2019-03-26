@@ -1914,6 +1914,12 @@ def runMLFit(twoDs):
 
 # NOT FINISHED
 def runLimit(twoDs,postfitWorkspaceDir,blindData=True):
+    # Check if we're running on condor
+    if 'condor' not in os.getcwd():
+        location = 'local'
+    else:
+        location = 'condor'
+
     # Set verbosity - chosen from first of configs
     verbose = ''
     if twoDs[0].verbosity != False:
@@ -1937,10 +1943,13 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True):
 
     # Set the project directory
     if len(twoDs) > 1:
+        identifier = twoDs[0].tag
         projDir = twoDs[0].tag
     else:
+        identifier = twoDs[0].name
         projDir = twoDs[0].projPath
 
+    card_name = 'card_'+identifier+'.txt'
     # Check if we can import post-fit result made during MLfit step
     if not os.path.isfile(postfitWorkspaceDir+'/fitDiagnostics.root'):
         print 'ERROR: '+postfitWorkspaceDir+'/fitDiagnostics.root does not exist. Please check that run_MLfit.py finished correctly. Quitting...'
@@ -1949,11 +1958,11 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True):
     # Make a prefit workspace from the data card
     print 'cd '+projDir
     with header.cd(projDir):
-        print 'Executing text2workspace.py -b card_'+twoDs[0].tag+'.txt -o limitworkspace.root' 
-        subprocess.call(['text2workspace.py -b card_'+twoDs[0].tag+'.txt -o limitworkspace.root'], shell=True)
+        print 'Executing text2workspace.py -b '+card_name+' -o limitworkspace.root' 
+        subprocess.call(['text2workspace.py -b '+card_name+' -o limitworkspace.root'], shell=True)
 
     # Morph workspace according to imported fit result
-    prefit_file = TFile(twoDs[0].tag+'/limitworkspace.root','update')
+    prefit_file = TFile(projDir+'/limitworkspace.root','update')
     postfit_w = prefit_file.Get('w')
     fit_result_file = TFile.Open(postfitWorkspaceDir+'/fitDiagnostics.root')
     fit_result = fit_result_file.Get("fit_b")
@@ -1969,10 +1978,22 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True):
 
     prefit_file.Close()
 
-    # Run combine    
-    print 'cd '+projDir
-    with header.cd(projDir):
-        print 'Executing combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option + sig_option 
-        subprocess.call(['combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option + sig_option], shell=True)
+    current_dir = os.getcwd()
 
-
+    # Run combine if not on condor
+    if location == 'local':    
+        print 'cd '+projDir
+        with header.cd(projDir):
+            print 'Executing combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option + sig_option 
+            subprocess.call(['combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option + sig_option], shell=True)
+    # If on condor, write a script to run (python will then release its memory usage)
+    else:
+        # Do all of the project specific shell scripting here
+        shell_finisher = open('shell_finisher.sh','w')
+        shell_finisher.write('#!/bin/csh\n')
+        shell_finisher.write('cd '+projDir+'\n')
+        shell_finisher.write('combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option + sig_option+'\n')
+        shell_finisher.write('cd '+current_dir+'\n')
+        shell_finisher.write('tar -czvf '+identifier+'.tgz '+projDir+'/\n')
+        shell_finisher.write('cp '+identifier+'.tgz ../../../')
+        shell_finisher.close()
