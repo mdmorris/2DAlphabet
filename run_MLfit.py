@@ -63,29 +63,7 @@ if len(inputConfigs) > 1:
 else:
     instance = TwoDAlphabet(inputConfigs[0],quicktag)
     runMLFit([instance])
-    thistag = instance.tag
-
-    # Save a post fit workspace - will use for limit setting
-    prefit_file = TFile.Open(thistag+'/higgsCombineTest.FitDiagnostics.mH120.root')
-    postfit_w = prefit_file.Get('w').Clone('w_post')
-    fit_result_file = TFile.Open(thistag+'/fitDiagnostics.root')
-    fit_result = fit_result_file.Get("fit_b")
-    postfit_vars = fit_result.floatParsFinal()
-
-    for idx in range(postfit_vars.getSize()):
-        par_name = postfit_vars[idx].GetName()
-        if postfit_w.obj(par_name):
-            var = postfit_w.obj(par_name)
-            var.setVal(postfit_vars[idx].getValV())
-            var.setError(postfit_vars[idx].getError())
-            var.setMin(postfit_vars[idx].getMin())
-            var.setMax(postfit_vars[idx].getMax())
-
-    postfit_file = TFile(thistag+'/postfitb_workspace.root','recreate')
-    postfit_file.cd()
-    postfit_w.Write()
-    postfit_file.Close()
-
+    thistag = instance.projPath
 
     # Plot
     try:

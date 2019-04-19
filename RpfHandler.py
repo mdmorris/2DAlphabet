@@ -230,3 +230,6 @@ class RpfHandler():
     def getRpfBinVal(self,c,xbin,ybin):
         formula_name = 'formula_'+c+'_bin_'+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
         return self.binVars[formula_name].getValV()
+
+    def getRpfVarNames(self):
+        return sorted(self.rpfVars.keys())

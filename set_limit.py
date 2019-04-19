@@ -31,7 +31,7 @@ parser.add_option('-b', '--blind', action="store_true",
                 dest      =   'blind',
                 help      =   'Only plot observed limit if false')
 parser.add_option('-l', '--lumi', metavar='F', type='string', action='store',
-                default       =       '',
+                default       =       '137052',
                 dest          =       'lumi',
                 help          =       'Luminosity option')
 parser.add_option('-m', '--mod', metavar='F', type='string', action='store',
@@ -260,12 +260,13 @@ if not options.blind:
     g_limit.GetYaxis().SetTitleOffset(1.4)
 
 else:
+    g_mclimit.GetYaxis().SetTitleOffset(1.4)
     g_mclimit.Draw("al")
     g_error95.Draw("lf")
     g_error.Draw("lf")
     g_mclimit.Draw("l")
     graphWP.Draw("l")
-    g_mclimit.GetYaxis().SetTitleOffset(1.4)
+    
 # graphWP.Draw("l")
 
 # WPunc.Draw("lf")
@@ -295,7 +296,7 @@ text1.DrawLatex(0.2,0.84, "#scale[1.0]{CMS, L = "+options.lumi+" pb^{-1} at  #sq
 
 TPT.Draw()      
 climits.RedrawAxis()
-climits.SaveAs("limits_combine_"+options.lumi+"pb_"+options.signals[:options.signals.find('.')]+".pdf")
+climits.SaveAs("limits_combine_"+options.lumi+"pb_"+options.signals[options.signals.find('/')+1:options.signals.find('.')]+".pdf")
 
 # Finally calculate the intercept
 expectedLimit = Inter(g_mclimit,graphWP)[0]

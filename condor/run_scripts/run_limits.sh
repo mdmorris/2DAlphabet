@@ -16,7 +16,7 @@ scramv1 b clean; scramv1 b
 # Grab the rootfiles
 xrdcp root://cmseos.fnal.gov//store/user/lcorcodi/bstar_presel_rootfiles.tgz ./
 mkdir rootfiles
-tar -xzf bstar_presel_rootfiles.tgz -C rootfiles/
+tar -xzf bstar_presel_rootfiles.tgz
 rm bstar_presel_rootfiles.tgz
 
 echo run_Limit.py $*

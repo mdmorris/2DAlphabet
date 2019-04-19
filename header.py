@@ -1,7 +1,7 @@
 import ROOT
 from ROOT import *
 from contextlib import contextmanager
-import os
+import os, pickle, subprocess
 import math
 from math import sqrt
 import array
@@ -369,6 +369,95 @@ def printWorkspace(myfile,myworkspace):
     myf = TFile.Open(myfile)
     myw = myf.Get(myworkspace)
     myw.Print()
+
+def ftestInfoLookup(projInfoDict):
+    nrpfparams = 0
+    nbins = 0
+    for k in projInfoDict.keys():
+        this_nrpfparams = len(projInfoDict[k]['rpfVarNames'])
+        this_nbins = (len(projInfoDict[k]['full_x_bins'])-1) * (len(projInfoDict[k]['newYbins'])-1)
+        if projInfoDict[k]['blindedFit'] == True:
+            this_nbins = this_nbins - ( (len(projInfoDict[k]['newXbins']['SIG'])-1) * (len(projInfoDict[k]['newYbins'])-1) )
+
+        nrpfparams+=this_nrpfparams
+        nbins+=this_nbins
+    
+    return nrpfparams,nbins
+
+def projInfoLookup(projDir,cardtag):
+    # Check if there was more than one 2DAlphabet object run over
+    more_than_one = False
+    run_card = open('card_'+card_tag+'.txt','r')
+    firstline = run_card.readline()
+    if 'Combination of ' in firstline:
+        more_than_one = True
+    
+    proj_info = {}
+    if more_than_one:
+        # Look up all categories run in the most recent fit
+        twoD_names = getTwoDAlphaNames(firstline)
+        for n in twoD_names:
+            proj_info[n] = pickle.load(open(projDir+twoD_obj_name+'/saveOut.p','r'))
+
+    elif not more_than_one:
+        proj_info[card_tag] = pickle.load(open(projDir+'/saveOut.p','r'))
+
+    return proj_info
+
+def getTwoDAlphaNames(line):
+    card_locs = [loc for loc in line.split(' ') if (loc != ' ' and loc != '' and 'txt' in loc)]
+    proj_names = [n.split('/') for n in card_locs]
+    return proj_names
+
+def executeCmd(cmd,dryrun=False):
+    print 'Executing: '+cmd
+    if not dryrun:
+        subprocess.call([cmd],shell=True)
+
+def dictToLatexTable(dict2convert,outfilename,roworder=[],columnorder=[]):
+    # First set of keys are row, second are column
+    if len(roworder) == 0:
+        rows = sorted(dict2convert.keys())
+    else:
+        rows = roworder
+    if len(columnorder) == 0:
+        columns = []
+        for r in rows:
+            thesecolumns = dict2convert[r].keys()
+            for c in thesecolumns:
+                if c not in columns:
+                    columns.append(c)
+        columns.sort()
+    else:
+        columns = columnorder
+
+    latexout = open(outfilename,'w')
+    latexout.write('\\begin{table}[] \n')
+    latexout.write('\\begin{tabular}{|c|'+len(columns)*'c'+'|} \n')
+    latexout.write('\\hline \n')
+
+    column_string = ' &'
+    for c in columns:
+        column_string += str(c)+'\t& '
+    column_string = column_string[:-2]+'\\\ \n'
+    latexout.write(column_string)
+
+    latexout.write('\\hline \n')
+    for r in rows:
+        row_string = '\t'+r+'\t& '
+        for c in columns:
+            if c in dict2convert[r].keys():
+                row_string += str(dict2convert[r][c])+'\t& '
+            else:
+                row_string += '- \t& '
+        row_string = row_string[:-2]+'\\\ \n'
+        latexout.write(row_string)
+
+    latexout.write('\\hline \n')
+    latexout.write('\\end{tabular} \n')
+    latexout.write('\\end{table}')
+    latexout.close()
+
 
 def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False):  
     # histlist is just the generic list but if bkglist is specified (non-empty)

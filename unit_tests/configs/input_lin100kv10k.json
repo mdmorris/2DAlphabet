@@ -5,7 +5,7 @@
     },
 
     "OPTIONS": {
-        "name":"lin100kv10knew",
+        "name":"lin100kv10k",
         "tag":"unitTest"
     },
 
@@ -22,7 +22,7 @@
             "FILE":"path",
             "HISTPASS":"signal_pass",
             "HISTFAIL":"signal_fail",
-            "SYSTEMATICS":[],
+            "SYSTEMATICS":["sym","asym","shape"],
             "CODE": 0
         }
     },

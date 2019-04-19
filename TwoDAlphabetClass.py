@@ -113,8 +113,7 @@ class TwoDAlphabet:
 
         # Make systematic uncertainty plots
         if self.plotUncerts:
-
-            self.makeSystematicPlots
+            self._makeSystematicPlots()
 
         # Run pseudo2D for fit guesses and make the config to actually run on
         if self.fitGuesses and "runConfig" not in self.recycle:
@@ -182,32 +181,32 @@ class TwoDAlphabet:
             self.inputConfig['GLOBAL'][s] = self.stringSwaps[s]
 
         print "Doing GLOBAL variable replacement in input json...",
-        for glob_var in self.inputConfig['GLOBAL'].keys():
-            if glob_var != "HELP":                                          # For each key in GLOBAL that is not HELP
-
+        for old_string in self.inputConfig['GLOBAL'].keys():
+            new_string = self.inputConfig['GLOBAL'][old_string]
+            
+            if old_string != "HELP":                                            # For each key in GLOBAL that is not HELP
                 for mainkey in self.inputConfig.keys():                         # For each main (top level) key in config that isn't GLOBAL
-                    if mainkey != 'GLOBAL' and mainkey != 'OPTIONS':                                 # Mainkeys are all unchangeable (uppercase) so no check performed
-                        
+                    if mainkey != 'GLOBAL' and mainkey != 'OPTIONS':            # Mainkeys are all unchangeable (uppercase) so no check performed
                         for subkey in self.inputConfig[mainkey].keys():         # For each subkey of main key dictionary
-                            if subkey.find(glob_var) != -1:                  # check subkey
-                                subkey = subkey.replace(glob_var,self.inputConfig['GLOBAL'][glob_var])   # replace it
+                            if old_string in subkey:                            # Check subkey for old_string
+                                self.inputConfig[mainkey][subkey.replace(old_string,new_string)] = self.inputConfig[mainkey].pop(subkey)  # replace it
+                                subkey = subkey.replace(old_string,new_string)
 
-                            if subkey == 'HELP':                                        # If the subkey isn't HELP, the key value is a dict
-                                continue
-                            elif subkey.find('FORM') != -1:
-                                if subkey.find(glob_var) != -1:                  # check subkey
-                                    subkey = subkey.replace(glob_var,self.inputConfig['GLOBAL'][glob_var])   # replace it
+                            # If the subkey value is not a dict, then check one more time
+                            if type(self.inputConfig[mainkey][subkey]) != dict:
+                                if old_string in self.inputConfig[mainkey][subkey]:
+                                    self.inputConfig[mainkey][subkey] = self.inputConfig[mainkey][subkey].replace(old_string,new_string)
+                            # If it is a dict, go deeper
                             else:
                                 for subsubkey in self.inputConfig[mainkey][subkey].keys():  # so loop though subsubkeys
-                                    if subsubkey.find(glob_var) != -1:                                   # check subsubkey
-                                        subsubkey = subsubkey.replace(glob_var,self.inputConfig['GLOBAL'][glob_var])    # replace it
+                                    if old_string in subsubkey:                                   # check subsubkey
+                                        self.inputConfig[mainkey][subkey][subsubkey.replace(old_string,new_string)] = self.inputConfig[mainkey][subkey].pop(subsubkey)   # replace it
+                                        subsubkey = subsubkey.replace(old_string,new_string)
 
-                                    try:
-                                        if self.inputConfig[mainkey][subkey][subsubkey].find(glob_var) != -1:                               # check subsubkey val
-                                            self.inputConfig[mainkey][subkey][subsubkey] = self.inputConfig[mainkey][subkey][subsubkey].replace(glob_var,self.inputConfig['GLOBAL'][glob_var]) # replace it
+                                    if type(self.inputConfig[mainkey][subkey][subsubkey]) == str:
+                                        if old_string in self.inputConfig[mainkey][subkey][subsubkey]:                               # check subsubkey val
+                                            self.inputConfig[mainkey][subkey][subsubkey] = self.inputConfig[mainkey][subkey][subsubkey].replace(old_string,new_string) # replace it
 
-                                    except:                 # Exception if not of type string
-                                        continue
 
     def _getRRVs(self):
         xRRVs = {}
@@ -386,7 +385,7 @@ class TwoDAlphabet:
             print 'WARNING: '+optionName+' boolean not set explicitely. Default to True.'
             option_return = True
         # Default to false
-        elif optionName in ['freezeFail','fitGuesses']:
+        elif optionName in ['freezeFail','fitGuesses','plotUncerts']:
             print 'WARNING: '+optionName+' boolean not set explicitely. Default to False.'
             option_return = False
         elif optionName == 'verbosity':
@@ -406,12 +405,29 @@ class TwoDAlphabet:
         json.dump(self.inputConfig,file_out,indent=2, sort_keys=True)
         file_out.close()
 
+        self.pickleDict['name'] = self.name
+        self.pickleDict['tag'] = self.tag
+        self.pickleDict['xVarName'] = self.xVarName
+        self.pickleDict['yVarName'] = self.yVarName
+        self.pickleDict['xVarTitle'] = self.xVarTitle
+        self.pickleDict['yVarTitle'] = self.yVarTitle
+        self.pickleDict['sigStart'] = self.sigStart
+        self.pickleDict['sigEnd'] = self.sigEnd
+        self.pickleDict['freezeFail'] = self.freezeFail
+        self.pickleDict['blindedFit'] = self.blindedFit
+        self.pickleDict['plotTogether'] = self.plotTogether
+
+        # Setup a directory to save
+        self.projPath = self._projPath()
+
         # bins
         self.pickleDict['newXbins'] = self.newXbins
+        self.pickleDict['full_x_bins'] = self.full_x_bins
         self.pickleDict['newYbins'] = self.newYbins
 
         # rpf - Don't do this - takes up +5 GB
         # self.pickleDict['rpf'] = self.rpf
+        self.pickleDict['rpfVarNames'] = self.rpf.getRpfVarNames()
 
         # organizedDict
         self.pickleDict['organizedDict'] = self.organizedDict
@@ -432,8 +448,8 @@ class TwoDAlphabet:
         elif attrname == 'newYbins':
             return self.pickleFile['newYbins']
 
-        elif attrname == 'rpf': 
-            return self.pickleFile['rpf']
+        # elif attrname == 'rpf': 
+        #     return self.pickleFile['rpf']
 
         elif attrname == 'organizedDict':
             return self.pickleFile['organizedDict']
@@ -1852,7 +1868,6 @@ class TwoDAlphabet:
 
 # WRAPPER FUNCTIONS
 def runMLFit(twoDs):
-
     # Set verbosity - chosen from first of configs
     verbose = ''
     if twoDs[0].verbosity != False:
@@ -1897,9 +1912,15 @@ def runMLFit(twoDs):
 
     # Run Combine
     print 'cd '+projDir
-    print 'Executing combine -M FitDiagnostics -d '+card_name+' --saveWithUncertainties '+blind_option+' --saveWorkspace' + syst_option + sig_option +verbose
+    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' --saveWithUncertainties '+blind_option+' --saveWorkspace' + syst_option + sig_option +verbose
+    print 'Executing '+FitDiagnostics_command
+
     with header.cd(projDir):
-        subprocess.call(['combine -M FitDiagnostics -d '+card_name+' --saveWithUncertainties '+blind_option+' --saveWorkspace' + syst_option + sig_option + verbose], shell=True)
+        command_saveout = open('FitDiagnostics_command.txt','w')
+        command_saveout.write(FitDiagnostics_command)
+        command_saveout.close()
+
+        subprocess.call([FitDiagnostics_command], shell=True)
 
         if not os.path.isfile('fitDiagnostics.root'):
             print "Combine failed and never made fitDiagnostics.root. Quitting..."
@@ -1912,14 +1933,10 @@ def runMLFit(twoDs):
         print 'Executing python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnostics.root --abs -g nuisance_pulls.root'
         subprocess.call(['python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnostics.root --abs -g nuisance_pulls.root'], shell=True)
 
-# NOT FINISHED
-def runLimit(twoDs,postfitWorkspaceDir,blindData=True):
-    # Check if we're running on condor
-    if 'condor' not in os.getcwd():
-        location = 'local'
-    else:
-        location = 'condor'
+        print 'Executing python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py '+card_name+' --all -f html > systematics_table.html'
+        subprocess.call(['Executing python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py '+card_name+' --all -f html > systematics_table.html'],shell=True)
 
+def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
     # Set verbosity - chosen from first of configs
     verbose = ''
     if twoDs[0].verbosity != False:
@@ -1990,7 +2007,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True):
     else:
         # Do all of the project specific shell scripting here
         shell_finisher = open('shell_finisher.sh','w')
-        shell_finisher.write('#!/bin/csh\n')
+        shell_finisher.write('#!/bin/sh\n')
         shell_finisher.write('cd '+projDir+'\n')
         shell_finisher.write('combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option + sig_option+'\n')
         shell_finisher.write('cd '+current_dir+'\n')

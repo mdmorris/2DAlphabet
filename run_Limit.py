@@ -29,11 +29,11 @@ for i,c in enumerate(inputArgs):
 
 print 'tag                              = ' + str(quicktag)
 print 'Location of b-only fit workspace = ' + postfitWorkspaceDir 
-print 'Blind data points                = '+str(blindData)
+print 'Blind data points                = '+ str(blindData)
 # print 'Recycle workspaces               = '+str(recycle)
 print 'Config Replacements:'
 for s in stringSwaps.keys():
-    print '\t'+ s + ' = ' + stringSwaps[s]
+    print '\t'+ s + ' -> ' + stringSwaps[s]
 print 'Configs:'
 for c in inputConfigs:
     print '\t'+c
@@ -76,9 +76,9 @@ if len(inputConfigs) > 1:
         for num in range(1,len(twoDinstances)+1):
             subprocess.call(["sed -i 's/ch"+str(num)+"_//g' card_"+thistag+".txt"],shell=True)
 
-    runLimit(twoDinstances,postfitWorkspaceDir,blindData=blindData)
+    runLimit(twoDinstances,postfitWorkspaceDir,blindData=bool(blindData),location='local')
 
 # If single fit
 else:
     instance = TwoDAlphabet(inputConfigs[0],quicktag,stringSwaps)
-    runLimit([instance],postfitWorkspaceDir,blindData=blindData)
+    runLimit([instance],postfitWorkspaceDir,blindData=bool(blindData),location='local')
