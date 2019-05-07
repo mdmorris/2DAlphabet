@@ -229,9 +229,11 @@ class TwoDAlphabet:
     def _projPath(self):
         if self.tag != '':
             if not os.path.isdir(self.tag+'/'):
+                print 'Making dir '+self.tag+'/'
                 os.mkdir(self.tag+'/')
             elif self.overwrite:
                 subprocess.call(['rm -rf '+self.tag],shell=True)
+                print 'Making dir '+self.tag+'/'
                 os.mkdir(self.tag+'/')
 
             if not os.path.isdir(self.tag+'/'+self.name): os.mkdir(self.tag+'/'+self.name)
@@ -1118,6 +1120,9 @@ class TwoDAlphabet:
                 for xbin in range(1,len(self.newXbins[c])):
                     this_full_xbin = self._getFullXbin(xbin,c)
                     # Now that we're in a specific bin, we need to process it
+
+                    # First check if we have an empty pass bin
+                    this_pass_bin_zero = True if TH2_data_pass.GetBinContent(xbin,ybin) <= 0 else False 
                     
                     # Now that we know we aren't in the blinded region, make a name for the bin RRV
                     fail_bin_name = 'Fail_'+c+'_bin_'+str(xbin)+'-'+str(ybin)+'_'+self.name
@@ -1147,8 +1152,8 @@ class TwoDAlphabet:
                             bin_err_down   = bin_err_down    - this_TH2.GetBinContent(xbin,ybin) - this_TH2.GetBinErrorLow(xbin,ybin)
 
                     # If bin content is <= 0, treat this bin as a RooConstVar at value close to 0
-                    if (bin_content <= 0):
-                        binRRV = RooConstVar(fail_bin_name, fail_bin_name, max(0.0001,bin_content))
+                    if (bin_content <= 0) or (this_pass_bin_zero == True):
+                        binRRV = RooConstVar(fail_bin_name, fail_bin_name, max(1e-9,bin_content))
                         bin_list_fail.add(binRRV)
                         self.allVars.append(binRRV)
 
@@ -1166,13 +1171,13 @@ class TwoDAlphabet:
                         self.allVars.append(x_const)
                         self.allVars.append(y_const)
 
-                        # And now get the Rpf function value for this bin 
+                        # # And now get the Rpf function value for this bin 
                         if self.rpf.fitType == 'cheb':
                             this_rpf = self.rpf.evalRpf(x_center_mapped, y_center_mapped,this_full_xbin,ybin) # chebyshev class takes different input
                         else:
                             this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
 
-                        this_bin_pass = RooConstVar(pass_bin_name, pass_bin_name, 0.0001)
+                        this_bin_pass = RooConstVar(pass_bin_name, pass_bin_name, 1e-9)
                         bin_list_pass.add(this_bin_pass)
                         self.allVars.append(this_bin_pass)
 
@@ -1182,19 +1187,19 @@ class TwoDAlphabet:
                             binRRV = RooConstVar(fail_bin_name, fail_bin_name, bin_content)
 
                         elif bin_content < 1: # Give larger floating to range to bins with fewer events
-                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,0.1), 0.0000001, 10)
+                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,0.1), bin_range_down, 10)
                             print fail_bin_name + ' < 1'
 
                         elif bin_content < 10: # Give larger floating to range to bins with fewer events
-                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,1), 0.0000001, 50)
+                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,1), 1e-9, 50)
                             print fail_bin_name + ' < 10'
                         else:
                             binRRV = RooRealVar(fail_bin_name, fail_bin_name, bin_content, max(1,bin_range_down), bin_range_up)
 
 
                         if not self.freezeFail:
-                            if bin_content - bin_err_down < 0:
-                                bin_err_down = bin_content - binRRV.getMin()     # For the rare case when bin error is larger than the content
+                            if bin_content - bin_err_down < 0.001:
+                                bin_err_down = bin_content - 0.001#binRRV.getMin()     # For the rare case when bin error is larger than the content
                             
                             binRRV.setAsymError(bin_err_down,bin_err_up)
                             self.floatingBins.append(fail_bin_name)
