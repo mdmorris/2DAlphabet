@@ -22,85 +22,85 @@ def ascii_encode_dict(data):
     ascii_encode = lambda x: x.encode('ascii') if isinstance(x, unicode) else x 
     return dict(map(ascii_encode, pair) for pair in data.items())
 
-def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHigh):
-    # Make a copy with the same Y bins but new X bins
-    nBinsY = thisHist.GetNbinsY()
-    yBinsLow = thisHist.GetYaxis().GetXmin()
-    yBinsHigh = thisHist.GetYaxis().GetXmax()
-    nNewBinsX = int((xNewBinsHigh-xNewBinsLow)/float(newBinWidthX))
-    # Use copyName with _temp to avoid overwriting if thisHist has the same name
-    # We can do this at the end but not before we're finished with thisHist
-    histCopy = TH2F(copyName+'_temp',copyName+'_temp',nNewBinsX,xNewBinsLow,xNewBinsHigh,nBinsY,yBinsLow,yBinsHigh)
-    histCopy.Sumw2()
+# def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHigh):
+#     # Make a copy with the same Y bins but new X bins
+#     nBinsY = thisHist.GetNbinsY()
+#     yBinsLow = thisHist.GetYaxis().GetXmin()
+#     yBinsHigh = thisHist.GetYaxis().GetXmax()
+#     nNewBinsX = int((xNewBinsHigh-xNewBinsLow)/float(newBinWidthX))
+#     # Use copyName with _temp to avoid overwriting if thisHist has the same name
+#     # We can do this at the end but not before we're finished with thisHist
+#     histCopy = TH2F(copyName+'_temp',copyName+'_temp',nNewBinsX,xNewBinsLow,xNewBinsHigh,nBinsY,yBinsLow,yBinsHigh)
+#     histCopy.Sumw2()
     
-    histCopy.GetXaxis().SetName(thisHist.GetXaxis().GetName())
-    histCopy.GetYaxis().SetName(thisHist.GetYaxis().GetName())
+#     histCopy.GetXaxis().SetName(thisHist.GetXaxis().GetName())
+#     histCopy.GetYaxis().SetName(thisHist.GetYaxis().GetName())
 
 
-    # Loop through the old bins
-    for binY in range(1,nBinsY+1):
-        # print 'Bin y: ' + str(binY)
-        for newBinX in range(1,nNewBinsX+1):
-            newBinContent = 0
-            newBinErrorSq = 0
-            newBinXlow = histCopy.GetXaxis().GetBinLowEdge(newBinX)
-            newBinXhigh = histCopy.GetXaxis().GetBinUpEdge(newBinX)
+#     # Loop through the old bins
+#     for binY in range(1,nBinsY+1):
+#         # print 'Bin y: ' + str(binY)
+#         for newBinX in range(1,nNewBinsX+1):
+#             newBinContent = 0
+#             newBinErrorSq = 0
+#             newBinXlow = histCopy.GetXaxis().GetBinLowEdge(newBinX)
+#             newBinXhigh = histCopy.GetXaxis().GetBinUpEdge(newBinX)
 
-            # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
-            for oldBinX in range(1,thisHist.GetNbinsX()+1):
-                if thisHist.GetXaxis().GetBinLowEdge(oldBinX) >= newBinXlow and thisHist.GetXaxis().GetBinUpEdge(oldBinX) <= newBinXhigh:
-                    # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
-                    # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
-                    newBinContent += thisHist.GetBinContent(oldBinX,binY)
-                    newBinErrorSq += thisHist.GetBinError(oldBinX,binY)**2
+#             # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
+#             for oldBinX in range(1,thisHist.GetNbinsX()+1):
+#                 if thisHist.GetXaxis().GetBinLowEdge(oldBinX) >= newBinXlow and thisHist.GetXaxis().GetBinUpEdge(oldBinX) <= newBinXhigh:
+#                     # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
+#                     # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
+#                     newBinContent += thisHist.GetBinContent(oldBinX,binY)
+#                     newBinErrorSq += thisHist.GetBinError(oldBinX,binY)**2
 
-            # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
-            if newBinContent > 0:
-                histCopy.SetBinContent(newBinX,binY,newBinContent)
-                histCopy.SetBinError(newBinX,binY,sqrt(newBinErrorSq))
+#             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
+#             if newBinContent > 0:
+#                 histCopy.SetBinContent(newBinX,binY,newBinContent)
+#                 histCopy.SetBinError(newBinX,binY,sqrt(newBinErrorSq))
 
-    # Will now set the copyName which will overwrite thisHist if it has the same name
-    histCopy.SetName(copyName)
-    histCopy.SetTitle(copyName)
+#     # Will now set the copyName which will overwrite thisHist if it has the same name
+#     histCopy.SetName(copyName)
+#     histCopy.SetTitle(copyName)
 
-    return histCopy
+#     return histCopy
 
-def copyHistWithNewYbounds(thisHist,copyName,newBinWidthY,yNewBinsLow,yNewBinsHigh):
-    # Make a copy with the same Y bins but new X bins
-    nBinsX = thisHist.GetNbinsX()
-    xBinsLow = thisHist.GetXaxis().GetXmin()
-    xBinsHigh = thisHist.GetXaxis().GetXmax()
-    nNewBinsY = int((yNewBinsHigh-yNewBinsLow)/float(newBinWidthY))
-    histCopy = TH2F(copyName,copyName,nBinsX,xBinsLow,xBinsHigh,nNewBinsY,yNewBinsLow,yNewBinsHigh)
-    histCopy.Sumw2()
+# def copyHistWithNewYbounds(thisHist,copyName,newBinWidthY,yNewBinsLow,yNewBinsHigh):
+#     # Make a copy with the same Y bins but new X bins
+#     nBinsX = thisHist.GetNbinsX()
+#     xBinsLow = thisHist.GetXaxis().GetXmin()
+#     xBinsHigh = thisHist.GetXaxis().GetXmax()
+#     nNewBinsY = int((yNewBinsHigh-yNewBinsLow)/float(newBinWidthY))
+#     histCopy = TH2F(copyName,copyName,nBinsX,xBinsLow,xBinsHigh,nNewBinsY,yNewBinsLow,yNewBinsHigh)
+#     histCopy.Sumw2()
     
-    histCopy.GetXaxis().SetName(thisHist.GetXaxis().GetName())
-    histCopy.GetYaxis().SetName(thisHist.GetYaxis().GetName())
+#     histCopy.GetXaxis().SetName(thisHist.GetXaxis().GetName())
+#     histCopy.GetYaxis().SetName(thisHist.GetYaxis().GetName())
 
 
-    # Loop through the old bins
-    for binX in range(1,nBinsX+1):
-        # print 'Bin y: ' + str(binY)
-        for newBinY in range(1,nNewBinsY+1):
-            newBinContent = 0
-            newBinErrorSq = 0
-            newBinYlow = histCopy.GetYaxis().GetBinLowEdge(newBinY)
-            newBinYhigh = histCopy.GetYaxis().GetBinUpEdge(newBinY)
+#     # Loop through the old bins
+#     for binX in range(1,nBinsX+1):
+#         # print 'Bin y: ' + str(binY)
+#         for newBinY in range(1,nNewBinsY+1):
+#             newBinContent = 0
+#             newBinErrorSq = 0
+#             newBinYlow = histCopy.GetYaxis().GetBinLowEdge(newBinY)
+#             newBinYhigh = histCopy.GetYaxis().GetBinUpEdge(newBinY)
 
-            # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
-            for oldBinY in range(1,thisHist.GetNbinsY()+1):
-                if thisHist.GetYaxis().GetBinLowEdge(oldBinY) >= newBinYlow and thisHist.GetYaxis().GetBinUpEdge(oldBinY) <= newBinYhigh:
-                    # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
-                    # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
-                    newBinContent += thisHist.GetBinContent(binX,oldBinY)
-                    newBinErrorSq += thisHist.GetBinError(binX,oldBinY)**2
+#             # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
+#             for oldBinY in range(1,thisHist.GetNbinsY()+1):
+#                 if thisHist.GetYaxis().GetBinLowEdge(oldBinY) >= newBinYlow and thisHist.GetYaxis().GetBinUpEdge(oldBinY) <= newBinYhigh:
+#                     # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
+#                     # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
+#                     newBinContent += thisHist.GetBinContent(binX,oldBinY)
+#                     newBinErrorSq += thisHist.GetBinError(binX,oldBinY)**2
 
-            # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
-            if newBinContent > 0:
-                histCopy.SetBinContent(binX,newBinY,newBinContent)
-                histCopy.SetBinError(binX,newBinY,sqrt(newBinErrorSq))
+#             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
+#             if newBinContent > 0:
+#                 histCopy.SetBinContent(binX,newBinY,newBinContent)
+#                 histCopy.SetBinError(binX,newBinY,sqrt(newBinErrorSq))
 
-    return histCopy
+#     return histCopy
 
 def copyHistWithNewXbins(thisHist,newXbins,copyName,oldBinWidth):
     # Make a copy with the same Y bins but new X bins
@@ -133,12 +133,17 @@ def copyHistWithNewXbins(thisHist,newXbins,copyName,oldBinWidth):
             new_bin_max = hist_copy.GetXaxis().GetBinUpEdge(xbin)
 
             # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
+            bins_added = 0
             for old_xbin in range(1,thisHist.GetNbinsX()+1):
                 if thisHist.GetXaxis().GetBinLowEdge(old_xbin) >= new_bin_min and thisHist.GetXaxis().GetBinUpEdge(old_xbin) <= new_bin_max:
                     # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
                     # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
+                    bins_added +=1
                     new_bin_content += thisHist.GetBinContent(old_xbin,ybin)
                     new_bin_errorsq += thisHist.GetBinError(old_xbin,ybin)**2
+
+            new_bin_content /= bins_added
+            new_bin_errorsq /= bins_added
 
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             if new_bin_content > 0:
@@ -184,12 +189,17 @@ def copyHistWithNewYbins(thisHist,newYbins,copyName,oldBinWidth):
             new_bin_max = hist_copy.GetYaxis().GetBinUpEdge(ybin)
 
             # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
+            bins_added = 0
             for old_ybin in range(1,thisHist.GetNbinsY()+1):
                 if thisHist.GetYaxis().GetBinLowEdge(old_ybin) >= new_bin_min and thisHist.GetYaxis().GetBinUpEdge(old_ybin) <= new_bin_max:
                     # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
                     # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
+                    bins_added += 1
                     new_bin_content += thisHist.GetBinContent(xbin,old_ybin)
                     new_bin_errorsq += thisHist.GetBinError(xbin,old_ybin)**2
+
+            new_bin_content /= bins_added
+            new_bin_errorsq /= bins_added
 
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             if new_bin_content > 0:
@@ -459,7 +469,7 @@ def dictToLatexTable(dict2convert,outfilename,roworder=[],columnorder=[]):
     latexout.close()
 
 
-def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False):  
+def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False,datastyle='pe'):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -545,8 +555,11 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
             if dataOff:
                 alpha = 0
             hist.SetLineColorAlpha(kBlack,alpha)
-            hist.SetMarkerColorAlpha(kBlack,alpha)
-            hist.SetMarkerStyle(8)
+            if 'pe' in datastyle.lower():
+                hist.SetMarkerColorAlpha(kBlack,alpha)
+                hist.SetMarkerStyle(8)
+            if 'hist' in datastyle.lower():
+                hist.SetFillColorAlpha(0,0)
             
             # If there are no backgrounds, only plot the data (semilog if desired)
             if len(bkglist) == 0:
@@ -554,7 +567,7 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                 hist.GetYaxis().SetTitle(ytitle)
                 if len(titles) > 0:
                     hist.SetTitle(titles[hist_index])
-                hist.Draw('p e')
+                hist.Draw(datastyle)
             
             # Otherwise...
             else:
@@ -634,7 +647,7 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                 hist.GetYaxis().SetTitleSize(mLS)
                 if logy == True:
                     hist.SetMinimum(1e-3)
-                hist.Draw('pe')
+                hist.Draw(datastyle)
 
                 stacks[hist_index].Draw('same hist')
 
@@ -654,8 +667,8 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                 # legends[hist_index].Draw()
 
                 if not dataOff:
-                    legends[hist_index].AddEntry(hist,'data','p')
-                    hist.Draw('p e same')
+                    legends[hist_index].AddEntry(hist,'data',datastyle)
+                    hist.Draw(datastyle+' same')
 
                 gPad.RedrawAxis()
 
@@ -667,7 +680,7 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                 pulls[hist_index].SetTitle(";"+hist.GetXaxis().GetTitle()+";(Data-Bkg)/#sigma")
                 pulls[hist_index].SetStats(0)
 
-                LS = .13
+                LS = .09
 
                 pulls[hist_index].GetYaxis().SetRangeUser(-2.9,2.9)
                 pulls[hist_index].GetYaxis().SetTitleOffset(0.4)
