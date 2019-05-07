@@ -1873,7 +1873,7 @@ class TwoDAlphabet:
         return histDict
 
 # WRAPPER FUNCTIONS
-def runMLFit(twoDs):
+def runMLFit(twoDs,rMin,rMax):
     # Set verbosity - chosen from first of configs
     verbose = ''
     if twoDs[0].verbosity != False:
@@ -1889,7 +1889,7 @@ def runMLFit(twoDs):
                         syst_option = ''                                           # with non-zero systematics, turn them on
 
     # Set signal strength range - chosen from first of configs
-    sig_option = ' --rMin 0 --rMax 5'
+    sig_option = ' --rMin '+rMin+' --rMax '+rMax
     # if twoDs[0].signalOff:
     #     sig_option = ' --rMin 0 --rMax 0'
 
