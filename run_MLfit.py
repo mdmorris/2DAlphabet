@@ -1,16 +1,45 @@
 from TwoDAlphabetClass import TwoDAlphabet, runMLFit
 import sys, traceback
+from optparse import OptionParser
 import subprocess
 import header
 import ROOT
 from ROOT import *
 
-inputConfigs = sys.argv[1:]
-quicktag = False
-for i,c in enumerate(inputConfigs):
-    if 'tag=' in c:
-        quicktag = c.split('=')[1]
-        inputConfigs.pop(i)
+parser = OptionParser()
+
+parser.add_option('-q', '--tag', metavar='F', type='string', action='store',
+                default =   '',
+                dest    =   'quicktag',
+                help    =   'Assigns a tag for this run')
+parser.add_option('--rMin', metavar='F', type='string', action='store',
+                default =   '0',
+                dest    =   'rMin',
+                help    =   'Minimum bound on r (signal strength)')
+parser.add_option('--rMax', metavar='F', type='string', action='store',
+                default =   '5',
+                dest    =   'rMax',
+                help    =   'Minimum bound on r (signal strength)')
+parser.add_option("--recycleAll", action="store_true", 
+                default =   False,
+                dest    =   "recycleAll",
+                help    =   "Recycle everything from the previous run with this tag")
+parser.add_option("--skipFit", action="store_true", 
+                default =   False,
+                dest    =   "skipFit",
+                help    =   "Skip fit and go directly to plotting (WARNING: Will use previous fit result if it exists and crash otherwise)")
+
+(options, args) = parser.parse_args()
+
+inputConfigs = args
+
+print 'Setting on-fly parameters:'
+print '\ttag\t\t = '+options.quicktag
+print '\trecycleAll\t = '+str(options.recycleAll)
+print '\tskipFit\t\t = '+str(options.skipFit)
+print 'Remaining arguments:'
+for i in inputConfigs:
+    print '\t'+i
 
 twoDinstances = []
 
@@ -18,7 +47,7 @@ twoDinstances = []
 if len(inputConfigs) > 1:
     # Instantiate all class instances
     for i in inputConfigs:
-        instance = TwoDAlphabet(i,quicktag)
+        instance = TwoDAlphabet(i,options.quicktag,options.recycleAll)
         twoDinstances.append(instance)
 
     # For each instance, check tags match and if they don't, ask the user for one
@@ -42,7 +71,8 @@ if len(inputConfigs) > 1:
         for num in range(1,len(twoDinstances)+1):
             subprocess.call(["sed -i 's/ch"+str(num)+"_//g' card_"+thistag+".txt"],shell=True)
 
-    runMLFit(twoDinstances)
+    if not options.skipFit:
+        runMLFit(twoDinstances,options.rMin,options.rMax)
 
     # Plot
     for t in twoDinstances:
@@ -61,8 +91,10 @@ if len(inputConfigs) > 1:
 
 # If single fit
 else:
-    instance = TwoDAlphabet(inputConfigs[0],quicktag)
-    runMLFit([instance])
+    instance = TwoDAlphabet(inputConfigs[0],options.quicktag,options.recycleAll)
+    
+    if not skipFit:
+        runMLFit([instance],options.rMin,options.rMax)
     thistag = instance.projPath
 
     # Plot

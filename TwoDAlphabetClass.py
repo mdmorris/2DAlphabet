@@ -30,7 +30,7 @@ class TwoDAlphabet:
         pass
 
     # Initialization setup to just build workspace. All other steps must be called with methods
-    def __init__ (self,jsonFileName,quicktag=False,stringSwaps={}): # jsonFileNames is a list
+    def __init__ (self,jsonFileName,quicktag=False,recycleAll=False,stringSwaps={}): # jsonFileNames is a list
         self.allVars = []    # This is a list of all RooFit objects made. It never gets used for anything but if the
                         # objects never get saved here, then the python memory management will throw them out
                         # because of conflicts with the RooFit memory management. It's a hack.
@@ -77,7 +77,7 @@ class TwoDAlphabet:
         self.projPath = self._projPath()
 
         # Pickle reading if recycling
-        if self.recycle != []:
+        if self.recycle != [] or recycleAll:
             self.pickleFile = pickle.load(open(self.projPath+'saveOut.p','rb'))
         
         # Dict to pickle at the end
@@ -90,13 +90,13 @@ class TwoDAlphabet:
         # Replace signal with command specified
 
         # Global var replacement
-        if 'runConfig' not in self.recycle:
+        if not recycleAll or 'runConfig' not in self.recycle:
             self._configGlobalVarReplacement()
         else:
             self.inputConfig = self._readIn('runConfig')
 
         # Get binning for three categories
-        if not ('newXbins' in self.recycle and 'newYbins' in self.recycle):
+        if not ('newXbins' in self.recycle and 'newYbins' in self.recycle) and not recycleAll:
             self.newXbins, self.newYbins, self.oldXwidth, self.oldYwidth = self._getBinning(self.inputConfig['BINNING']) # sets self.new*bins (list of user specified bins or False if none specified)
         else:
             self.newXbins = self._readIn('newXbins')
@@ -112,21 +112,21 @@ class TwoDAlphabet:
         print self.full_x_bins
 
         # Make systematic uncertainty plots
-        if self.plotUncerts:
+        if self.plotUncerts and not recycleAll:
             self._makeSystematicPlots()
 
         # Run pseudo2D for fit guesses and make the config to actually run on
-        if self.fitGuesses and "runConfig" not in self.recycle:
+        if self.fitGuesses and ("runConfig" not in self.recycle and not recycleAll):
             self._makeFitGuesses()
 
         # Initialize rpf class
-        if 'organizedDict' not in self.recycle:
+        if 'organizedDict' not in self.recycle and not recycleAll:
         #     self.rpf = self._readIn('rpf')
         # else:
             self.rpf = RpfHandler.RpfHandler(self.inputConfig['FIT'],self.name)
 
         # Organize everything for workspace building
-        if 'organizedDict' in self.recycle:
+        if 'organizedDict' in self.recycle or recycleAll:
             self.organizedDict = self._readIn('organizedDict')
             self.orgFile = TFile.Open(self.projPath+'organized_hists.root') # have to save out the histograms to keep them persistent past this function
         else:
@@ -135,19 +135,20 @@ class TwoDAlphabet:
             self._inputOrganizer()
 
         # Build the workspace
-        if 'workspace' in self.recycle:
+        if 'workspace' in self.recycle or recycleAll:
             self.workspace = self._readIn('workspace')
             self.floatingBins = self._readIn('floatingBins')
         else:
             self._buildFitWorkspace()
 
         # Make the card
-        if 'card' not in self.recycle:
+        if 'card' not in self.recycle and not recycleAll:
             self._makeCard()
 
         # Save out at the end
-        self._saveOut()
-        pickle.dump(self.pickleDict, open(self.projPath+'saveOut.p','wb'))
+        if not recycleAll:
+            self._saveOut()
+            pickle.dump(self.pickleDict, open(self.projPath+'saveOut.p','wb'))
 
         # Very last thing - get a seg fault otherwise
         del self.workspace
