@@ -1574,7 +1574,7 @@ class TwoDAlphabet:
             if isSignal and fittag != 's':
                 continue
             else:
-                header.makeCan('fit_'+fittag+'/'+process+'_fit'+fittag+'_2D',self.projPath,twoDList,xtitle=self.xVarTitle,ytitle=self.xVarTitle)
+                header.makeCan('fit_'+fittag+'/'+process+'_fit'+fittag+'_2D',self.projPath,twoDList,xtitle=self.xVarTitle,ytitle=self.yVarTitle)
 
         # Invert the last two items (unique to b*) - customize as needed
         process_list[-1],process_list[-2] = process_list[-2],process_list[-1]
@@ -1662,8 +1662,8 @@ class TwoDAlphabet:
                             else:
                                 prepostcolors = [kYellow]
 
-                    if 'x' in plotType: header.makeCan('fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=self.xVarTitle)
-                    if 'y' in plotType: header.makeCan('fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=self.yVarTitle)
+                    if 'x' in plotType: header.makeCan('fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=self.xVarTitle,datastyle='histe')
+                    if 'y' in plotType: header.makeCan('fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=self.yVarTitle,datastyle='histe')
 
 
         ##############
@@ -1932,15 +1932,15 @@ def runMLFit(twoDs):
             print "Combine failed and never made fitDiagnostics.root. Quitting..."
             quit()
 
-        print 'Executing PostFitShapes2D -d '+card_name+' -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
-        subprocess.call(['PostFitShapes2D -d '+card_name+' -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'], shell=True)
-        print 'Executing PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
-        subprocess.call(['PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'], shell=True)
-        print 'Executing python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnostics.root --abs -g nuisance_pulls.root'
-        subprocess.call(['python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnostics.root --abs -g nuisance_pulls.root'], shell=True)
+        bshapes_cmd = 'PostFitShapes2D -d '+card_name+' -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
+        header.executeCmd(bshapes_cmd)
+        sshapes_cmd = 'PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
+        header.executeCmd(sshapes_cmd)
+        diffnuis_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnostics.root --abs -g nuisance_pulls.root'
+        header.executeCmd(diffnuis_cmd)
 
-        print 'Executing python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py '+card_name+' --all -f html > systematics_table.html'
-        subprocess.call(['Executing python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py '+card_name+' --all -f html > systematics_table.html'],shell=True)
+        systematic_analyzer_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py '+card_name+' --all -f html > systematics_table.html'
+        header.executeCmd(systematic_analyzer_cmd)
 
 def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
     # Set verbosity - chosen from first of configs
@@ -1981,8 +1981,8 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
     # Make a prefit workspace from the data card
     print 'cd '+projDir
     with header.cd(projDir):
-        print 'Executing text2workspace.py -b '+card_name+' -o limitworkspace.root' 
-        subprocess.call(['text2workspace.py -b '+card_name+' -o limitworkspace.root'], shell=True)
+        t2w_cmd = 'text2workspace.py -b '+card_name+' -o limitworkspace.root' 
+        header.executeCmd(t2w_cmd)
 
     # Morph workspace according to imported fit result
     prefit_file = TFile(projDir+'/limitworkspace.root','update')
@@ -2003,19 +2003,20 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
 
     current_dir = os.getcwd()
 
+    aL_cmd = 'combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option# + sig_option 
+
     # Run combine if not on condor
     if location == 'local':    
         print 'cd '+projDir
         with header.cd(projDir):
-            print 'Executing combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option + sig_option 
-            subprocess.call(['combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option + sig_option], shell=True)
+            header.executeCmd(aL_cmd)
     # If on condor, write a script to run (python will then release its memory usage)
     else:
         # Do all of the project specific shell scripting here
         shell_finisher = open('shell_finisher.sh','w')
         shell_finisher.write('#!/bin/sh\n')
         shell_finisher.write('cd '+projDir+'\n')
-        shell_finisher.write('combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option + sig_option+'\n')
+        shell_finisher.write(aL_cmd+'\n')
         shell_finisher.write('cd '+current_dir+'\n')
         shell_finisher.write('tar -czvf '+identifier+'.tgz '+projDir+'/\n')
         shell_finisher.write('cp '+identifier+'.tgz ../../../')
