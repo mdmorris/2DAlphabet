@@ -1873,7 +1873,7 @@ class TwoDAlphabet:
         return histDict
 
 # WRAPPER FUNCTIONS
-def runMLFit(twoDs,rMin,rMax):
+def runMLFit(twoDs,rMin,rMax,skipPlots=False):
     # Set verbosity - chosen from first of configs
     verbose = ''
     if twoDs[0].verbosity != False:
@@ -1932,10 +1932,11 @@ def runMLFit(twoDs,rMin,rMax):
             print "Combine failed and never made fitDiagnostics.root. Quitting..."
             quit()
 
-        bshapes_cmd = 'PostFitShapes2D -d '+card_name+' -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
-        header.executeCmd(bshapes_cmd)
-        sshapes_cmd = 'PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
-        header.executeCmd(sshapes_cmd)
+        if not skipPlots:
+            bshapes_cmd = 'PostFitShapes2D -d '+card_name+' -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
+            header.executeCmd(bshapes_cmd)
+            sshapes_cmd = 'PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
+            header.executeCmd(sshapes_cmd)
         diffnuis_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnostics.root --abs -g nuisance_pulls.root'
         header.executeCmd(diffnuis_cmd)
 

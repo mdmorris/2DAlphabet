@@ -28,6 +28,10 @@ parser.add_option("--skipFit", action="store_true",
                 default =   False,
                 dest    =   "skipFit",
                 help    =   "Skip fit and go directly to plotting (WARNING: Will use previous fit result if it exists and crash otherwise)")
+parser.add_option("--skipPlots", action="store_true", 
+                default =   False,
+                dest    =   "skipPlots",
+                help    =   "Skip plotting")
 
 (options, args) = parser.parse_args()
 
@@ -72,42 +76,44 @@ if len(inputConfigs) > 1:
             subprocess.call(["sed -i 's/ch"+str(num)+"_//g' card_"+thistag+".txt"],shell=True)
 
     if not options.skipFit:
-        runMLFit(twoDinstances,options.rMin,options.rMax)
+        runMLFit(twoDinstances,options.rMin,options.rMax,skipPlots=options.skipPlots)
 
     # Plot
-    for t in twoDinstances:
-        try:
-            t.plotFitResults('b',simfit=True)
-        except Exception as exc:
-            print traceback.format_exc()
-            print exc
-            print 'Failed to run b plots for '+t.name
-        try:
-            t.plotFitResults('s',simfit=True)
-        except Exception as exc:
-            print traceback.format_exc()
-            print exc
-            print 'Failed to run s plots for '+t.name
+    if not options.skipPlots:
+        for t in twoDinstances:
+            try:
+                t.plotFitResults('b',simfit=True)
+            except Exception as exc:
+                print traceback.format_exc()
+                print exc
+                print 'Failed to run b plots for '+t.name
+            try:
+                t.plotFitResults('s',simfit=True)
+            except Exception as exc:
+                print traceback.format_exc()
+                print exc
+                print 'Failed to run s plots for '+t.name
 
 # If single fit
 else:
     instance = TwoDAlphabet(inputConfigs[0],options.quicktag,options.recycleAll)
     
     if not skipFit:
-        runMLFit([instance],options.rMin,options.rMax)
+        runMLFit([instance],options.rMin,options.rMax,skipPlots=options.skipPlots)
     thistag = instance.projPath
 
     # Plot
-    try:
-        instance.plotFitResults('b')
-    except Exception as exc:
-        print traceback.format_exc()
-        print exc
-        print 'Failed to run b plots for '+instance.name
-    try:
-        instance.plotFitResults('s')
-    except Exception as exc:
-        print traceback.format_exc()
-        print exc
-        print 'Failed to run s plots for '+instance.name
+    if not options.skipPlots:
+        try:
+            instance.plotFitResults('b')
+        except Exception as exc:
+            print traceback.format_exc()
+            print exc
+            print 'Failed to run b plots for '+instance.name
+        try:
+            instance.plotFitResults('s')
+        except Exception as exc:
+            print traceback.format_exc()
+            print exc
+            print 'Failed to run s plots for '+instance.name
     
