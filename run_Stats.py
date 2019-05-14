@@ -31,7 +31,7 @@ parser.add_option("--gof",
                 action="store_true", dest="gof", default=False,
                 help="Perform goodness of fit test")
 parser.add_option("--signalInjection", 
-                action="store_true", dest="signalInjection", default=False,
+                action="store", dest="signalInjection", default='',
                 help="Perform signal injection test")
 parser.add_option("--biasStudy", 
                 action="store_true", dest="biasStudy", default=False,
@@ -59,6 +59,9 @@ if not os.path.isdir(projDir):
 
 # Start with tests that only require the projDir and don't do a comparison
 with header.cd(projDir):
+    #######
+    # GOF #
+    #######
     if options.gof:
         if not options.plotOnly:
             commands = []
@@ -170,6 +173,9 @@ if options.biasStudy or options.ftest:
         print altDir +' is not a directory. Quitting...'
         quit()
 
+    ##############
+    # Bias study #
+    ##############
     if options.biasStudy:
         ########################################################################
         # First morph the base workspace to post-fit according to MLfit result #
@@ -182,7 +188,7 @@ if options.biasStudy or options.ftest:
         # Make a prefit workspace from the data card
         print 'cd '+projDir
         with header.cd(projDir):
-            t2w_cmd = 'text2workspace.py -b '+card_name+' -o biasworkspace.root' 
+            t2w_cmd = 'text2workspace.py -b card_'+card_tag+'.txt -o biasworkspace.root' 
             header.executeCmd(t2w_cmd,options.dryrun)
 
             # Morph workspace according to imported fit result
@@ -206,7 +212,7 @@ if options.biasStudy or options.ftest:
             # Now generate toys from this workspace #
             #########################################
             seed = random.randint(100000,999999)
-            gen_command = 'combine -M biasworkspace.root GenerateOnly -t '+options.toys+' --expectSignal 1 --saveToys -m 120 -s '+str(seed)
+            gen_command = 'combine -M biasworkspace.root GenerateOnly -t '+options.toys+' --expectSignal 0 --bypassFrequentistFit --saveToys -m 120 -s '+str(seed)
             header.executeCmd(gen_command)
 
         ######################################################################

@@ -102,7 +102,7 @@ if len(inputConfigs) > 1:
 else:
     instance = TwoDAlphabet(inputConfigs[0],options.quicktag,options.recycleAll)
     
-    if not skipFit:
+    if not options.skipFit:
         runMLFit([instance],options.rMin,options.rMax,skipPlots=options.skipPlots)
     thistag = instance.projPath
 

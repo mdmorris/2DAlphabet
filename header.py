@@ -680,7 +680,7 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                 pulls[hist_index].SetTitle(";"+hist.GetXaxis().GetTitle()+";(Data-Bkg)/#sigma")
                 pulls[hist_index].SetStats(0)
 
-                LS = .09
+                LS = .13
 
                 pulls[hist_index].GetYaxis().SetRangeUser(-2.9,2.9)
                 pulls[hist_index].GetYaxis().SetTitleOffset(0.4)

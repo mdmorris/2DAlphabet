@@ -6,7 +6,9 @@
 
     "OPTIONS": {
         "name":"lin100kv10k",
-        "tag":"unitTest"
+        "tag":"unitTest",
+        "blindedFit":true,
+        "blindedPlots":true
     },
 
     "PROCESS": {
