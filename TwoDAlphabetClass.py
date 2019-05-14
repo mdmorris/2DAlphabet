@@ -29,6 +29,9 @@ class TwoDAlphabet:
     def __init__(self):
         pass
 
+    def __del__(self):
+        del self.workspace
+
     # Initialization setup to just build workspace. All other steps must be called with methods
     def __init__ (self,jsonFileName,quicktag=False,recycleAll=False,stringSwaps={}): # jsonFileNames is a list
         self.allVars = []    # This is a list of all RooFit objects made. It never gets used for anything but if the
@@ -151,7 +154,7 @@ class TwoDAlphabet:
             pickle.dump(self.pickleDict, open(self.projPath+'saveOut.p','wb'))
 
         # Very last thing - get a seg fault otherwise
-        del self.workspace
+        # del self.workspace
 
     # FUNCTIONS USED IN INITIALIZATION
     def _configGlobalVarReplacement(self):

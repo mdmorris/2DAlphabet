@@ -42,6 +42,9 @@ parser.add_option("--ftest",
 parser.add_option("--diagnosticsWithToys", 
                 action="store_true", dest="diagnosticsWithToys", default=False,
                 help="Perform diagnostics with toys")
+parser.add_option("--post", 
+                action="store_true", dest="post", default=False,
+                help="Run in conjunction with diagnosticsWithToys or signalInjection to create plots")
 (options, args) = parser.parse_args()
 
 projDir = options.projDir # home of the workspace - has the cards, fit results, etc
@@ -156,11 +159,70 @@ with header.cd(projDir):
 
         cout.Print('gof_plot.pdf','pdf')
 
+    #########################################
+    # Toy diagnositics and signal injection #
+    #########################################
+    if options.diagnosticsWithToys or options.signalInjection != '':
+        if not options.post:
+            projtag = projDir.split('/')[0]
+            if options.diagnosticsWithToys:
+                expectSignal = '0'
+                run_name = 'diagnosticsWithToys'
+            elif options.signalInjection != '':
+                expectSignal = options.signalInjection
+                run_name = 'signalInjection'+expectSignal
 
-    if options.diagnosticsWithToys:
-        command_to_diagnose = open('FitDiagnostics_command.txt','r').readline()
-        command_to_diagnose += ' -n toys -t '+options.toys+' --toysFrequentist --expectSignal 0 --noErrors --minos none'
-        header.executeCmd(command_to_diagnose,options.dryrun)
+            ########################################################################
+            # First morph the base workspace to post-fit according to MLfit result #
+            ########################################################################
+            # Check if we can import post-fit result made during MLfit step
+            if not os.path.isfile('fitDiagnostics.root'):
+                print 'ERROR: '+projDir+'/fitDiagnostics.root does not exist. Please check that run_MLfit.py finished correctly. Quitting...'
+                quit()
+
+            # Make a prefit workspace from the data card
+            t2w_cmd = 'text2workspace.py -b card_'+card_tag+'.txt -o '+run_name+'workspace.root' 
+            header.executeCmd(t2w_cmd,options.dryrun)
+
+            # Morph workspace according to imported fit result
+            prefit_file = TFile(run_name+'workspace.root','update')
+            postfit_w = prefit_file.Get('w')
+            fit_result_file = TFile.Open('fitDiagnostics.root')
+            fit_result = fit_result_file.Get("fit_b")
+            postfit_vars = fit_result.floatParsFinal()
+
+            for idx in range(postfit_vars.getSize()):
+                par_name = postfit_vars[idx].GetName()
+                if postfit_w.var(par_name):
+                    
+                    var = postfit_w.var(par_name)
+                    var.setVal(postfit_vars[idx].getValV())
+                    for pn in ['fullPoly','splitPoly','cheb','generic']:
+                        if pn in par_name:
+                            var.setError(abs(min(postfit_vars[idx].getError(),postfit_vars[idx].getValV())))
+                            print 'Setting '+par_name+' to '+str(postfit_vars[idx].getValV())+' +/- '+str(abs(min(postfit_vars[idx].getError(),postfit_vars[idx].getValV())))
+                        else:
+                            var.setError(postfit_vars[idx].getError())
+                            print 'Setting '+par_name+' to '+str(postfit_vars[idx].getValV())+' +/- '+str(postfit_vars[idx].getError())
+
+
+            prefit_file.Close()
+
+            #########################################
+            # Now generate toys from this workspace #
+            #########################################
+            seed = random.randint(100000,999999)
+            gen_command = 'combine '+run_name+'workspace.root -M GenerateOnly -t '+options.toys+' --expectSignal '+expectSignal+'  --saveToys -m 120 -s '+str(seed)+' -n '+run_name
+            header.executeCmd(gen_command,options.dryrun)
+            fit_command = 'combine card_'+card_tag+'.txt -M FitDiagnostics -t '+options.toys+' --toysFile higgsCombine'+run_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin -5 --rMax 5 --noErrors --minos none --skipBOnlyFit --bypassFrequentistFit -n '+run_name
+            header.executeCmd(fit_command,options.dryrun)
+
+            # command_to_diagnose = open('FitDiagnostics_command.txt','r').readline()
+            # command_to_diagnose += ' --toysFile -n '+run_name+' -t '+options.toys+' --toysFrequentist --expectSignal 0 --noErrors --minos none'
+        # Need to write bit to plot
+        # else:
+
+ 
 
 # Can run against other models or one model against itself to do a b-only vs s+b comparison
 if options.biasStudy or options.ftest:
@@ -280,7 +342,7 @@ if options.biasStudy or options.ftest:
             header.executeCmd(alt_fit_cmd)
         # Generation
         with header.cd(projDir):
-            gen_cmd = 'combine card_'+card_tag+'.txt -M GenerateOnly --rMax 10.0 --rMin -10.0 --toysFrequentist -t '+options.toys+' --expectSignal 0 --saveToys --seed '+seed
+            gen_cmd = 'combine card_'+card_tag+'.txt -M GenerateOnly --rMax 10.0 --rMin -10.0 --toysFrequentist -t '+options.toys+' --expectSignal 0 --bypassFrequentistFit --saveToys --seed '+seed
             header.executeCmd(gen_cmd)
         # Base fit to toys
             base_toy_fit_cmd = 'combine card_'+card_tag+'.txt -M GoodnessOfFit --rMax 10.0 --rMin -10.0 --algo saturated -t '+options.toys+' --toysFile higgsCombineTest.GenerateOnly.mH120.'+seed+'.root'
