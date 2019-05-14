@@ -1,0 +1,1 @@
+configs/input_dataBsFull16.json configs/input_dataBsFull17.json configs/input_dataBsFull18.json tag=BlindLH1400 dataBsFullLatest /uscms_data/d3/lcorcodi/BStar13TeV/CMSSW_10_2_0/src/BStar13TeV/rootfiles:rootfiles signalLH2000:signalLH1200

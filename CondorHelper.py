@@ -25,6 +25,8 @@ commands = []
 
 print options.args
 
+commands.append('source condor/prep.csh')
+
 # Tar stuff
 if options.inputs != '':
     commands.append("tar czvf tarball.tgz "+options.inputs)
