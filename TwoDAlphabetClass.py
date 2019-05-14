@@ -1187,7 +1187,7 @@ class TwoDAlphabet:
                             binRRV = RooConstVar(fail_bin_name, fail_bin_name, bin_content)
 
                         elif bin_content < 1: # Give larger floating to range to bins with fewer events
-                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,0.1), bin_range_down, 10)
+                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,0.1), 1e-9, 10)
                             print fail_bin_name + ' < 1'
 
                         elif bin_content < 10: # Give larger floating to range to bins with fewer events
@@ -1873,7 +1873,7 @@ class TwoDAlphabet:
         return histDict
 
 # WRAPPER FUNCTIONS
-def runMLFit(twoDs,rMin,rMax,skipPlots=False):
+def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
     # Set verbosity - chosen from first of configs
     verbose = ''
     if twoDs[0].verbosity != False:
@@ -1909,12 +1909,24 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False):
         blind_option = '--text2workspace "--channel-masks" --setParameters' + blind_option
 
     # Set card name and project directory
-    if len(twoDs) > 1:
-        card_name = 'card_'+twoDs[0].tag+'.txt'
-        projDir = twoDs[0].tag
+    if plotOn == '':
+        if len(twoDs) > 1:
+            card_name = 'card_'+twoDs[0].tag+'.txt'
+            projDir = twoDs[0].tag
+        else:
+            card_name = 'card_'+twoDs[0].name+'.txt'
+            projDir = twoDs[0].projPath
     else:
-        card_name = 'card_'+twoDs[0].name+'.txt'
-        projDir = twoDs[0].projPath
+        if len(twoDs) > 1:
+            card_name = 'card_'+plotOn.split('/')[1]+'.txt'
+            projDir = twoDs[0].tag
+
+        else:
+            card_name = 'card_'+plotOn.split('/')[1]+'.txt'
+            projDir = twoDs[0].projPath
+
+        if plotOn[-1] != '/': plotOn_depth = '../'*(len(plotOn.count('/'))+1)
+        else: plotOn_depth = '../'*(len(plotOn.count('/')))
 
     # Run Combine
     print 'cd '+projDir
@@ -1932,16 +1944,27 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False):
             print "Combine failed and never made fitDiagnostics.root. Quitting..."
             quit()
 
-        if not skipPlots:
-            bshapes_cmd = 'PostFitShapes2D -d '+card_name+' -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
-            header.executeCmd(bshapes_cmd)
-            sshapes_cmd = 'PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
-            header.executeCmd(sshapes_cmd)
         diffnuis_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnostics.root --abs -g nuisance_pulls.root'
         header.executeCmd(diffnuis_cmd)
 
         systematic_analyzer_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py '+card_name+' --all -f html > systematics_table.html'
         header.executeCmd(systematic_analyzer_cmd)
+
+    if not skipPlots:
+        if plotOn == '':
+            with header.cd(projDir):
+                bshapes_cmd = 'PostFitShapes2D -d '+card_name+' -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
+                header.executeCmd(bshapes_cmd)
+                sshapes_cmd = 'PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
+                header.executeCmd(sshapes_cmd)
+
+        else:
+            with header.cd(plotOn):
+                print 'Plotting fit result from '+projDir+' onto workspace from '+card_name
+                bshapes_cmd = 'PostFitShapes2D -d '+card_name+' -o postfitshapes_b.root -f '+plotOn_depth+'fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
+                header.executeCmd(bshapes_cmd)
+                sshapes_cmd = 'PostFitShapes2D -d '+card_name+' -o postfitshapes_s.root -f '+plotOn_depth+'fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
+                header.executeCmd(sshapes_cmd)
 
 def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
     # Set verbosity - chosen from first of configs
