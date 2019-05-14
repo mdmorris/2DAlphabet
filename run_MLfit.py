@@ -98,6 +98,9 @@ if len(inputConfigs) > 1:
                 print exc
                 print 'Failed to run s plots for '+t.name
 
+    for t in twoDinstances:
+        del t
+
 # If single fit
 else:
     instance = TwoDAlphabet(inputConfigs[0],options.quicktag,options.recycleAll)
@@ -120,4 +123,6 @@ else:
             print traceback.format_exc()
             print exc
             print 'Failed to run s plots for '+instance.name
+
+    del instance
     
