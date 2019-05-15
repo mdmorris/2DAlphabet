@@ -263,7 +263,7 @@ int main(int argc, char* argv[]) {
       if (datacard != "") {
         TH2F ref = cmb_card.cp().bin({bin}).GetObserved2DShape();
         for (auto & it : pre_shapes[bin]) {
-          it.second = ch::RestoreBinning(it.second, ref);
+          it.second = ch::RestoreBinning2D(it.second, ref);
         }
       }
 
@@ -332,7 +332,7 @@ int main(int argc, char* argv[]) {
       if (datacard != "") {
         TH2F ref = cmb_card.cp().GetObserved2DShape();
         for (auto & it : post_shapes_tot) {
-          it.second = ch::RestoreBinning(it.second, ref);
+          it.second = ch::RestoreBinning2D(it.second, ref);
         }
       }
 
