@@ -322,11 +322,11 @@ int main(int argc, char* argv[]) {
                    : cmb_bkgs.Get2DShapeWithUncertainty();
       std::cout << ">> Doing postfit: TotalSig" << std::endl;
       post_shapes_tot["TotalSig"] =
-          sampling ? cmb_sigs.Get2D2DShapeWithUncertainty(res, samples)
+          sampling ? cmb_sigs.Get2DShapeWithUncertainty(res, samples)
                    : cmb_sigs.Get2DShapeWithUncertainty();
       std::cout << ">> Doing postfit: TotalProcs" << std::endl;
       post_shapes_tot["TotalProcs"] =
-          sampling ? cmb.cp().Get2D2DShapeWithUncertainty(res, samples)
+          sampling ? cmb.cp().Get2DShapeWithUncertainty(res, samples)
                    : cmb.cp().Get2DShapeWithUncertainty();
 
       if (datacard != "") {
@@ -354,7 +354,7 @@ int main(int argc, char* argv[]) {
         // the sampling method or the "wrong" method (assumes no correlations)
         std::cout << ">> Doing postfit: " << bin << "," << proc << std::endl;
         if (skip_proc_errs) {
-          post_shapes[bin][proc] = cmb_proc.GetShape();
+          post_shapes[bin][proc] = cmb_proc.Get2DShape();
         } else {
           post_shapes[bin][proc] =
               sampling ? cmb_proc.Get2DShapeWithUncertainty(res, samples)
