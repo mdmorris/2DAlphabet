@@ -216,9 +216,9 @@ int main(int argc, char* argv[]) {
           cmb.cp().Get2DShapeWithUncertainty();
 
       if (datacard != "") {
-        TH1F ref = cmb_card.cp().GetObserved2DShape();
+        TH2F ref = cmb_card.cp().GetObserved2DShape();
         for (auto & it : pre_shapes_tot) {
-          it.second = ch::RestoreBinning(it.second, ref);
+          it.second = ch::RestoreBinning2D(it.second, ref);
         }
       }
 
@@ -261,7 +261,7 @@ int main(int argc, char* argv[]) {
 
 
       if (datacard != "") {
-        TH1F ref = cmb_card.cp().bin({bin}).GetObserved2DShape();
+        TH2F ref = cmb_card.cp().bin({bin}).GetObserved2DShape();
         for (auto & it : pre_shapes[bin]) {
           it.second = ch::RestoreBinning(it.second, ref);
         }
@@ -305,11 +305,11 @@ int main(int argc, char* argv[]) {
 
     // Calculate the post-fit fractional background uncertainty in each bin
 
-    map<string, map<string, TH1F>> post_shapes;
+    map<string, map<string, TH2F>> post_shapes;
     map<string, TH2F> post_yield_cov;
     map<string, TH2F> post_yield_cor;
 
-    map<string, TH1F> post_shapes_tot;
+    map<string, TH2F> post_shapes_tot;
 
     if(total_shapes){
       post_shapes_tot["data_obs"] = cmb.GetObserved2DShape();
@@ -330,7 +330,7 @@ int main(int argc, char* argv[]) {
                    : cmb.cp().Get2DShapeWithUncertainty();
 
       if (datacard != "") {
-        TH1F ref = cmb_card.cp().GetObserved2DShape();
+        TH2F ref = cmb_card.cp().GetObserved2DShape();
         for (auto & it : post_shapes_tot) {
           it.second = ch::RestoreBinning(it.second, ref);
         }
@@ -382,9 +382,9 @@ int main(int argc, char* argv[]) {
                    : cmb_bin.cp().Get2DShapeWithUncertainty();
 
       if (datacard != "") {
-        TH1F ref = cmb_card.cp().bin({bin}).GetObserved2DShape();
+        TH2F ref = cmb_card.cp().bin({bin}).GetObserved2DShape();
         for (auto & it : post_shapes[bin]) {
-          it.second = ch::RestoreBinning(it.second, ref);
+          it.second = ch::RestoreBinning2D(it.second, ref);
         }
       }
 
