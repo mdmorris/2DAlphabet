@@ -1883,13 +1883,13 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
         verbose = ' -v '+twoDs[0].verbosity
     
     # Set systematics
-    syst_option = ' -S 0' # Default 0 systematics
-    for twoD in twoDs:
-        for proc in twoD.inputConfig['PROCESS'].keys():
-            if type(twoD.inputConfig['PROCESS'][proc]) == dict:
-                if twoD.inputConfig['PROCESS'][proc]['CODE'] == 0:
-                    if len(twoD.inputConfig['PROCESS'][proc]['SYSTEMATICS']) != 0: # If at any point there's a process
-                        syst_option = ''                                           # with non-zero systematics, turn them on
+    #syst_option = ' -S 0' # Default 0 systematics
+    #for twoD in twoDs:
+    #    for proc in twoD.inputConfig['PROCESS'].keys():
+    #        if type(twoD.inputConfig['PROCESS'][proc]) == dict:
+    #            if twoD.inputConfig['PROCESS'][proc]['CODE'] == 0:
+    #                if len(twoD.inputConfig['PROCESS'][proc]['SYSTEMATICS']) != 0: # If at any point there's a process
+    #                    syst_option = ''                                           # with non-zero systematics, turn them on
 
     # Set signal strength range - chosen from first of configs
     sig_option = ' --rMin '+rMin+' --rMax '+rMax
@@ -1933,7 +1933,7 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
 
     # Run Combine
     print 'cd '+projDir
-    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' --saveWithUncertainties '+blind_option+' --saveWorkspace' + syst_option + sig_option +verbose
+    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' --saveWithUncertainties '+blind_option+' --saveWorkspace' + sig_option +verbose #+syst_option -> now out of date
     print 'Executing '+FitDiagnostics_command
 
     with header.cd(projDir):
@@ -1945,6 +1945,8 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
 
         if not os.path.isfile('fitDiagnostics.root'):
             print "Combine failed and never made fitDiagnostics.root. Quitting..."
+            for i in twoDs:
+                del i
             quit()
 
         diffnuis_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnostics.root --abs -g nuisance_pulls.root'
@@ -1956,17 +1958,17 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
     if not skipPlots:
         if plotOn == '':
             with header.cd(projDir):
-                bshapes_cmd = 'PostFit2DShapesFromWorkspace -d '+card_name+' -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
+                bshapes_cmd = 'PostFit2DShapesFromWorkspace -d '+card_name+' -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
                 header.executeCmd(bshapes_cmd)
-                sshapes_cmd = 'PostFit2DShapesFromWorkspace -d '+card_name+' -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
+                sshapes_cmd = 'PostFit2DShapesFromWorkspace -d '+card_name+' -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
                 header.executeCmd(sshapes_cmd)
 
         else:
             with header.cd(plotOn):
                 print 'Plotting fit result from '+projDir+' onto workspace from '+card_name
-                bshapes_cmd = 'PostFit2DShapesFromWorkspace -d '+card_name+' -o postfitshapes_b.root -f '+plotOn_depth+'fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
+                bshapes_cmd = 'PostFit2DShapesFromWorkspace -d '+card_name+' -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f '+plotOn_depth+'fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
                 header.executeCmd(bshapes_cmd)
-                sshapes_cmd = 'PostFit2DShapesFromWorkspace -d '+card_name+' -o postfitshapes_s.root -f '+plotOn_depth+'fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
+                sshapes_cmd = 'PostFit2DShapesFromWorkspace -d '+card_name+' -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f '+plotOn_depth+'fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
                 header.executeCmd(sshapes_cmd)
 
 def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
