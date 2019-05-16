@@ -1259,6 +1259,8 @@ class TwoDAlphabet:
                     #     getattr(self.workspace,'import')(rooObj,RooFit.RecycleConflictNodes(),RooFit.Silence())
                     # else:
                     for itemkey in rooObj.keys():
+                        if self.workspace.obj(rooObj[itemkey].GetName()):
+                            continue
                         print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat + ', ' + itemkey
                         getattr(self.workspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes(),RooFit.Silence())
                 
@@ -1270,6 +1272,8 @@ class TwoDAlphabet:
                         #     getattr(self.workspace,'import')(rooObj,RooFit.RecycleConflictNodes(),RooFit.Silence())
                         # else:
                         for itemkey in rooObj.keys():
+                            if self.workspace.obj(rooObj[itemkey].GetName()):
+                                continue
                             print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat  +', ' +dist+ ', ' + itemkey
                             getattr(self.workspace,'import')(rooObj[itemkey])#,RooFit.RecycleConflictNodes(),RooFit.Silence())
 
@@ -1933,7 +1937,7 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
 
     # Run Combine
     print 'cd '+projDir
-    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' --saveWithUncertainties '+blind_option+' --saveWorkspace' + sig_option +verbose #+syst_option -> now out of date
+    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace' + sig_option +verbose #+syst_option -> now out of date
     print 'Executing '+FitDiagnostics_command
 
     with header.cd(projDir):
