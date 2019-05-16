@@ -1958,17 +1958,17 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
     if not skipPlots:
         if plotOn == '':
             with header.cd(projDir):
-                bshapes_cmd = 'PostFit2DShapesFromWorkspace -d '+card_name+' -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
+                bshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
                 header.executeCmd(bshapes_cmd)
-                sshapes_cmd = 'PostFit2DShapesFromWorkspace -d '+card_name+' -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
+                sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
                 header.executeCmd(sshapes_cmd)
 
         else:
             with header.cd(plotOn):
                 print 'Plotting fit result from '+projDir+' onto workspace from '+card_name
-                bshapes_cmd = 'PostFit2DShapesFromWorkspace -d '+card_name+' -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f '+plotOn_depth+'fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
+                bshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f '+plotOn_depth+'fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
                 header.executeCmd(bshapes_cmd)
-                sshapes_cmd = 'PostFit2DShapesFromWorkspace -d '+card_name+' -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f '+plotOn_depth+'fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
+                sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f '+plotOn_depth+'fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
                 header.executeCmd(sshapes_cmd)
 
 def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
