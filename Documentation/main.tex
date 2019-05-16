@@ -7,6 +7,10 @@
 \usepackage{indentfirst}
 \usepackage{titlesec}
 \usepackage{hyperref}
+\usepackage{listings}
+\usepackage{courier}
+
+\lstset{basicstyle=\footnotesize\ttfamily,breaklines=true}
 \usepackage[margin=0.5in]{geometry}
 
 \usepackage [autostyle, english = american]{csquotes}
@@ -55,25 +59,46 @@
     %     \item \verb"scram b -j 10"
     %     \item \verb"cmsenv"
     % \end{itemize}
+
+    2D Alphabet has only been tested in a CMSSW environment. The Higgs Analysis Combine Tool must be installed. Please follow the instructions below to checkout a 2D Alphabet friendly version of Combine. These instructions are based off of the Combine documentation \footnote{\verb"http://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/"} for 102X setup. Please cross-check the instructions here with those for new instructions should they change.
+
+
+
+    \begin{lstlisting}[language=csh]
+        set SCRAM_ARCH=slc7_amd64_gcc700
+        cmsrel CMSSW_10_2_13
+        cd CMSSW_10_2_13/src
+        cmsenv
+        git clone https://github.com/lcorcodilos/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
+        cd HiggsAnalysis/CombinedLimit
+        cd $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit
+        git fetch origin
+        git checkout v8.0.1
+        scramv1 b clean; scramv1 b
+    \end{lstlisting}
+
+    If the command \verb"combine --help" returns the help menu then you've successfully setup the environment (remember to run \verb"cmsenv" before trying this!).
+
+    Additionally, one needs the accompanying Combine Harvester setup in their \verb"$CMSSW_BASE/src" which can be grabbed and compiled via 
+
+    \begin{lstlisting}
+        wget -O - https://raw.githubusercontent.com/cms-analysis/CombineHarvester/master/CombineTools/scripts/sparse-checkout-ssh.sh | bash
+    \end{lstlisting}
+
+    \subsection{Outdated Instructions for 81X release - DON'T USE. FOR DOCUMENTATION PURPOSE ONLY}
     2D Alphabet has only been tested in a CMSSW environment. The Higgs Analysis Combine Tool must be installed. Please follow the instructions in the Combine documentation \footnote{\verb"https://cms-hcomb.gitbooks.io/combine/content/part1/"} to setup the prerequisite software. If the command \verb"combine --help" returns the help menu then you've successfully setup the environment (remember to run \verb"cmsenv" before trying this!).
 
     Additionally, one needs the accompanying Combine Harvester setup in their \verb"$CMSSW_BASE/src" which can be grabbed and compiled via \verb"git clone https://github.com/cms-analysis/CombineHarvester.git CombineHarvester; scram b".
 
 \section{Installation}
 
-    Once a CMSSW environment with Combine is setup, one can install the 2D Alphabet software. There are two main steps. The first is to clone the master release from \url{https://github.com/lcorcodilos/2DAlphabet}. This can be done by doing
-    \begin{itemize}
-        \item \verb"cd $CMSSW_BASE/src"
-        \item \verb"git clone https://github.com/lcorcodilos/2DAlphabet"
-    \end{itemize}
+    Once a CMSSW environment with Combine is setup, one can install the 2D Alphabet software. Simply clone the master release from \url{https://github.com/lcorcodilos/2DAlphabet}. This can be done by doing
+    \begin{lstlisting}
+        cd $CMSSW_BASE/src
+        git clone https://github.com/lcorcodilos/2DAlphabet
+    \end{lstlisting}
     
-    The second step is to copy several files from the 2D Alphabet release to your Combine directory and re-compile Combine so it can use a new class - RooParametricHist2D - and new plotting code that gives Combine 2D capabilites. You can accomplish this by using the following commands
-    \begin{itemize}
-        \item \verb"cd $CMSSW_BASE/src/2DAlphabet/setup"
-        \item \verb"source run_setup.csh" (tcsh on cmslpc) or \verb"sh run_setup.sh" (bash on lxplus)
-    \end{itemize}
-
-    It's a good idea to make sure there are no errors in this step! (copy or compile related) Run \verb"combine --help" again and try to call RooParametricHist2D in interactive python if you're feeling uneasy and to ensure everything is working. 
+    Run \verb"combine --help" again and try to call RooParametricHist2D in interactive python if you're feeling uneasy and to ensure everything is working. 
 
 \section{How To Run}
     The 2D Alphabet framework is designed to run by calling a single script (\verb"2DAlphabet.py") with a JSON configuration file as input via the command line option \verb"-i". There are several other options that will be discussed later but they are truly "optional" whereas the configuration file is not - so I will discuss that first.

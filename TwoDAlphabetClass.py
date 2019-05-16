@@ -1259,8 +1259,6 @@ class TwoDAlphabet:
                     #     getattr(self.workspace,'import')(rooObj,RooFit.RecycleConflictNodes(),RooFit.Silence())
                     # else:
                     for itemkey in rooObj.keys():
-                        if self.workspace.obj(rooObj[itemkey].GetName()):
-                            continue
                         print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat + ', ' + itemkey
                         getattr(self.workspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes(),RooFit.Silence())
                 
@@ -1272,10 +1270,8 @@ class TwoDAlphabet:
                         #     getattr(self.workspace,'import')(rooObj,RooFit.RecycleConflictNodes(),RooFit.Silence())
                         # else:
                         for itemkey in rooObj.keys():
-                            if self.workspace.obj(rooObj[itemkey].GetName()):
-                                continue
                             print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat  +', ' +dist+ ', ' + itemkey
-                            getattr(self.workspace,'import')(rooObj[itemkey])#,RooFit.RecycleConflictNodes(),RooFit.Silence())
+                            getattr(self.workspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes(),RooFit.Silence())
 
     def _makeCard(self):
         # Recreate file
