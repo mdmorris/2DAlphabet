@@ -10,8 +10,8 @@
 \usepackage{listings}
 \usepackage{courier}
 
-\lstset{basicstyle=\footnotesize\ttfamily,breaklines=true}
-\usepackage[margin=0.5in]{geometry}
+\lstset{basicstyle=\ttfamily,breaklines=true}
+\usepackage[margin=0.4in]{geometry}
 
 \usepackage [autostyle, english = american]{csquotes}
 \MakeOuterQuote{"}
@@ -29,40 +29,28 @@
 \titlespacing{\subsubsection}{0pt}{5pt}{0pt}
 \setlength{\parskip}{1em}
 
-\section{Introduction to the method}
-    As one might expect, the 2D Alphabet background estimation method is a two dimensional version of the Alphabet method. The 1D Alphabet method derives a background estimate in the jet mass signal region by interpolating a pass-to-fail ratio, $R_{P/F}$, from the calculated values in the jet mass sidebands and multiplying the failing distribution in the signal region by this $R_{P/F}$. 
+\section{Introduction}
+\label{sec:intro}
+    2D Alphabet is a wrapper to construct the workspace for a specific type of background estimate, provide input to the Combine Statistical Tool, plot the 2D distributions from the fit result, and provide the infrastructure to test this result. 
 
-    This method has been used successfully in the past. However, if the signal region is wide and the statistics in the high jet mass sideband are low, the background estimate is susceptible to shifts that do not accurately describe the behavior of the background being estimated. Additionally, if the $R_{P/F}$ has a strong dependence on the measurement variable (for example, resonance mass), 1D Alphabet will not be able to accurately predict the background in this variable. The 2D Alphabet method attempts to remedy both of these issues by constraining the shape of the $R_{P/F}$ with the measurement variable as the second dimension.
+    The name of the wrapper is derived from the data driven background estimate performed to estimate combinatorial backgrounds that are otherwise poorly modeled by Monte Carlo simulation. In many cases, the background being modeled is QCD production and as a default, this is the name of the output background produced in plots. However, depending on the selection, there may be other backgrounds accounted for as well such as V+jets. Please see Section \ref{sec:options} for details on how to change the name of this background from "QCD" to something more appropriate.
 
-    Since the 1D Alphabet method requires a fit of the sideband values to interpolate the signal region, the 2D Alphabet method must do the same but in two dimensions. The statistical tool of choice to accomplish this is the Higgs Analysis Combine Tool. The documentation for the tool can be found \href{https://cms-hcomb.gitbooks.io/combine/content/}{here}. 
+    As one might expect, the data driven background estimation method is a two dimensional version of the Alphabet method. The 1D Alphabet method works on the concept of a transfer function for non-resonant backgrounds as a function of variable, $x$, which will be cut on to discriminate signal from background. By defining a descriminator, $D$, one can separate data events based on whether they pass or fail the selection on $D$ (the sets $D_{pass}$ and $D_{fail}$. Then resonant backgrounds can be subtracted from these selections to get estimates of the non-resonant background. Since the non-resonant background is smooth in $x$ in both the pass and fail, the pass-to-fail ratio should also be smooth (and positive). 
 
-    To be clear, this method is not unique to the $M_{resonance}$ vs $M_jet$ space. It can be used for any analysis if the background being estimated has both a smooth pass-fail ratio in the region of interest and any signal appears as a peak in this region.
+    Using this criteria, one can calculate the per-bin ratios as a function of $x$ outside of the signal selection and then fit for a function, $R_{P/F}(x)$, that interpolates the $x$ signal region. Then those events that fail $D$ and exist in the $x$ signal selection can be multiplied by $R_{P/F}(x)$ to estimate $D_{pass}$ in the signal region.
+
+    This 1D method has been used successfully in the past. However, if the signal region is wide and the statistics in the $x$ sidebands are low, the background estimate is susceptible to shifts that do not accurately describe the behavior of the background being estimated. Additionally, if the $R_{P/F}$ has a strong dependence on the measurement variable (for example, resonance mass), 1D Alphabet will not be able to accurately predict the background in this variable. The 2D Alphabet method attempts to remedy both of these issues by constraining the shape of the $R_{P/F}$ with the measurement variable, $y$, as the second dimension. 
+
+    While fitting for this surface, it's convenient to also fit for other background contributions. For example, say an analysis has as its main backgrounds QCD and $Bkg_A$. $Bkg_A$ modeled well enough by simulation that the MC can be used directly. However, there may be a recommendation to fit for some MC-to-data corrections given a systematic uncertainty (for example, this is the recommendation for top $p_{T}$ reweighting for $t\bar{t}$ MC). This means that the contribution of $Bkg_A$ can change and therefore, the amount subtracted from data to form the initial QCD estimate in the $x$ sidebands can change! Thus, QCD and $Bkg_A$ are fit simultaneously to derive a total background estimate. The details of accounting for systematic uncertainties are explained in Section \ref{sec:syst}.
+
+    A useful feature of the 2D Alphabet setup is that multiple pairs of pass and fail distributions (called "Alphabet pairs") can be fit simultaneously. For example, one can setup this estimate for 2016, 2017, and 2018 data and selections (three pairs of pass and fail) and then fit all three at the same time with nuisance parameters easily correlated across pairs. 
+
+    The statistical tool of choice to accomplish this is the Higgs Analysis Combine Tool. The documentation for the tool can be found \href{https://cms-hcomb.gitbooks.io/combine/content/}{\textbf{here}}. One significant addition is made to the central Combine release to make Combine 2D Alphabet-friendly - the RooParametricHist2D class. This is identical to the RooParametricHist class already provided by Combine but take as input a TH2 instead of a TH1. The accompanying changes to accomodate this class are made in the Combine Tool code. Additionally, code has been added and modified in Combine Harvester (used for plotting) to plot the 2D distributions. User's not interested in development do not need to worry about the specifics of this since calls to RooParametricHist2D are all internal. 
+
+    An example analysis is provided in Section \ref{sec:example} to show possible choices of $D$, $x$, and $y$ and to illustrate the method graphically.
 
 \section{Prerequisites}
-    % The only environement this software has been tested in is CMSSW\textunderscore 7\textunderscore 4\textunderscore 7\textunderscore patch2 on CMSLPC. The Higgs Analysis Combine Tool must be installed. To set this up on CMSLPC, follow the below recipe:
-
-    % \begin{itemize}
-    %     \item \verb"cmsrel CMSSW_7_4_7_patch2"
-    %     \item \verb"cd CMSSW_7_4_7_patch2/src"
-    %     \item \verb"cmsenv"
-    %     \item \verb"scram b -j 10"
-    %     \item \verb"git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git" \verb"HiggsAnalysis/CombinedLimit"
-    %     \begin{itemize}
-    %         \item Your target directory MUST be HiggsAnalysis/CombinedLimit or the package won't compile
-    %         \item There is a git bug that started in the Spring of 2018 that will not allow you to clone using CMSSW\textunderscore 7\textunderscore 4\textunderscore 7\textunderscore patch2. Since it's difficult to get Combine to compile in a different CMSSW release, the workaround is to clone in a newer version of CMSSW and then copy the HiggsAnalysis folder over to CMSSW\textunderscore 7\textunderscore 4\textunderscore 7\textunderscore patch2.
-    %     \end{itemize}
-    %     \item \verb"cd HiggsAnalysis/CombinedLimit"
-    %     \item \verb"git checkout -b <new_branch> origin/74x-root6"
-    %     \item \verb"cat env_standalone.sh | sed 's/=/ /g' | sed 's/export/setenv/g' > env_standalone.csh"
-    %     \item \verb"source env_standalone.csh"
-    %     \item \verb"make -j 8; make"
-    %     \item \verb"scram b -j 10"
-    %     \item \verb"cmsenv"
-    % \end{itemize}
-
-    2D Alphabet has only been tested in a CMSSW environment. The Higgs Analysis Combine Tool must be installed. Please follow the instructions below to checkout a 2D Alphabet friendly version of Combine. These instructions are based off of the Combine documentation \footnote{\verb"http://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/"} for 102X setup. Please cross-check the instructions here with those for new instructions should they change.
-
-
+    2D Alphabet has only been tested in a CMSSW environment. The Higgs Analysis Combine Tool must be installed. Please follow the instructions below to checkout a 2D Alphabet-friendly version of Combine. These instructions are based off of the Combine documentation \footnote{\verb"http://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/"} for 102X setup. Please cross-check the instructions here with the official instructions. The only difference should be in the cloned repository and lack of branch change.
 
     \begin{lstlisting}[language=csh]
         set SCRAM_ARCH=slc7_amd64_gcc700
@@ -72,12 +60,11 @@
         git clone https://github.com/lcorcodilos/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
         cd HiggsAnalysis/CombinedLimit
         cd $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit
-        git fetch origin
-        git checkout v8.0.1
         scramv1 b clean; scramv1 b
+        cmsenv
     \end{lstlisting}
 
-    If the command \verb"combine --help" returns the help menu then you've successfully setup the environment (remember to run \verb"cmsenv" before trying this!).
+    If the command \verb"combine --help" returns the help menu then you've successfully setup the environment.
 
     Additionally, one needs the accompanying Combine Harvester setup in their \verb"$CMSSW_BASE/src" which can be grabbed and compiled via 
 
@@ -85,28 +72,66 @@
         wget -O - https://raw.githubusercontent.com/cms-analysis/CombineHarvester/master/CombineTools/scripts/sparse-checkout-ssh.sh | bash
     \end{lstlisting}
 
-    \subsection{Outdated Instructions for 81X release - DON'T USE. FOR DOCUMENTATION PURPOSE ONLY}
-    2D Alphabet has only been tested in a CMSSW environment. The Higgs Analysis Combine Tool must be installed. Please follow the instructions in the Combine documentation \footnote{\verb"https://cms-hcomb.gitbooks.io/combine/content/part1/"} to setup the prerequisite software. If the command \verb"combine --help" returns the help menu then you've successfully setup the environment (remember to run \verb"cmsenv" before trying this!).
+    % \subsection{Outdated Instructions for 81X release - DON'T USE. FOR DOCUMENTATION PURPOSE ONLY}
+    % 2D Alphabet has only been tested in a CMSSW environment. The Higgs Analysis Combine Tool must be installed. Please follow the instructions in the Combine documentation \footnote{\verb"https://cms-hcomb.gitbooks.io/combine/content/part1/"} to setup the prerequisite software. If the command \verb"combine --help" returns the help menu then you've successfully setup the environment (remember to run \verb"cmsenv" before trying this!).
 
-    Additionally, one needs the accompanying Combine Harvester setup in their \verb"$CMSSW_BASE/src" which can be grabbed and compiled via \verb"git clone https://github.com/cms-analysis/CombineHarvester.git CombineHarvester; scram b".
+    % Additionally, one needs the accompanying Combine Harvester setup in their \verb"$CMSSW_BASE/src" which can be grabbed and compiled via \verb"git clone https://github.com/cms-analysis/CombineHarvester.git CombineHarvester; scram b".
 
 \section{Installation}
 
-    Once a CMSSW environment with Combine is setup, one can install the 2D Alphabet software. Simply clone the master release from \url{https://github.com/lcorcodilos/2DAlphabet}. This can be done by doing
+    Once a CMSSW environment with Combine is setup, one can install the 2D Alphabet software by simply cloning the master release from \url{https://github.com/lcorcodilos/2DAlphabet}. This can be done by doing
     \begin{lstlisting}
         cd $CMSSW_BASE/src
         git clone https://github.com/lcorcodilos/2DAlphabet
     \end{lstlisting}
     
-    Run \verb"combine --help" again and try to call RooParametricHist2D in interactive python if you're feeling uneasy and to ensure everything is working. 
+    Try to call RooParametricHist2D in interactive python if you're feeling uneasy and to ensure everything is working. 
 
 \section{How To Run}
-    The 2D Alphabet framework is designed to run by calling a single script (\verb"2DAlphabet.py") with a JSON configuration file as input via the command line option \verb"-i". There are several other options that will be discussed later but they are truly "optional" whereas the configuration file is not - so I will discuss that first.
+    The 2D Alphabet framework is designed to run by calling a one of a set of python scripts all with the prefix \verb"run_". The simplest and most important of these is \verb"run_MLfit.py". 
+
+    \subsection{Using run\_MLfit.py}
+        This script takes as input a list of JSON configuration files (detailed in Section \ref{sec:configs}) via a command such as
+
+        \begin{lstlisting}[language=python]
+            python run_MLfit.py input_config1.json input_config2.json ... input_configN.json
+        \end{lstlisting}
+
+        where \verb"input_config*.json" are the configurations for each Alphabet pair. Based on the input from the JSON files, the \verb"run_MLfit.py" grabs all distributions, generates the RooFit objects from them, creates the pass and fail distributions of the QCD/non-resonant background estimated from data, passes these all to Combine, calls Combine, interprets the fit result, and plots the post-fit distributions. It also outputs additional plots and read-out for debugging or reference. \verb"run_MLfit.py" creates the starting point for all other \verb"run_" scripts because it
+        \begin{itemize}
+            \item Takes us from pre-fit (where we know little about the total background estimate) to post-fit where background estimate is meaningful,
+            \item Creates a directory where all of the information of the run can be stored and accessed for later use.
+        \end{itemize}
+
+        Thus, \verb"run_MLfit.py" should be run before the other scripts whenever attempting to fit a new Alphabet pair or a new set of pairs.
+
+        Other possible command line options are provided below.
+
+        \begin{itemize}
+            \item \textbf{\verb"-q, --tag"}: Assigns a tag for the run. This takes precendent over tags defined in configuration files and is a good way to make sure you don't overwrite an old run result by coming up with a new tag quickly.
+            \item \textbf{\verb"--rMin/--rMax"}: These are the minimum and maximum bounds of the signal strength (r) in the fit. They default to 0 and 5, respectively. It may be useful to loosen or tighten the bounds if the fit is failing near one of the boundaries.
+            \item \textbf{\verb"--recycleAll"}: Recycles everything generated in the previous run using the given tag (either by the --tag option or within the configuration file(s)). This means the construction of the workspace, fit guesses, and other steps previous to the fit are skipped and the previous run versions are loaded instead. Use this if you haven't changed your configuration file and would like to speed things up.
+            \item \textbf{\verb"--skipFit"}: Skips running the fit and goes directly to plotting.
+            \item \textbf{\verb"--skipPlots"}: Skips running the plots. Sometimes this is the part that takes the longest because a sampling method is used to estimate errors.
+        \end{itemize}
+
+    \subsection{Using run\_Limit.py}
+        This script or is for calculating limits on the signal strength ($r$) of a given simulated signal. The script takes the background only fit result (\verb"fit_b") output from \verb"run_MLfit.py", morphs a copy of the pre-fit workspace to this result (thus bypassing having to perform a likelihood fit again), generates toys from the background estimate of the morphed pre-fit workspace to create pseudo-data, and fits these toys to derive expected limits for the simulated signal (blinding can be turned off so that the real data is also fit to get an observed limit on $r$). 
+
+        Because the background only fit result is used, the signal simulation used in the configuration file for the \verb"run_MLfit.py" does not matter. However, the signal for limit setting obviously matters and in all likelihood (no pun intended), the user will want to scan over several simulated signals to generate limits as a function of their samples (perhaps each one was generated at a different mass). 
+
+        You do NOT have to write a configuration file for each simulated sample. At any point in the python call to \verb"run_Limit.py", one can provide a string swap specified by the syntax \verb"oldString:newString" which will replace all instances of \verb"oldString" in the configuration files provided with \verb"newString".
+
+    \subsection{Using run\_Impacts.py}
+
+    \subsection{Using run\_Stats.py}
 
     \subsection{JSON Configuration}
-        While I've tried to keep the format of the JSON configuration file obvious, it's not fair to assume that everyone else will feel the same way. I've included "HELP" keys in dictionaries where I felt I could easily explain the formatting. You may delete these entries in your configuration file if you'd like. This section is a necessary supplement to those HELP keys. Please note that I may use phrases like, "The key 'HELP' is defined inside 'PROCESS'." I'm aware this is not correct since "PROCESS" is a key for a dictionary which has a key "HELP" and so "HELP" can't be "inside" "PROCESS" but it simplifies the explanation so I'm going to roll with it.  
+        While I've tried to keep the format of the JSON configuration file obvious, it's not fair to assume that everyone else will feel the same way. I've included "HELP" keys in dictionaries where I felt I could easily explain the formatting. You may delete these entries in your configuration file if you'd like. This section is a necessary supplement to those HELP keys. 
 
-        The goal of the JSON is to have an easily configurable input that allows the 2D Alphabet software to read and organize analysis files and histograms to its liking while also giving the user the ability to easily configure values like bin sizes and ranges without lots of command line options. This means that while the user is encouraged to add what they need, there are some keys and values that must stay the same. \textbf{These static strings are always in capital letters to make them easy to distinguish.} I'll now describe what each of the five static sections is designed for.
+        Disclaimer: I may use phrases like, "The key 'HELP' is defined inside 'PROCESS'." I'm aware this is not correct since "PROCESS" is a key for a dictionary which has a key "HELP" and so "HELP" can't be "inside" "PROCESS" but it simplifies the explanation so it is the convention I'll use.  
+
+        The goal of the JSON is to have an easily configurable input that allows the 2D Alphabet software to read and organize analysis files and histograms to its liking while also giving the user the ability to easily configure values like bin sizes and ranges without lots of command line options. This means that while the user is encouraged to add what they need, there are some keys and values that must stay the same. \textbf{These static strings are always in capital letters to make them easy to distinguish.} The six static sections are described below.
 
         \subsubsection{PROCESS}
             In this section, the user can define as many processes as they need to account for. This includes data, background simulation, and signal simulation. Please note two important things. (1) You should NOT define the background to be estimated via the transfer function (typically QCD). That background is naturally defined by the difference between data and the other backgrounds defined here. If you are attempting to estimate a background that is not QCD, you'll need to make this name change yourself. (2) Combine always requires that there be an observation (data), a background estimate, and a signal sample. This means that your configuration file must contain at a minimum data (code 1) and signal (code 0)\footnotetext{The codes classify the processes and are defined below} (it doesn't require a background because the QCD estimate will always exist). 
@@ -242,6 +267,12 @@
 
         	Thus, the user must be careful they don't accidentally use strings in the JSON that are identical to keys in \verb"GLOBAL" but that should be unchanged. This means keys in \verb"GLOBAL" should be descriptive (single character keys would be a bad idea). 
 
+        \subsubsection{OPTIONS}
+            This section is used to supply additional options to the fit that do not fit into any of the other five categories. A description of the possible options and the input they take are described below.
+
+            \begin{itemize}
+                \item 
+            \end{itemize}}
 
     \subsection{Command line options}
         There are several command line options that are currently implemented for use when running 2DAlphabet.py. The most important (and required) is \verb"-i" (\verb"--input") which points to the configuration file which should be named as \verb"input_<tag>.json" where \verb"<tag>" will be the name of the folder where all outputs are saved to keep the user organized.

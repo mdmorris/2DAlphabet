@@ -119,7 +119,7 @@ class TwoDAlphabet:
             self._makeSystematicPlots()
 
         # Run pseudo2D for fit guesses and make the config to actually run on
-        if self.fitGuesses and ("runConfig" not in self.recycle and not recycleAll):
+        if ("runConfig" not in self.recycle and not recycleAll):
             self._makeFitGuesses()
 
         # Initialize rpf class
@@ -154,7 +154,7 @@ class TwoDAlphabet:
             pickle.dump(self.pickleDict, open(self.projPath+'saveOut.p','wb'))
 
         # Very last thing - get a seg fault otherwise
-        # del self.workspace
+        del self.workspace
 
     # FUNCTIONS USED IN INITIALIZATION
     def _configGlobalVarReplacement(self):
@@ -743,7 +743,7 @@ class TwoDAlphabet:
             # Need to take a 2D function and freeze it in one dimension for each y slice
             funcString = header.RFVform2TF1(self.inputConfig['FIT']['FORM'],0)
             yFuncString = '[0]' # since all y dependence will be absorbed by the funcString, there should be no y dependence on each of the parameters and thus we should fit each with a constant
-            nxparams = max([int(param) for param in self.inputConfig['FIT'].keys() if param != 'FORM']) +1
+            nxparams = max([int(param) for param in self.inputConfig['FIT'].keys() if param != 'FORM' and param != 'HELP']) +1
 
         else:
             print 'Fit form not supported in get_fit_guesses.py. Quitting...'
@@ -764,14 +764,14 @@ class TwoDAlphabet:
         pseudo2D_results = TFile.Open(self.projPath+'/pseudo2D_results.root','RECREATE')
         pseudo2D_results.cd()
         for ybin in range(1,Rpf.GetNbinsY()+1):
-            # If doing GFORM, define xFuncString here with y bin center plugged in
-            if 'GFORM' in self.inputConfig['FIT'].keys():
+            # If doing FORM, define xFuncString here with y bin center plugged in
+            if 'FORM' in self.inputConfig['FIT'].keys():
                 thisYBinCenter = Rpf.GetYaxis().GetBinCenter(ybin)
                 xFuncString = funcString.replace('y',str(thisYBinCenter))
 
             fitResults['fitSlice_'+str(ybin)] = TF1('fitSlice_'+str(ybin),xFuncString,0,1)
 
-            if 'GFORM' in self.inputConfig['FIT'].keys():
+            if 'FORM' in self.inputConfig['FIT'].keys():
                 for p in range(nxparams):
                     fitResults['fitSlice_'+str(ybin)].SetParameter(p,self.inputConfig['FIT'][str(p)]['NOMINAL'])
                     fitResults['fitSlice_'+str(ybin)].SetParLimits(p,self.inputConfig['FIT'][str(p)]['MIN'],self.inputConfig['FIT'][str(p)]['MAX'])
@@ -826,38 +826,38 @@ class TwoDAlphabet:
                 header.makeCan('xparam_v_y_'+str(i),self.projPath,chunk,xtitle=self.yVarName)
 
 
-        # Remove old fit values and store new ones in inputConfig
-        print 'Resetting fit parameters in input config'
-
+        # Remove old fit values and store new ones in inputConfig if PFORM else just make the pseudo2D_Rpf for plotting
         pseudo2D_Rpf = TF2('pseudo2D_Rpf',funcString,0,1,0,1)
         paramIndex = 0
 
         if 'FORM' in self.inputConfig['FIT'].keys():
-            self.inputConfig['FIT'] = {'FORM':funcString}
+            # self.inputConfig['FIT'] = {'FORM':funcString}
             for p in range(nxparams):
                 param = 'X'+str(p)+'Y0'
                 pseudo2D_Rpf.SetParameter(paramIndex,fitResults[param])
                 pseudo2D_Rpf.SetParError(paramIndex,fitResults[param+'err'])
-                self.inputConfig['FIT'][str(p)] = {'NOMINAL':None,'MIN':None,'MAX':None}
-                self.inputConfig['FIT'][str(p)]['NOMINAL'] = fitResults[param]
-                self.inputConfig['FIT'][str(p)]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
-                self.inputConfig['FIT'][str(p)]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
-                self.inputConfig['FIT'][str(p)]['ERROR'] = fitResults[param+'err']
+                # self.inputConfig['FIT'][str(p)] = {'NOMINAL':None,'MIN':None,'MAX':None}
+                # self.inputConfig['FIT'][str(p)]['NOMINAL'] = fitResults[param]
+                # self.inputConfig['FIT'][str(p)]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
+                # self.inputConfig['FIT'][str(p)]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
+                # self.inputConfig['FIT'][str(p)]['ERROR'] = fitResults[param+'err']
 
                 paramIndex+=1
 
         elif 'PFORM' in self.inputConfig['FIT'].keys() or ('XPFORM' in self.inputConfig['FIT'].keys() and 'YPFORM' in self.inputConfig['FIT'].keys()):
+            print 'Resetting fit parameters in input config'
             self.inputConfig['FIT'] = {'PFORM':funcString}
             for ix in range(nxparams):
                 for iy in range(nyparams):
                     param = 'X'+str(ix)+'Y'+str(iy)
                     pseudo2D_Rpf.SetParameter(paramIndex,fitResults[param])
                     pseudo2D_Rpf.SetParError(paramIndex,fitResults[param+'err'])
-                    self.inputConfig['FIT'][param] = {'NOMINAL':None,'MIN':None,'MAX':None}
-                    self.inputConfig['FIT'][param]['NOMINAL'] = fitResults[param]
-                    self.inputConfig['FIT'][param]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
-                    self.inputConfig['FIT'][param]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
-                    self.inputConfig['FIT'][param]['ERROR'] = fitResults[param+'err']
+                    if self.fitGuesses != False:
+                        self.inputConfig['FIT'][param] = {'NOMINAL':None,'MIN':None,'MAX':None}
+                        self.inputConfig['FIT'][param]['NOMINAL'] = fitResults[param]
+                        self.inputConfig['FIT'][param]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
+                        self.inputConfig['FIT'][param]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
+                        self.inputConfig['FIT'][param]['ERROR'] = fitResults[param+'err']
 
                     paramIndex+=1
 
@@ -1677,43 +1677,13 @@ class TwoDAlphabet:
         rpf_ynbins = len(self.newYbins)-1
         rpf_zbins = [i/1000. for i in range(0,1001)]
         rpf_samples = TH3F('rpf_samples','rpf_samples',rpf_xnbins, array.array('d',self.full_x_bins), rpf_ynbins, array.array('d',self.newYbins), len(rpf_zbins)-1, array.array('d',rpf_zbins))# TH3 to store samples
-        sample_size = 100
+        sample_size = 500
 
         # Collect all final parameter values
         param_final = fit_result.floatParsFinal()
         coeffs_final = RooArgSet()
         for v in self.rpf.rpfVars.keys():
             coeffs_final.add(param_final.find(v))
-
-        # Save out to a text file and make a re-run config
-        param_out = open(self.projPath+'rpf_params_'+self.name+'.txt','w')
-        rerun_config = header.dictCopy(self.inputConfig)
-        coeffIter_final = coeffs_final.createIterator()
-        coeff_final = coeffIter_final.Next()
-        while coeff_final:
-            # Text file
-            param_out.write(coeff_final.GetName()+': ' + str(coeff_final.getValV()) + ' +/- ' + str(coeff_final.getError())+'\n')
-            # Re run config
-            for k in rerun_config['FIT'].keys():
-                if k in coeff_final.GetName():
-                    rerun_config['FIT'][k]['ERROR'] = coeff_final.getError()
-                    rerun_config['FIT'][k]['NOMINAL'] = coeff_final.getValV()
-                    if coeff_final.getValV() >= 0:
-                        rerun_config['FIT'][k]['MIN'] = coeff_final.getValV()*0.5
-                        rerun_config['FIT'][k]['MAX'] = coeff_final.getValV()*1.5
-                    else:
-                        rerun_config['FIT'][k]['MAX'] = coeff_final.getValV()*0.5
-                        rerun_config['FIT'][k]['MIN'] = coeff_final.getValV()*1.5
-
-            # Next
-            coeff_final = coeffIter_final.Next()
-
-        # Close text file
-        param_out.close()
-        # Write out dictionary
-        rerun_out = open(self.projPath+'rerunConfig.json', 'w')
-        json.dump(rerun_config,rerun_out,indent=2, sort_keys=True)
-        rerun_out.close()
 
         if self.rpf.fitType != 'cheb':
             # Now sample to generate the Rpf distribution
@@ -1954,6 +1924,37 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
 
         systematic_analyzer_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py '+card_name+' --all -f html > systematics_table.html'
         header.executeCmd(systematic_analyzer_cmd)
+
+    # Save out Rp/f to a text file and make a re-run config
+    for twoD in twoDs:
+        param_out = open(twoD.projPath+'rpf_params_'+twoD.name+'.txt','w')
+        rerun_config = header.dictCopy(twoD.inputConfig)
+        coeffIter_final = coeffs_final.createIterator()
+        coeff_final = coeffIter_final.Next()
+        while coeff_final:
+            # Text file
+            param_out.write(coeff_final.GetName()+': ' + str(coeff_final.getValV()) + ' +/- ' + str(coeff_final.getError())+'\n')
+            # Re run config
+            for k in rerun_config['FIT'].keys():
+                if k in coeff_final.GetName():
+                    rerun_config['FIT'][k]['ERROR'] = coeff_final.getError()
+                    rerun_config['FIT'][k]['NOMINAL'] = coeff_final.getValV()
+                    # if coeff_final.getValV() >= 0:
+                    rerun_config['FIT'][k]['MIN'] = coeff_final.getValV()-3*coeff_final.getError()
+                    rerun_config['FIT'][k]['MAX'] = coeff_final.getValV()+3*coeff_final.getError()
+                    # else:
+                    #     rerun_config['FIT'][k]['MAX'] = coeff_final.getValV()*0.5
+                    #     rerun_config['FIT'][k]['MIN'] = coeff_final.getValV()*1.5
+
+            # Next
+            coeff_final = coeffIter_final.Next()
+
+        # Close text file
+        param_out.close()
+        # Write out dictionary
+        rerun_out = open(twoD.projPath+'rerunConfig_fit'+fittag+'.json', 'w')
+        json.dump(rerun_config,rerun_out,indent=2, sort_keys=True)
+        rerun_out.close()
 
     if not skipPlots:
         if plotOn == '':

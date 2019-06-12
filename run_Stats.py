@@ -1,4 +1,4 @@
-import sys, os, time, decimal
+import sys, os, time, decimal, pickle
 import header
 import random
 import ROOT
@@ -18,6 +18,14 @@ parser.add_option("-a", "--altDir", dest="altDir",
                 help="Home of the alternative model that you'd like to compare against the one in projDir")
 parser.add_option("-t", "--toys", dest="toys",default='100',
                 help="Number of toys to generate - fed to combine")
+parser.add_option('--rMin', metavar='F', type='string', action='store',
+                default =   '0',
+                dest    =   'rMin',
+                help    =   'Minimum bound on r (signal strength)')
+parser.add_option('--rMax', metavar='F', type='string', action='store',
+                default =   '5',
+                dest    =   'rMax',
+                help    =   'Minimum bound on r (signal strength)')
 # parser.add_option("-b", "--blind", 
 #                 action="store_false", dest="blind", default=True,
 #                 help="Blinds the signal region in the fit")
@@ -172,6 +180,65 @@ with header.cd(projDir):
                 expectSignal = options.signalInjection
                 run_name = 'signalInjection'+expectSignal
 
+
+
+            # #####################################################################################
+            # # First get the postfit plots and use TotalBkg to make RPH2Ds to generate toys from #
+            # # - Make workspace and card pieces simultaneously                                   #                                                 #
+            # #####################################################################################
+            # toy_gen_workspace = RooWorkspace('w_toys')
+
+            # postfit_plot_file = TFile.Open('postfitshapes_b.root')
+            # folder_iterator = TIter(postfit_plot_file.GetListOfKeys())
+            
+            # channel_key = folder_iterator.Begin() # channel_key = <pass/fail>_<LOW/SIG/HIGH>_<name>_<pre/postfit>
+            # channels = []
+            # while channel_key:
+            #     channelInfo = pickle.load(open(channel_key.GetName().split('_')[2]+'/saveOut.p','r'))
+            #     xvar_name = channelInfo['xVarName']+'_'+channel_key.GetName().split('_')[1]+'_'+channelInfo['name']
+            #     yvar_name = channelInfo['yVarName']+'_'+channelInfo['name']
+
+            #     # Get postfit TotalBkg
+            #     if 'postfit' in channel_key.GetName():
+            #         # Get hist
+            #         this_bkg = postfit_plot_file.Get(channel_key.GetName()+'/TotalBkg')
+            #         this_data = postfit_plot_file.Get(channel_key.GetName()+'/data_obs')
+            #         # Build var list
+            #         xvar = RooRealVar(xvar_name, xvar_name, this_bkg.GetXaxis().GetXmin(), this_bkg.GetXaxis().GetXmax())
+            #         yvar = RooRealVar(yvar_name, yvar_name, this_bkg.GetYaxis().GetXmin(), this_bkg.GetYaxis().GetXmax())
+            #         this_varList = RooArgList(xvar, yvar)
+            #         # Make RDH
+            #         this_bkgRDH = header.makeRDH(this_bkg, this_varList, 'TotalBkg_'+channel_key.GetName().replace('_postfit',''))
+            #         this_dataRDH = header.makeRDH(this_data, this_varList, 'data_obs_'+channel_key.GetName().replace('_postfit',''))
+            #         # Import to workspace
+            #         getattr(toy_gen_workspace,'import')(this_bkgRDH,RooFit.RecycleConflictNodes(),RooFit.Silence())
+            #         getattr(toy_gen_workspace,'import')(this_dataRDH,RooFit.RecycleConflictNodes(),RooFit.Silence())
+
+            #         channels.append(channel_key.GetName().replace('_postfit',''))
+                    
+            #     # Get prefit TotalSig
+            #     elif 'prefit' in channel_key.GetName():
+            #         # Get hist
+            #         this_sig = postfit_plot_file.Get(channel_key.GetName()+'/TotalSig')
+            #         # Build var list
+            #         xvar = RooRealVar(xvar_name, xvar_name, this_sig.GetXaxis().GetXmin(), this_sig.GetXaxis().GetXmax())
+            #         yvar = RooRealVar(yvar_name, yvar_name, this_sig.GetYaxis().GetXmin(), this_sig.GetYaxis().GetXmax())
+            #         this_varList = RooArgList(xvar, yvar)
+            #         # Make RDH
+            #         this_sigRDH = header.makeRDH(this_sig, this_varList, 'TotalSig_'+channel_key.GetName().replace('_prefit',''))
+            #         # Import to workspace
+            #         getattr(toy_gen_workspace,'import')(this_sigRDH,RooFit.RecycleConflictNodes(),RooFit.Silence())
+
+            #     # Next
+            #     channel_key = folder_iterator.Next()
+
+            # toy_gen_workspace.writeToFile('toy_gen_workspace.root',True)          
+            # del toy_gen_workspace
+            # ##################################################################
+            # # Now make a card to reference the workspace and give to Combine #
+            # ##################################################################
+            # header.makeToyCard(channels)
+
             ########################################################################
             # First morph the base workspace to post-fit according to MLfit result #
             ########################################################################
@@ -197,13 +264,13 @@ with header.cd(projDir):
                     
                     var = postfit_w.var(par_name)
                     var.setVal(postfit_vars[idx].getValV())
-                    for pn in ['fullPoly','splitPoly','cheb','generic']:
-                        if pn in par_name:
-                            var.setError(abs(min(postfit_vars[idx].getError(),postfit_vars[idx].getValV())))
-                            print 'Setting '+par_name+' to '+str(postfit_vars[idx].getValV())+' +/- '+str(abs(min(postfit_vars[idx].getError(),postfit_vars[idx].getValV())))
-                        else:
-                            var.setError(postfit_vars[idx].getError())
-                            print 'Setting '+par_name+' to '+str(postfit_vars[idx].getValV())+' +/- '+str(postfit_vars[idx].getError())
+                    # for pn in ['fullPoly','splitPoly','cheb','generic']:
+                    #     if pn in par_name:
+                    #         var.setError(abs(min(postfit_vars[idx].getError(),postfit_vars[idx].getValV())))
+                    #         print 'Setting '+par_name+' to '+str(postfit_vars[idx].getValV())+' +/- '+str(abs(min(postfit_vars[idx].getError(),postfit_vars[idx].getValV())))
+                    #     else:
+                    var.setError(postfit_vars[idx].getError())
+                    print 'Setting '+par_name+' to '+str(postfit_vars[idx].getValV())+' +/- '+str(postfit_vars[idx].getError())
 
 
             prefit_file.Close()
@@ -212,9 +279,9 @@ with header.cd(projDir):
             # Now generate toys from this workspace #
             #########################################
             seed = random.randint(100000,999999)
-            gen_command = 'combine '+run_name+'workspace.root -M GenerateOnly -t '+options.toys+' --expectSignal '+expectSignal+'  --saveToys -m 120 -s '+str(seed)+' -n '+run_name
-            header.executeCmd(gen_command,options.dryrun)
-            fit_command = 'combine card_'+card_tag+'.txt -M FitDiagnostics -t '+options.toys+' --toysFile higgsCombine'+run_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin -5 --rMax 5 --noErrors --minos none --skipBOnlyFit --bypassFrequentistFit -n '+run_name
+            # gen_command = 'combine card_toygen.txt -M GenerateOnly -t '+options.toys+' --expectSignal '+expectSignal+'  --saveToys -m 120 -s '+str(seed)+' -n '+run_name
+            # header.executeCmd(gen_command,options.dryrun)
+            fit_command = 'combine '+run_name+'workspace.root -M FitDiagnostics -t '+options.toys+' --rMin '+options.rMin+' --rMax '+options.rMax+' --noErrors --minos none --skipBOnlyFit -n '+run_name
             header.executeCmd(fit_command,options.dryrun)
 
             # command_to_diagnose = open('FitDiagnostics_command.txt','r').readline()
@@ -285,7 +352,7 @@ if options.biasStudy or options.ftest:
 
         print 'cd '+altDir
         with header.cd(altDir):
-            fit_command = 'combine card_'+altcard_tag+'.txt -M FitDiagnostics --toysFile '+altDir_depth+projDir+'/higgsCombineTest.GenerateOnly.mH120.'+str(seed)+'.root  -t '+options.toys+' --rMin -10 --rMax 10'
+            fit_command = 'combine card_'+altcard_tag+'.txt -M FitDiagnostics --toysFile '+altDir_depth+projDir+'/higgsCombineTest.GenerateOnly.mH120.'+str(seed)+'.root  -t '+options.toys+' --rMin '+options.rMin+' --rMax '+options.rMax
             header.executeCmd(fit_command,options.dryrun)
 
             ################################
@@ -354,8 +421,8 @@ if options.biasStudy or options.ftest:
 
 
         print 'Analyzing F-test results...'
-        base_fstat = FStatCalc(projDir+"/"+base_fit_filename, altDir+"/"+base_fit_filename, base_nrpf_params, alt_nrpf_params, ftest_nbins)
-        toys_fstat = FStatCalc(projDir+"/"+toy_fit_filename, altDir+"/"+toy_fit_filename, base_nrpf_params, alt_nrpf_params, ftest_nbins)
+        base_fstat = header.FStatCalc(projDir+"/"+base_fit_filename, altDir+"/"+base_fit_filename, base_nrpf_params, alt_nrpf_params, ftest_nbins)
+        toys_fstat = header.FStatCalc(projDir+"/"+toy_fit_filename, altDir+"/"+toy_fit_filename, base_nrpf_params, alt_nrpf_params, ftest_nbins)
 
         if len(base_fstat) == 0: base_fstat = [0.0]
         print "base_fstat: ",base_fstat
@@ -443,34 +510,3 @@ if options.biasStudy or options.ftest:
         c.SaveAs(tag+"_ftest.png")
 
 
-def FStatCalc(filename1,filename2,p1,p2,n):
-    print 'Calculating F statistic'
-    print 'Files: ',filename1,filename2
-    print 'Parameters: p1 %f, p2 %f, n %f'%(p1,p2,n)
-    # Flip flop to make sure p2 is always greater than p1 (more parameters should always fit better)
-    if p1 > p2:
-        p1, p2 = p2, p1
-        filename1, filename2 = filename2, filename1
-
-    # Get limit trees from each file
-    file1 = TFile.Open(filename1)
-    tree1 = file1.Get("limit")
-    file2 = TFile.Open(filename2)
-    tree2 = file2.Get("limit")
-    diffs=[]
-    print 'Entries ',tree1.GetEntries(),tree2.GetEntries()
-
-    # Loop over entries and calculate the F statistics
-    for i in range(0,tree1.GetEntries()):
-        tree1.GetEntry(i)
-        tree2.GetEntry(i)
-        print 'Limits ',tree1.limit,tree2.limit
-        if tree1.limit-tree2.limit>0:
-            F = (tree1.limit-tree2.limit)/(p2-p1)/(lTree2.limit/(n-p2))
-            print 'Entry ',i, ":", tree2.limit, "-", tree1.limit, "=", tree2.limit-tree1.limit, "F =", F
-            diffs.append(F)
-        else:
-            print 'WARNING in calculationg of F statistic for entry %i. limit1-limit2 <=0 (%f - %f)' %(i,tree1.limit,tree2.limit)
-
-    print 'Diffs F stat: ',diffs
-    return diffs

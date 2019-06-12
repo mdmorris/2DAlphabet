@@ -97,12 +97,12 @@ class RpfHandler():
             for c in sorted(self.fitDict.keys()):
                 input_param_vals = self.fitDict[c]
                 if c.isdigit():
-                    thisNom = input_param_vals['NOMINAL']
+                    this_nom = input_param_vals['NOMINAL']
                     if 'MIN' in input_param_vals.keys() and 'MAX' in input_param_vals.keys():
                         this_min = input_param_vals['MIN']
                         this_max = input_param_vals['MAX']
                         varname = self.fitType+c+'_'+self.name
-                        self.rpfVars[varname] = RooRealVar(varname, varname, this_nom, this_low, this_high)
+                        self.rpfVars[varname] = RooRealVar(varname, varname, this_nom, this_min, this_max)
 
                         if 'ERROR_UP' in input_param_vals.keys() and 'ERROR_DOWN' in input_param_vals.keys():
                             self.rpfVars[varname].setAsymError(input_param_vals['ERROR_DOWN'],input_param_vals['ERROR_UP'])
@@ -145,7 +145,7 @@ class RpfHandler():
         elif self.fitType == 'fullPoly':
             return self.fitDict['PFORM']
         elif self.fitType == 'generic':
-            nCoeffs = max([int(param) for param in self.fitDict.keys() if param != 'FORM'])+1
+            nCoeffs = max([int(param) for param in self.fitDict.keys() if param != 'FORM' and param != 'HELP'])+1
             gFormula = self.fitDict['FORM'].replace('+x','+@'+str(nCoeffs)).replace('+y','+@'+str(nCoeffs+1))
             gFormula = gFormula.replace('*x','*@'+str(nCoeffs)).replace('*y','*@'+str(nCoeffs+1))
             gFormula = gFormula.replace('-x','-@'+str(nCoeffs)).replace('-y','-@'+str(nCoeffs+1))

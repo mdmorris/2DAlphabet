@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.18 (TeX Live 2017/Debian) (preloaded format=pdflatex 2018.11.2)  16 MAY 2019 15:59
+This is pdfTeX, Version 3.14159265-2.6-1.40.18 (TeX Live 2017/Debian) (preloaded format=pdflatex 2018.11.2)  20 MAY 2019 09:59
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -730,15 +730,15 @@ LaTeX Info: Redefining \nameref on input line 25.
 * layout: <same size as paper>
 * layoutoffset:(h,v)=(0.0pt,0.0pt)
 * modes: 
-* h-part:(L,W,R)=(36.135pt, 542.02501pt, 36.135pt)
-* v-part:(T,H,B)=(36.135pt, 722.7pt, 36.135pt)
+* h-part:(L,W,R)=(28.90755pt, 556.4799pt, 28.90755pt)
+* v-part:(T,H,B)=(28.90755pt, 737.15489pt, 28.90755pt)
 * \paperwidth=614.295pt
 * \paperheight=794.96999pt
-* \textwidth=542.02501pt
-* \textheight=722.7pt
-* \oddsidemargin=-36.135pt
-* \evensidemargin=-36.135pt
-* \topmargin=-73.135pt
+* \textwidth=556.4799pt
+* \textheight=737.15489pt
+* \oddsidemargin=-43.36244pt
+* \evensidemargin=-43.36244pt
+* \topmargin=-80.36244pt
 * \headheight=12.0pt
 * \headsep=25.0pt
 * \topskip=10.0pt
@@ -757,60 +757,69 @@ LaTeX Info: Redefining \nameref on input line 25.
 * (1in=72.27pt=25.4mm, 1cm=28.453pt)
 
 Package csquotes Info: Making character " active on input line 25.
-LaTeX Font Info:    Try loading font information for OT1+pcr on input line 63.
+
+LaTeX Warning: Reference `sec:options' on page 1 undefined on input line 36.
+
+
+LaTeX Warning: Reference `sec:syst' on page 1 undefined on input line 44.
+
+
+LaTeX Warning: Reference `sec:example' on page 1 undefined on input line 50.
+
+LaTeX Font Info:    Try loading font information for OT1+pcr on input line 53.
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1pcr.fd
 File: ot1pcr.fd 2001/06/04 font definitions for OT1/pcr.
-)
+) [1
+
+{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}]
 (/usr/share/texlive/texmf-dist/tex/latex/listings/lstlang1.sty
 File: lstlang1.sty 2015/06/04 1.6 listings language file
 )
-LaTeX Font Info:    Font shape `OT1/pcr/bx/n' in size <8> not available
-(Font)              Font shape `OT1/pcr/b/n' tried instead on input line 68.
- [1
+LaTeX Font Info:    Font shape `OT1/pcr/bx/n' in size <10> not available
+(Font)              Font shape `OT1/pcr/b/n' tried instead on input line 56.
 
-{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}]
-Overfull \hbox (63.47516pt too wide) in paragraph at lines 91--92
-\OT1/cmr/m/n/10 and com-piled via [][]\OT1/pcr/m/n/10 git clone https://github.
-com/cms-analysis/CombineHarvester.git CombineHarvester; scram b[]\OT1/cmr/m/n/1
-0 . 
- []
 
-LaTeX Font Info:    Try loading font information for OMS+cmr on input line 116.
+LaTeX Warning: Reference `sec:configs' on page 2 undefined on input line 94.
+
+(/usr/share/texlive/texmf-dist/tex/latex/listings/lstlang1.sty
+File: lstlang1.sty 2015/06/04 1.6 listings language file
+)
+LaTeX Font Info:    Try loading font information for OMS+cmr on input line 102.
+
 
 (/usr/share/texlive/texmf-dist/tex/latex/base/omscmr.fd
 File: omscmr.fd 2014/09/29 v2.5h Standard LaTeX font definitions
 )
 LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <10> not available
-(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 116.
- [2pdfTeX warning (ext4): destination with the same identifier (name{Hfootnote.
-2}) has been already used, duplicate ignored
-
-\AtBegShi@Output ...ipout \box \AtBeginShipoutBox 
-                                                  \fi \fi 
-l.119                 \item \verb
-                                 "SYSTEMATICS:" a list of strings that corre...
-]
-Overfull \hbox (77.91887pt too wide) in paragraph at lines 153--154
-\OT1/cmr/m/n/10 re-spond-ing sig-nal dis-trib-tu-tions are in [][]\OT1/pcr/m/n/
-10 signal_pileup_up.root[]\OT1/cmr/m/n/10 , I can use the key value pair [][]\O
-T1/pcr/m/n/10 'FILE_UP_*':'*_pileup_up.root'[]\OT1/cmr/m/n/10 . 
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 102.
+ [2]pdfTeX warning (ext4): destination with the same identifier (name{Hfootnote
+.1}) has been already used, duplicate ignored
+<to be read again> 
+                   \relax 
+l.132 ...sify the processes and are defined below}
+                                                   (it doesn't require a bac...
+[3]
+Overfull \hbox (55.10286pt too wide) in paragraph at lines 173--174
+\OT1/cmr/m/n/10 spond-ing sig-nal dis-trib-tu-tions are in [][]\OT1/pcr/m/n/10 
+signal_pileup_up.root[]\OT1/cmr/m/n/10 , I can use the key value pair [][]\OT1/
+pcr/m/n/10 'FILE_UP_*':'*_pileup_up.root'[]\OT1/cmr/m/n/10 . 
  []
 
-[3]
-Overfull \hbox (28.72867pt too wide) in paragraph at lines 161--162
+[4]
+Overfull \hbox (14.27377pt too wide) in paragraph at lines 181--182
 [][][]\OT1/pcr/m/n/10 HISTPASS_DOWN_myprocess: []\OT1/cmr/m/n/10 the name of th
 e his-togram for mypro-cess in [][]\OT1/pcr/m/n/10 /path/to/filedown_myprocess.
 root
  []
 
 
-Overfull \hbox (28.72867pt too wide) in paragraph at lines 163--164
+Overfull \hbox (14.27377pt too wide) in paragraph at lines 183--184
 [][][]\OT1/pcr/m/n/10 HISTFAIL_DOWN_myprocess: []\OT1/cmr/m/n/10 the name of th
 e his-togram for mypro-cess in [][]\OT1/pcr/m/n/10 /path/to/filedown_myprocess.
 root
  []
 
-[4]
+[5]
 
 ! LaTeX Error: Something's wrong--perhaps a missing \item.
 
@@ -818,45 +827,40 @@ See the LaTeX manual or LaTeX Companion for explanation.
 Type  H <return>  for immediate help.
  ...                                              
                                                   
-l.206             \end{itemize}
+l.226             \end{itemize}
                                
 Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
 
+[6]
+! Too many }'s.
+l.270             \end{itemize}}
+                                
+You've closed more groups than you opened.
+Such booboos are generally harmless, so keep going.
 
-Overfull \hbox (10.53125pt too wide) in paragraph at lines 247--248
-\OT1/cmr/m/n/10 im-por-tant (and re-quired) is [][]\OT1/pcr/m/n/10 -i []\OT1/cm
-r/m/n/10 ([][]\OT1/pcr/m/n/10 --input[]\OT1/cmr/m/n/10 ) which points to the co
-n-fig-u-ra-tion file which should be named as [][]\OT1/pcr/m/n/10 input_<tag>.j
-son
- []
-
-[5]
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 266.
- [6]
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 266.
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 292.
+[7]
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 292.
  (./main.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 266.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 266.
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 292.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 292.
+Package rerunfilecheck Info: File `main.out' has not changed.
+(rerunfilecheck)             Checksum: 44FF636CDC413DF2CA75035FB92ECE2A;1050.
 
 
-Package rerunfilecheck Warning: File `main.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
+LaTeX Warning: There were undefined references.
 
-Package rerunfilecheck Info: Checksums for `main.out':
-(rerunfilecheck)             Before: 6510BC39710FA06FBEDA3655B3D9FFB9;810
-(rerunfilecheck)             After:  8B1FD98A1FF432A22CBBF1F7749BCA0F;842.
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 266.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 292.
  ) 
 Here is how much of TeX's memory you used:
- 9789 strings out of 494923
- 136711 string characters out of 6180742
- 294581 words of memory out of 5000000
- 12952 multiletter control sequences out of 15000+600000
+ 9944 strings out of 494923
+ 138478 string characters out of 6180742
+ 301030 words of memory out of 5000000
+ 13100 multiletter control sequences out of 15000+600000
  10914 words of font info for 40 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 28i,8n,42p,927b,1182s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 28i,8n,42p,927b,1202s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/share/texliv
 e/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/share/texlive/texm
 f-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texlive/texmf-dist
@@ -871,10 +875,10 @@ re/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/tex
 live/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/t
 exmf-dist/fonts/type1/urw/courier/ucrb8a.pfb></usr/share/texlive/texmf-dist/fon
 ts/type1/urw/courier/ucrr8a.pfb>
-Output written on main.pdf (6 pages, 183927 bytes).
+Output written on main.pdf (7 pages, 189410 bytes).
 PDF statistics:
- 177 PDF objects out of 1000 (max. 8388607)
- 153 compressed objects within 2 object streams
- 39 named destinations out of 1000 (max. 500000)
- 105 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 199 PDF objects out of 1000 (max. 8388607)
+ 174 compressed objects within 2 object streams
+ 44 named destinations out of 1000 (max. 500000)
+ 137 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -2,35 +2,45 @@
 
 from TwoDAlphabetClass import TwoDAlphabet, runLimit
 import sys, traceback, os
+from optparse import OptionParser
 import subprocess
 import header
 
+parser = OptionParser()
+
+parser.add_option('-q', '--tag', metavar='F', type='string', action='store',
+                default =   '',
+                dest    =   'quicktag',
+                help    =   'Assigns a tag for this run')
+parser.add_option('-d', '--projDir', metavar='F', type='string', action='store',
+                default =   '',
+                dest    =   'projDir',
+                help    =   'Points to the directory where the b-only fit result is located')
+parser.add_option("--unblindData", action="store_true", 
+                default =   False,
+                dest    =   "unblindData",
+                help    =   "Unblind the observation and calculate the observed limit")
+
+
+(options, args) = parser.parse_args()
+
+inputConfigsAndArgs = args
+
 # Assign and summarize input
-inputArgs = sys.argv[1:]
-inputConfigs = []
-quicktag = False
-blindData = True
 stringSwaps = {}
-postfitWorkspaceDir = ''
-for i,c in enumerate(inputArgs):
-    if 'tag=' in c:
-        quicktag = c.split('=')[1]
-    elif 'blind=' in c:
-        blindData = c.split('=')[1]
-    # elif 'recycle=' in c:
-    #     recycle = c.split('=')[1]
-    elif ':' in c: # specify string swap
+inputConfigs = []
+postfitWorkspaceDir = options.projDir
+for i,c in enumerate(inputConfigsAndArgs):
+    if ':' in c: # specify string swap
         stringSwaps[c.split(':')[0]] = c.split(':')[1]
         print c.split(':')[0] +' = '+c.split(':')[1]
     elif '.json' in c:
         inputConfigs.append(c)
-    else:
-        postfitWorkspaceDir = c
 
-print 'tag                              = ' + str(quicktag)
+
+print 'tag                              = ' + str(options.quicktag)
 print 'Location of b-only fit workspace = ' + postfitWorkspaceDir 
-print 'Blind data points                = '+ str(blindData)
-# print 'Recycle workspaces               = '+str(recycle)
+print 'Unblind data points                = '+ str(unblindData)
 print 'Config Replacements:'
 for s in stringSwaps.keys():
     print '\t'+ s + ' -> ' + stringSwaps[s]
@@ -53,7 +63,7 @@ twoDinstances = []
 if len(inputConfigs) > 1:
     # Instantiate all class instances
     for i in inputConfigs:
-        instance = TwoDAlphabet(i,quicktag,stringSwaps)
+        instance = TwoDAlphabet(i,options.quicktag,stringSwaps)
         twoDinstances.append(instance)
 
     # For each instance, check tags match and if they don't, ask the user for one
@@ -76,9 +86,9 @@ if len(inputConfigs) > 1:
         for num in range(1,len(twoDinstances)+1):
             subprocess.call(["sed -i 's/ch"+str(num)+"_//g' card_"+thistag+".txt"],shell=True)
 
-    runLimit(twoDinstances,postfitWorkspaceDir,blindData=bool(blindData),location='local')
+    runLimit(twoDinstances,postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local')
 
 # If single fit
 else:
-    instance = TwoDAlphabet(inputConfigs[0],quicktag,stringSwaps)
-    runLimit([instance],postfitWorkspaceDir,blindData=bool(blindData),location='local')
+    instance = TwoDAlphabet(inputConfigs[0],options.quicktag,stringSwaps)
+    runLimit([instance],postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local')

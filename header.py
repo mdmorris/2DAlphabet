@@ -113,7 +113,7 @@ def copyHistWithNewXbins(thisHist,newXbins,copyName,oldBinWidth):
     ynbins = len(ybins_array)-1
 
     xbins_array = array.array('f',newXbins)
-    xnbins = len(xbins_array)-1
+    xnbins = len(xbins_array)-1 
 
     # Use copyName with _temp to avoid overwriting if thisHist has the same name
     # We can do this at the end but not before we're finished with thisHist
@@ -332,8 +332,10 @@ def makeBlindedHist(nomHist,sigregion):
 
     return blindedHist
 
-def makeRDH(myTH2,RAL_vars):
+def makeRDH(myTH2,RAL_vars,altname=''):
     name = myTH2.GetName()
+    if altname != '':
+        name = altname
     thisRDH = RooDataHist(name,name,RAL_vars,myTH2)
     return thisRDH
 
@@ -393,6 +395,107 @@ def ftestInfoLookup(projInfoDict):
         nbins+=this_nbins
     
     return nrpfparams,nbins
+
+def FStatCalc(filename1,filename2,p1,p2,n):
+    print 'Calculating F statistic'
+    print 'Files: ',filename1,filename2
+    print 'Parameters: p1 %f, p2 %f, n %f'%(p1,p2,n)
+    # Flip flop to make sure p2 is always greater than p1 (more parameters should always fit better)
+    if p1 > p2:
+        p1, p2 = p2, p1
+        filename1, filename2 = filename2, filename1
+
+    # Get limit trees from each file
+    file1 = TFile.Open(filename1)
+    tree1 = file1.Get("limit")
+    file2 = TFile.Open(filename2)
+    tree2 = file2.Get("limit")
+    diffs=[]
+    print 'Entries ',tree1.GetEntries(),tree2.GetEntries()
+
+    # Loop over entries and calculate the F statistics
+    for i in range(0,tree1.GetEntries()):
+        tree1.GetEntry(i)
+        tree2.GetEntry(i)
+        print 'Limits ',tree1.limit,tree2.limit
+        if tree1.limit-tree2.limit>0:
+            F = (tree1.limit-tree2.limit)/(p2-p1)/(lTree2.limit/(n-p2))
+            print 'Entry ',i, ":", tree2.limit, "-", tree1.limit, "=", tree2.limit-tree1.limit, "F =", F
+            diffs.append(F)
+        else:
+            print 'WARNING in calculationg of F statistic for entry %i. limit1-limit2 <=0 (%f - %f)' %(i,tree1.limit,tree2.limit)
+
+    print 'Diffs F stat: ',diffs
+    return diffs
+
+def makeToyCard(channelNames):
+    # Open a new card
+    toy_gen_card = open('card_toygen.txt','w')
+    column_width = 20
+
+    nchannels = len(channelNames) # imax
+    nprocesses = 1 # jmax
+    nsystematics = 0 # kmax
+
+    toy_gen_card.write('imax '+str(nchannels)+'\n')      
+    toy_gen_card.write('jmax '+str(nprocesses)+'\n')
+    toy_gen_card.write('kmax '+str(nsystematics)+'\n')
+    toy_gen_card.write('-'*120+'\n')
+
+    processes = ['TotalSig','TotalBkg','data_obs']
+    for proc in processes:
+        if proc == 'TotalSig' or proc == 'data_obs':
+            preORpost = '_prefit'
+        else:
+            preORpost = '_postfit'
+
+        for chan in channelNames:
+            toy_gen_card.write(colliMate('shapes  '+proc+' '+chan+' toy_gen_workspace.root w_toys:'+proc+'_'+chan+'\n'))
+
+    toy_gen_card.write('-'*120+'\n')
+
+    tempString = 'bin  '
+    for chan in channelNames:
+        tempString += (chan+' ')
+    tempString += '\n'
+    toy_gen_card.write(colliMate(tempString,column_width))
+
+    tempString = 'observation  '
+    for ichan in range(int(nchannels)):
+        tempString += '-1 '
+    tempString += '\n'
+    toy_gen_card.write(colliMate(tempString,column_width))
+
+    toy_gen_card.write('-'*120+'\n')
+
+    bin_line = 'bin  '
+    processName_line = 'process  '
+    processCode_line = 'process  '
+    rate_line = 'rate  '
+
+    for chan in channelNames:
+        for proc in ['TotalBkg','TotalSig']:
+            # Start lines
+            bin_line += (chan+' ')
+            processName_line += (proc+' ')
+
+            # If signal
+            if proc == 'TotalSig':
+                processCode_line += ('0 ')
+                rate_line += ('-1 ')
+
+            # If bkg
+            elif proc == 'TotalBkg':
+                processCode_line += ('1 ')
+                rate_line += '-1 '                                            
+
+    toy_gen_card.write(colliMate(bin_line+'\n',column_width))
+    toy_gen_card.write(colliMate(processName_line+'\n',column_width))
+    toy_gen_card.write(colliMate(processCode_line+'\n',column_width))
+    toy_gen_card.write(colliMate(rate_line+'\n',column_width))
+    toy_gen_card.write('-'*120+'\n')
+
+    toy_gen_card.close()
 
 def projInfoLookup(projDir,cardtag):
     # Check if there was more than one 2DAlphabet object run over
