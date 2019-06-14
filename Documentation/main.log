@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.18 (TeX Live 2017/Debian) (preloaded format=pdflatex 2018.11.2)  16 MAY 2019 15:59
+This is pdfTeX, Version 3.14159265-2.6-1.40.18 (TeX Live 2017/Debian) (preloaded format=pdflatex 2018.11.2)  14 JUN 2019 14:19
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -838,22 +838,15 @@ Package atveryend Info: Empty hook `AfterLastShipout' on input line 266.
  (./main.aux)
 Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 266.
 Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 266.
-
-
-Package rerunfilecheck Warning: File `main.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-Package rerunfilecheck Info: Checksums for `main.out':
-(rerunfilecheck)             Before: 6510BC39710FA06FBEDA3655B3D9FFB9;810
-(rerunfilecheck)             After:  8B1FD98A1FF432A22CBBF1F7749BCA0F;842.
+Package rerunfilecheck Info: File `main.out' has not changed.
+(rerunfilecheck)             Checksum: 8B1FD98A1FF432A22CBBF1F7749BCA0F;842.
 Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 266.
  ) 
 Here is how much of TeX's memory you used:
- 9789 strings out of 494923
- 136711 string characters out of 6180742
- 294581 words of memory out of 5000000
- 12952 multiletter control sequences out of 15000+600000
+ 9787 strings out of 494923
+ 136688 string characters out of 6180742
+ 294582 words of memory out of 5000000
+ 12950 multiletter control sequences out of 15000+600000
  10914 words of font info for 40 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
  28i,8n,42p,927b,1182s stack positions out of 5000i,500n,10000p,200000b,80000s
@@ -871,7 +864,7 @@ re/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/tex
 live/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/t
 exmf-dist/fonts/type1/urw/courier/ucrb8a.pfb></usr/share/texlive/texmf-dist/fon
 ts/type1/urw/courier/ucrr8a.pfb>
-Output written on main.pdf (6 pages, 183927 bytes).
+Output written on main.pdf (6 pages, 183942 bytes).
 PDF statistics:
  177 PDF objects out of 1000 (max. 8388607)
  153 compressed objects within 2 object streams
