@@ -58,7 +58,6 @@
         cd CMSSW_10_2_13/src
         cmsenv
         git clone https://github.com/lcorcodilos/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
-        cd HiggsAnalysis/CombinedLimit
         cd $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit
         scramv1 b clean; scramv1 b
         cmsenv
@@ -69,7 +68,7 @@
     Additionally, one needs the accompanying Combine Harvester setup in their \verb"$CMSSW_BASE/src" which can be grabbed and compiled via 
 
     \begin{lstlisting}
-        wget -O - https://raw.githubusercontent.com/cms-analysis/CombineHarvester/master/CombineTools/scripts/sparse-checkout-ssh.sh | bash
+        wget -O - https://raw.githubusercontent.com/lcorcodilos/CombineHarvester/master/CombineTools/scripts/sparse-checkout-ssh.sh | bash
     \end{lstlisting}
 
     % \subsection{Outdated Instructions for 81X release - DON'T USE. FOR DOCUMENTATION PURPOSE ONLY}
