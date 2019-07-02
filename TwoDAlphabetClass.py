@@ -245,6 +245,9 @@ class TwoDAlphabet:
         ylow = self.newYbins[0]
         yhigh = self.newYbins[-1]
         yRRV = RooRealVar(yname,yname,ylow,yhigh)
+        yBinArray = array.array('d',self.newYbins)
+        yRooBinning = RooBinning(len(self.newYbins)-1,yBinArray)
+        yRRV.setBinning(yRooBinning)
 
         # X
         for c in ['LOW','SIG','HIGH']:
@@ -252,6 +255,9 @@ class TwoDAlphabet:
             xlow = self.newXbins[c][0]
             xhigh = self.newXbins[c][-1]
             xRRVs[c] = RooRealVar(xname,xname,xlow,xhigh)
+            xBinArray = array.array('d',self.newXbins[c])
+            xRooBinning = RooBinning(len(self.newXbins[c])-1,xBinArray)
+            xRRVs[c].setBinning(xRooBinning)
 
         return xRRVs,yRRV
 
