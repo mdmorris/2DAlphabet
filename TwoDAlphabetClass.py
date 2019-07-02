@@ -33,7 +33,7 @@ class TwoDAlphabet:
         del self.workspace
 
     # Initialization setup to just build workspace. All other steps must be called with methods
-    def __init__ (self,jsonFileName,quicktag=False,recycleAll=False,stringSwaps={}): # jsonFileNames is a list
+    def __init__ (self,jsonFileName,quicktag='',recycleAll=False,stringSwaps={}): # jsonFileNames is a list
         self.allVars = []    # This is a list of all RooFit objects made. It never gets used for anything but if the
                         # objects never get saved here, then the python memory management will throw them out
                         # because of conflicts with the RooFit memory management. It's a hack.
@@ -50,7 +50,7 @@ class TwoDAlphabet:
             self.name = self.inputConfig['OPTIONS']['name']
         else:
             self.name = jsonFileName.split('.json')[0].split('input_')[1]
-        if quicktag != False:
+        if quicktag != '':
             self.tag = quicktag
         elif 'tag' in self.inputConfig['OPTIONS'].keys():
             self.tag = self.inputConfig['OPTIONS']['tag']
