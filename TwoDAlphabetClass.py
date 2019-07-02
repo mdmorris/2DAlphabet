@@ -1990,7 +1990,7 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
 
     # Run Combine
     print 'cd '+projDir
-    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace' + sig_option +verbose #+syst_option -> now out of date
+    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace --cminDefaultMinimizerStrategy 0' + sig_option +verbose #+syst_option -> now out of date
     print 'Executing '+FitDiagnostics_command
 
     with header.cd(projDir):
@@ -1998,7 +1998,10 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
         command_saveout.write(FitDiagnostics_command)
         command_saveout.close()
 
-        subprocess.call([FitDiagnostics_command], shell=True)
+        if os.path.isfile('fitDiagnostics.root'):
+            header.executeCmd('rm fitDiagnostics.root')
+
+        header.executeCmd(FitDiagnostics_command)
 
         if not os.path.isfile('fitDiagnostics.root'):
             print "Combine failed and never made fitDiagnostics.root. Quitting..."
