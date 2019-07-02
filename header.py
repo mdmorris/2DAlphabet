@@ -685,7 +685,12 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
 
                 legends.append(TLegend(0.65,0.6,0.95,0.93))
                 stacks.append(THStack(hist.GetName()+'_stack',hist.GetName()+'_stack'))
-                tot_hists.append(TH1F(hist.GetName()+'_tot',hist.GetName()+'_tot',hist.GetNbinsX(),hist.GetXaxis().GetXmin(),hist.GetXaxis().GetXmax()))
+                tot_hist = hist.Clone(hist.GetName()+'_tot')
+                tot_hist.Reset()
+                tot_hist.SetTitle(hist.GetName()+'_tot')
+                tot_hist.SetMarkerStyle(0)
+                tot_hists.append(tot_hist)
+
 
                 # Set margins and make these two pads primitives of the division, thisPad
                 mains[hist_index].SetBottomMargin(0.0)

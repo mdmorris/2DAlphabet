@@ -1287,7 +1287,7 @@ class TwoDAlphabet:
                             binRRV = RooRealVar(fail_bin_name, fail_bin_name, bin_content, max(1,bin_range_down), bin_range_up)
 
 
-                        if not self.freezeFail:
+                        if not self.freezeFail and bin_content >= 10:
                             if bin_content - bin_err_down < 0.001:
                                 bin_err_down = bin_content - 0.001#binRRV.getMin()     # For the rare case when bin error is larger than the content
                             
