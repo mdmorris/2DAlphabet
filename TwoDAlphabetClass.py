@@ -72,6 +72,7 @@ class TwoDAlphabet:
         self.draw = self._getOption('draw')
         self.verbosity = str(self._getOption('verbosity')) # will eventually need to be fed as a string so just convert now
         self.fitGuesses = self._getOption('fitGuesses')
+        self.prerun = self._getOption('prerun')
         self.overwrite = self._getOption('overwrite')
         self.recycle = self._getOption('recycle')
         self.plotTogether = self._getOption('plotTogether')
@@ -147,6 +148,33 @@ class TwoDAlphabet:
         # Make the card
         if 'card' not in self.recycle and not recycleAll:
             self._makeCard()
+
+        # Do a prerun where we fit just this pass-fail pair and set the rpf to result
+        if self.prerun:
+            print 'Pre-running '+self.tag+' '+self.name+' to get a better estimate of the transfer function'
+            self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
+            runMLFit([self],'0','5',skipPlots=True)    
+            prerun_file = TFile.Open(self.projPath+'/fitDiagnostics.root')
+            if prerun_file:
+                if prerun_file.GetListOfKeys().Contains('fit_b'):
+                    prerun_result = prerun_file.Get('fit_b').floatParsFinal()
+                elif prerun_file.GetListOfKeys().Contains('fit_s'):
+                    prerun_result = prerun_file.Get('fit_s').floatParsFinal()
+                else:
+                    prerun_result = False
+                if prerun_result != False:
+                    for v in self.rpf.rpfVars.keys():
+                        prerun_coeff = prerun_result.find(v)
+                        self.rpf.rpfVars[v].setVal(prerun_coeff.getValV())
+                        self.rpf.rpfVars[v].setError(prerun_coeff.getValV()*0.5)
+                        # self.rpf.rpfVars[v].setMin(max(self.rpf.rpfVars[v].getMin(), prerun_coeff.getValV()-2*prerun_coeff.getError()))
+                        # self.rpf.rpfVars[v].setMax(min(self.rpf.rpfVars[v].getMax(), prerun_coeff.getValV()+2*prerun_coeff.getError()))
+                        self.workspace.var(v).setVal(prerun_coeff.getValV())
+                        self.workspace.var(v).setError(prerun_coeff.getValV()*0.5)
+                        # self.workspace.var(v).setMin(max(self.rpf.rpfVars[v].getMin(), prerun_coeff.getValV()-2*prerun_coeff.getError()))
+                        # self.workspace.var(v).setMax(min(self.rpf.rpfVars[v].getMax(), prerun_coeff.getValV()+2*prerun_coeff.getError()))
+            else:
+                raw_input('WARNING: Pre-run for '+self.tag+' '+self.name+'failed. Using original Rp/f parameters. Press any key to continue.')
 
         # Save out at the end
         if not recycleAll:
@@ -391,7 +419,7 @@ class TwoDAlphabet:
             print 'WARNING: '+optionName+' boolean not set explicitely. Default to True.'
             option_return = True
         # Default to false
-        elif optionName in ['freezeFail','fitGuesses','plotUncerts']:
+        elif optionName in ['freezeFail','fitGuesses','plotUncerts','prerun']:
             print 'WARNING: '+optionName+' boolean not set explicitely. Default to False.'
             option_return = False
         elif optionName == 'verbosity':
@@ -592,6 +620,10 @@ class TwoDAlphabet:
             for c in ['SIG','HIGH']:
                 xbins_pseudo.extend(xbins_pseudo_dict[c][1:])
 
+        else:
+            xbins_pseudo = self.fullXbins
+            ybins_pseudo = self.newYbins
+
         print xbins_pseudo
         print ybins_pseudo
         ##############################
@@ -694,179 +726,230 @@ class TwoDAlphabet:
         ###############################################
         # Determine fit function from the inputConfig #
         ###############################################
-        if 'XPFORM' in self.inputConfig['FIT'].keys() and 'YPFORM' in self.inputConfig['FIT'].keys():
-            # Do some quick checks to make sure these are formatted correctly
-            header.checkFitForm(self.inputConfig['FIT']['XPFORM'],self.inputConfig['FIT']['YPFORM'])
-            # Determine number of params in each direction
-            nxparams = max([int(param[1:]) for param in self.inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XPFORM'])
-            nyparams = max([int(param[1:]) for param in self.inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YPFORM'])
-            # Get the strings
-            xFuncString = header.RFVform2TF1(self.inputConfig['FIT']['XPFORM'],-1)
-            yFuncString = header.RFVform2TF1(self.inputConfig['FIT']['YPFORM'],-1)
-            yFuncString = yFuncString.replace('y','x')
+        if self.fitGuesses != False:
+            if 'XPFORM' in self.inputConfig['FIT'].keys() and 'YPFORM' in self.inputConfig['FIT'].keys():
+                # Do some quick checks to make sure these are formatted correctly
+                header.checkFitForm(self.inputConfig['FIT']['XPFORM'],self.inputConfig['FIT']['YPFORM'])
+                # Determine number of params in each direction
+                nxparams = max([int(param[1:]) for param in self.inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XPFORM'])
+                nyparams = max([int(param[1:]) for param in self.inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YPFORM'])
+                # Get the strings
+                xFuncString = header.RFVform2TF1(self.inputConfig['FIT']['XPFORM'],-1)
+                yFuncString = header.RFVform2TF1(self.inputConfig['FIT']['YPFORM'],-1)
+                yFuncString = yFuncString.replace('y','x')
 
-            # Make the fixed form of the formula
-            funcString = ''
-            paramIndex = 0
-            for xparam in range(nxparams):
-                for yparam in range(nyparams):
-                    funcString += '['+str(paramIndex)+']*x**'+str(xparam)+'*y**'+str(yparam)+'+'
-                    paramIndex += 1
-            funcString = funcString[:-1]
-
-
-        elif 'PFORM' in self.inputConfig['FIT'].keys():
-            funcString = self.inputConfig['FIT']['PFORM']
-            # Reconstruct x
-            xFuncString = ''
-            nxparams = 0
-            for xparam in self.inputConfig['FIT'].keys():
-                if 'X' in xparam:                                           # For each X*Y0
-                    if 'Y0' in xparam:
-                        powerIndex = xparam[xparam.find('X')+1]
-                        xFuncString += '['+str(powerIndex)+']*x**'+str(powerIndex)+'+'
-                        nxparams += 1
-            xFuncString = xFuncString[:-1]
-
-            # Reconstruct y
-            yFuncString = ''
-            nyparams = 0
-            for yparam in self.inputConfig['FIT'].keys():
-                if 'X0Y' in yparam:                                           # For each X0Y*
-                    powerIndex = yparam[yparam.find('Y')+1]
-                    yFuncString += '['+str(powerIndex)+']*x**'+str(powerIndex)+'+'
-                    nyparams += 1
-            yFuncString = yFuncString[:-1]
+                # Make the fixed form of the formula
+                funcString = ''
+                paramIndex = 0
+                for xparam in range(nxparams):
+                    for yparam in range(nyparams):
+                        funcString += '['+str(paramIndex)+']*x**'+str(xparam)+'*y**'+str(yparam)+'+'
+                        paramIndex += 1
+                funcString = funcString[:-1]
 
 
-        elif 'FORM' in self.inputConfig['FIT'].keys():
-            # Need to take a 2D function and freeze it in one dimension for each y slice
-            funcString = header.RFVform2TF1(self.inputConfig['FIT']['FORM'],0)
-            yFuncString = '[0]' # since all y dependence will be absorbed by the funcString, there should be no y dependence on each of the parameters and thus we should fit each with a constant
-            nxparams = max([int(param) for param in self.inputConfig['FIT'].keys() if param != 'FORM' and param != 'HELP']) +1
+            elif 'PFORM' in self.inputConfig['FIT'].keys():
+                funcString = self.inputConfig['FIT']['PFORM']
+                # Reconstruct x
+                xFuncString = ''
+                nxparams = 0
+                for xparam in self.inputConfig['FIT'].keys():
+                    if 'X' in xparam:                                           # For each X*Y0
+                        if 'Y0' in xparam:
+                            powerIndex = xparam[xparam.find('X')+1]
+                            xFuncString += '['+str(powerIndex)+']*x**'+str(powerIndex)+'+'
+                            nxparams += 1
+                xFuncString = xFuncString[:-1]
 
-        else:
-            print 'Fit form not supported in get_fit_guesses.py. Quitting...'
-            quit()
+                # Reconstruct y
+                yFuncString = ''
+                nyparams = 0
+                for yparam in self.inputConfig['FIT'].keys():
+                    if 'X0Y' in yparam:                                           # For each X0Y*
+                        powerIndex = yparam[yparam.find('Y')+1]
+                        yFuncString += '['+str(powerIndex)+']*x**'+str(powerIndex)+'+'
+                        nyparams += 1
+                yFuncString = yFuncString[:-1]
 
-        ##################################
-        # Now do the fit in the y slices #
-        ##################################
-        fitResults = {}
 
-        # Book TGraphs to store the fit results as a function of y bins
-        unitYbins = array.array('d',[Rpf.GetYaxis().GetBinLowEdge(b) for b in range(1,Rpf.GetNbinsY()+1)]+[1])
-        for xparam in range(nxparams):
-            fitResults['xparam_'+str(xparam)+'_vs_y'] = TH1F('xparam_'+str(xparam)+'_vs_y','xparam_'+str(xparam)+'_vs_y',Rpf.GetNbinsY(),unitYbins)
+            elif 'FORM' in self.inputConfig['FIT'].keys():
+                # Need to take a 2D function and freeze it in one dimension for each y slice
+                funcString = header.RFVform2TF1(self.inputConfig['FIT']['FORM'],0)
+                yFuncString = '[0]' # since all y dependence will be absorbed by the funcString, there should be no y dependence on each of the parameters and thus we should fit each with a constant
+                nxparams = max([int(param) for param in self.inputConfig['FIT'].keys() if param != 'FORM' and param != 'HELP']) +1
 
-        # Project each y-axis bin and fit along x - save out coefficients to booked tgraph
-        projXs = []
-        pseudo2D_results = TFile.Open(self.projPath+'/pseudo2D_results.root','RECREATE')
-        pseudo2D_results.cd()
-        for ybin in range(1,Rpf.GetNbinsY()+1):
-            # If doing FORM, define xFuncString here with y bin center plugged in
-            if 'FORM' in self.inputConfig['FIT'].keys():
-                thisYBinCenter = Rpf.GetYaxis().GetBinCenter(ybin)
-                xFuncString = funcString.replace('y',str(thisYBinCenter))
+            elif 'XFORM' in self.inputConfig['FIT'].keys() and 'YFORM' in self.inputConfig['FIT'].keys():
+                xFuncString = self.inputConfig['FIT']['XFORM']
+                yFuncString = self.inputConfig['FIT']['YFORM']
+                funcString = '('+header.RFVform2TF1(self.inputConfig['FIT']['XFORM'],0)+')*('+header.RFVform2TF1(self.inputConfig['FIT']['YFORM'],0).replace('x','y')+')'
+                nxparams = max([int(param[1:]) for param in self.inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XFORM'])
+                nyparams = max([int(param[1:]) for param in self.inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YFORM'])
 
-            fitResults['fitSlice_'+str(ybin)] = TF1('fitSlice_'+str(ybin),xFuncString,0,1)
+            else:
+                print 'Fit form not supported in get_fit_guesses.py. Quitting...'
+                quit()
 
-            if 'FORM' in self.inputConfig['FIT'].keys():
+            pseudo2D_results = TFile.Open(self.projPath+'/pseudo2D_results.root','RECREATE')
+            pseudo2D_results.cd()
+
+            if 'FORM' in self.inputConfig['FIT'].keys():# or ('XFORM' in self.inputConfig['FIT'].keys() and 'YFORM' in self.inputConfig['FIT'].keys()):
+                pseudo2D_Rpf = TF2('pseudo2D_Rpf',funcString,0,1,0,1)
+
                 for p in range(nxparams):
-                    fitResults['fitSlice_'+str(ybin)].SetParameter(p,self.inputConfig['FIT'][str(p)]['NOMINAL'])
-                    fitResults['fitSlice_'+str(ybin)].SetParLimits(p,self.inputConfig['FIT'][str(p)]['MIN'],self.inputConfig['FIT'][str(p)]['MAX'])
+                    pseudo2D_Rpf.SetParameter(p,self.inputConfig['FIT'][str(p)]['NOMINAL'])
+                    pseudo2D_Rpf.SetParLimits(p,self.inputConfig['FIT'][str(p)]['MIN'],self.inputConfig['FIT'][str(p)]['MAX'])
 
-            projX = Rpf.ProjectionX('rebinnedRpf_sliceX_'+str(ybin),ybin,ybin,'e o')
-            # projX.Draw('p e')
-            projX.Write()
-            projX.Fit(fitResults['fitSlice_'+str(ybin)],'EM')
-            
-            # projX.Draw('p e')
-            projX.SetMaximum(1.1)
-            projX.SetMinimum(0.0)
-            projX.SetTitle('fitSlice_'+str(ybin))
+                Rpf.Fit(pseudo2D_Rpf)
+                
+                print 'Resetting fit parameters in input config'
+                self.inputConfig['FIT']['FORM'] = funcString
+                for ix in range(nxparams):
+                    # for iy in range(nyparams):
+                        param = str(ix)
+                        pseudo2D_Rpf.SetParameter(ix,pseudo2D_Rpf.GetParameter(ix))
+                        pseudo2D_Rpf.SetParError(ix,pseudo2D_Rpf.GetParError(ix))
+                        if self.fitGuesses != False:
+                            # self.inputConfig['FIT'][param] = {'NOMINAL':None,'MIN':None,'MAX':None}
+                            self.inputConfig['FIT'][param]['NOMINAL'] = pseudo2D_Rpf.GetParameter(ix)
+                            self.inputConfig['FIT'][param]['MAX'] = min(self.inputConfig['FIT'][param]['MAX'],pseudo2D_Rpf.GetParameter(ix)+sigma*pseudo2D_Rpf.GetParError(ix))
+                            self.inputConfig['FIT'][param]['MIN'] = max(self.inputConfig['FIT'][param]['MIN'],pseudo2D_Rpf.GetParameter(ix)-sigma*pseudo2D_Rpf.GetParError(ix))
+                            self.inputConfig['FIT'][param]['ERROR'] = pseudo2D_Rpf.GetParError(ix)
 
-            projXs.append(projX)
+                pp.pprint(self.inputConfig['FIT'])
+                            
+            else:
+                ##################################
+                # Now do the fit in the y slices #
+                ##################################
+                fitResults = {}
 
-            for ix in range(nxparams):
-                fitResults['xparam_'+str(ix)+'_vs_y'].SetBinContent(ybin,fitResults['fitSlice_'+str(ybin)].GetParameter(ix))
-                fitResults['xparam_'+str(ix)+'_vs_y'].SetBinError(ybin,fitResults['fitSlice_'+str(ybin)].GetParError(ix))
-     
-        if len(projXs) <= 6:
-            header.makeCan('fitSlices_0-6',self.projPath,projXs,xtitle=self.xVarName)
+                # Book TGraphs to store the fit results as a function of y bins
+                unitYbins = array.array('d',[Rpf.GetYaxis().GetBinLowEdge(b) for b in range(1,Rpf.GetNbinsY()+1)]+[1])
+                for xparam in range(nxparams):
+                    fitResults['xparam_'+str(xparam)+'_vs_y'] = TH1F('xparam_'+str(xparam)+'_vs_y','xparam_'+str(xparam)+'_vs_y',Rpf.GetNbinsY(),unitYbins)
 
-        else:
-            chunkedProjX = [projXs[i:i + 6] for i in xrange(0, len(projXs), 6)]
-            for i,chunk in enumerate(chunkedProjX):
-                header.makeCan('fitSlices_'+str(i*6)+'-'+str(6*(i+1)),self.projPath,chunk,xtitle=self.xVarName)
+                # Project each y-axis bin and fit along x - save out coefficients to booked tgraph
+                projXs = []
+                for ybin in range(1,Rpf.GetNbinsY()+1):
+                    # If doing FORM, define xFuncString here with y bin center plugged in
+                    if 'FORM' in self.inputConfig['FIT'].keys():
+                        thisYBinCenter = Rpf.GetYaxis().GetBinCenter(ybin)
+                        xFuncString = funcString.replace('y',str(thisYBinCenter))
 
-        pseudo2D_results.Close()
+                    fitResults['fitSlice_'+str(ybin)] = TF1('fitSlice_'+str(ybin),xFuncString,0,1)
 
-        ########################################################
-        # And now fit these parameters as a function of y axis #
-        ########################################################
+                    if 'FORM' in self.inputConfig['FIT'].keys():
+                        for p in range(nxparams):
+                            fitResults['fitSlice_'+str(ybin)].SetParameter(p,self.inputConfig['FIT'][str(p)]['NOMINAL'])
+                            fitResults['fitSlice_'+str(ybin)].SetParLimits(p,self.inputConfig['FIT'][str(p)]['MIN'],self.inputConfig['FIT'][str(p)]['MAX'])
 
-        # Build fit for each parameter distribution along y-axis
-        drawList = []
-        for xparam in range(nxparams):
-            fitResults['fitParam_'+str(xparam)] = TF1('yFunc_'+str(xparam),yFuncString,0,1)
-            # Do the fit
-            fitResults['xparam_'+str(xparam)+'_vs_y'].Fit(fitResults['fitParam_'+str(xparam)],"EM")
-            drawList.append(fitResults['xparam_'+str(xparam)+'_vs_y'])
-            # Get and store parameters found
-            for iy in range(fitResults['fitParam_'+str(xparam)].GetNpar()):
-                fitResults['X'+str(xparam)+'Y'+str(iy)] = fitResults['fitParam_'+str(xparam)].GetParameter(iy)
-                fitResults['X'+str(xparam)+'Y'+str(iy)+'err'] = fitResults['fitParam_'+str(xparam)].GetParError(iy)
+                    projX = Rpf.ProjectionX('rebinnedRpf_sliceX_'+str(ybin),ybin,ybin,'e o')
+                    # projX.Draw('p e')
+                    projX.Write()
+                    projX.Fit(fitResults['fitSlice_'+str(ybin)],'EM')
+                    
+                    # projX.Draw('p e')
+                    projX.SetMaximum(1.1)
+                    projX.SetMinimum(0.0)
+                    projX.SetTitle('fitSlice_'+str(ybin))
 
-        if len(drawList) <= 6:
-            header.makeCan('xparam_v_y',self.projPath,drawList,xtitle=self.yVarName)
-        else:
-            chunkedDrawList = [drawList[i:i + 6] for i in xrange(0, len(drawList), 6)]
-            for i,chunk in enumerate(chunkedDrawList):
-                header.makeCan('xparam_v_y_'+str(i),self.projPath,chunk,xtitle=self.yVarName)
+                    projXs.append(projX)
+
+                    for ix in range(nxparams):
+                        fitResults['xparam_'+str(ix)+'_vs_y'].SetBinContent(ybin,fitResults['fitSlice_'+str(ybin)].GetParameter(ix))
+                        fitResults['xparam_'+str(ix)+'_vs_y'].SetBinError(ybin,fitResults['fitSlice_'+str(ybin)].GetParError(ix))
+             
+                if len(projXs) <= 6:
+                    header.makeCan('fitSlices_0-6',self.projPath,projXs,xtitle=self.xVarName)
+
+                else:
+                    chunkedProjX = [projXs[i:i + 6] for i in xrange(0, len(projXs), 6)]
+                    for i,chunk in enumerate(chunkedProjX):
+                        header.makeCan('fitSlices_'+str(i*6)+'-'+str(6*(i+1)),self.projPath,chunk,xtitle=self.xVarName)
+
+                pseudo2D_results.Close()
+
+                ########################################################
+                # And now fit these parameters as a function of y axis #
+                ########################################################
+
+                # Build fit for each parameter distribution along y-axis
+                drawList = []
+                for xparam in range(nxparams):
+                    fitResults['fitParam_'+str(xparam)] = TF1('yFunc_'+str(xparam),yFuncString,0,1)
+                    # Do the fit
+                    fitResults['xparam_'+str(xparam)+'_vs_y'].Fit(fitResults['fitParam_'+str(xparam)],"EM")
+                    drawList.append(fitResults['xparam_'+str(xparam)+'_vs_y'])
+                    # Get and store parameters found
+                    for iy in range(fitResults['fitParam_'+str(xparam)].GetNpar()):
+                        fitResults['X'+str(xparam)+'Y'+str(iy)] = fitResults['fitParam_'+str(xparam)].GetParameter(iy)
+                        fitResults['X'+str(xparam)+'Y'+str(iy)+'err'] = fitResults['fitParam_'+str(xparam)].GetParError(iy)
+
+                if len(drawList) <= 6:
+                    header.makeCan('xparam_v_y',self.projPath,drawList,xtitle=self.yVarName)
+                else:
+                    chunkedDrawList = [drawList[i:i + 6] for i in xrange(0, len(drawList), 6)]
+                    for i,chunk in enumerate(chunkedDrawList):
+                        header.makeCan('xparam_v_y_'+str(i),self.projPath,chunk,xtitle=self.yVarName)
 
 
-        # Remove old fit values and store new ones in inputConfig if PFORM else just make the pseudo2D_Rpf for plotting
-        pseudo2D_Rpf = TF2('pseudo2D_Rpf',funcString,0,1,0,1)
-        paramIndex = 0
+                # Remove old fit values and store new ones in inputConfig if PFORM else just make the pseudo2D_Rpf for plotting
+                pseudo2D_Rpf = TF2('pseudo2D_Rpf',funcString,0,1,0,1)
+                paramIndex = 0
 
-        if 'FORM' in self.inputConfig['FIT'].keys():
-            # self.inputConfig['FIT'] = {'FORM':funcString}
-            for p in range(nxparams):
-                param = 'X'+str(p)+'Y0'
-                pseudo2D_Rpf.SetParameter(paramIndex,fitResults[param])
-                pseudo2D_Rpf.SetParError(paramIndex,fitResults[param+'err'])
-                # self.inputConfig['FIT'][str(p)] = {'NOMINAL':None,'MIN':None,'MAX':None}
-                # self.inputConfig['FIT'][str(p)]['NOMINAL'] = fitResults[param]
-                # self.inputConfig['FIT'][str(p)]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
-                # self.inputConfig['FIT'][str(p)]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
-                # self.inputConfig['FIT'][str(p)]['ERROR'] = fitResults[param+'err']
+                if 'FORM' in self.inputConfig['FIT'].keys():
+                    # self.inputConfig['FIT'] = {'FORM':funcString}
+                    for p in range(nxparams):
+                        param = 'X'+str(p)+'Y0'
+                        pseudo2D_Rpf.SetParameter(paramIndex,fitResults[param])
+                        pseudo2D_Rpf.SetParError(paramIndex,fitResults[param+'err'])
+                        # self.inputConfig['FIT'][str(p)] = {'NOMINAL':None,'MIN':None,'MAX':None}
+                        # self.inputConfig['FIT'][str(p)]['NOMINAL'] = fitResults[param]
+                        # self.inputConfig['FIT'][str(p)]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
+                        # self.inputConfig['FIT'][str(p)]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
+                        # self.inputConfig['FIT'][str(p)]['ERROR'] = fitResults[param+'err']
 
-                paramIndex+=1
+                        paramIndex+=1
 
-        elif 'PFORM' in self.inputConfig['FIT'].keys() or ('XPFORM' in self.inputConfig['FIT'].keys() and 'YPFORM' in self.inputConfig['FIT'].keys()):
-            print 'Resetting fit parameters in input config'
-            self.inputConfig['FIT'] = {'PFORM':funcString}
-            for ix in range(nxparams):
-                for iy in range(nyparams):
-                    param = 'X'+str(ix)+'Y'+str(iy)
-                    pseudo2D_Rpf.SetParameter(paramIndex,fitResults[param])
-                    pseudo2D_Rpf.SetParError(paramIndex,fitResults[param+'err'])
-                    if self.fitGuesses != False:
-                        self.inputConfig['FIT'][param] = {'NOMINAL':None,'MIN':None,'MAX':None}
-                        self.inputConfig['FIT'][param]['NOMINAL'] = fitResults[param]
-                        self.inputConfig['FIT'][param]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
-                        self.inputConfig['FIT'][param]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
-                        self.inputConfig['FIT'][param]['ERROR'] = fitResults[param+'err']
+                elif 'PFORM' in self.inputConfig['FIT'].keys() or ('XPFORM' in self.inputConfig['FIT'].keys() and 'YPFORM' in self.inputConfig['FIT'].keys()):
+                    print 'Resetting fit parameters in input config'
+                    self.inputConfig['FIT'] = {'PFORM':funcString}
+                    for ix in range(nxparams):
+                        for iy in range(nyparams):
+                            param = 'X'+str(ix)+'Y'+str(iy)
+                            pseudo2D_Rpf.SetParameter(paramIndex,fitResults[param])
+                            pseudo2D_Rpf.SetParError(paramIndex,fitResults[param+'err'])
+                            if self.fitGuesses != False:
+                                self.inputConfig['FIT'][param] = {'NOMINAL':None,'MIN':None,'MAX':None}
+                                self.inputConfig['FIT'][param]['NOMINAL'] = fitResults[param]
+                                self.inputConfig['FIT'][param]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
+                                self.inputConfig['FIT'][param]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
+                                self.inputConfig['FIT'][param]['ERROR'] = fitResults[param+'err']
 
-                    paramIndex+=1
+                            paramIndex+=1               
+                elif 'XFORM' in self.inputConfig['FIT'].keys() and 'YFORM' in self.inputConfig['FIT'].keys():
+                    print 'Resetting fit parameters in input config'
+                    self.inputConfig['FIT'] = {'FORM':funcString}
+                    for ix in range(nxparams):
+                        for iy in range(nyparams):
+                            param = 'X'+str(ix)+'Y'+str(iy)
+                            pseudo2D_Rpf.SetParameter(paramIndex,fitResults[param])
+                            pseudo2D_Rpf.SetParError(paramIndex,fitResults[param+'err'])
+                            if self.fitGuesses != False:
+                                self.inputConfig['FIT'][param] = {'NOMINAL':None,'MIN':None,'MAX':None}
+                                self.inputConfig['FIT'][param]['NOMINAL'] = fitResults[param]
+                                self.inputConfig['FIT'][param]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
+                                self.inputConfig['FIT'][param]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
+                                self.inputConfig['FIT'][param]['ERROR'] = fitResults[param+'err']
 
-        else:
-            print 'Output fit type not supported for fitGuesses. Quittting...'
-            quit()
+                            paramIndex+=1
 
-        # Finally draw the surface
-        header.makeCan('pseudo2D_Rpf',self.projPath,[pseudo2D_Rpf],xtitle=self.xVarName,ytitle=self.yVarName)
+                else:
+                    print 'Output fit type not supported for fitGuesses. Quittting...'
+                    quit()
+
+            # Finally draw the surface
+            header.makeCan('pseudo2D_Rpf',self.projPath,[pseudo2D_Rpf],xtitle=self.xVarName,ytitle=self.yVarName)
 
     def _inputOrganizer(self):
         #################################################################################
@@ -1927,34 +2010,41 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
 
     # Save out Rp/f to a text file and make a re-run config
     for twoD in twoDs:
-        param_out = open(twoD.projPath+'rpf_params_'+twoD.name+'.txt','w')
-        rerun_config = header.dictCopy(twoD.inputConfig)
-        coeffIter_final = coeffs_final.createIterator()
-        coeff_final = coeffIter_final.Next()
-        while coeff_final:
-            # Text file
-            param_out.write(coeff_final.GetName()+': ' + str(coeff_final.getValV()) + ' +/- ' + str(coeff_final.getError())+'\n')
-            # Re run config
-            for k in rerun_config['FIT'].keys():
-                if k in coeff_final.GetName():
-                    rerun_config['FIT'][k]['ERROR'] = coeff_final.getError()
-                    rerun_config['FIT'][k]['NOMINAL'] = coeff_final.getValV()
-                    # if coeff_final.getValV() >= 0:
-                    rerun_config['FIT'][k]['MIN'] = coeff_final.getValV()-3*coeff_final.getError()
-                    rerun_config['FIT'][k]['MAX'] = coeff_final.getValV()+3*coeff_final.getError()
-                    # else:
-                    #     rerun_config['FIT'][k]['MAX'] = coeff_final.getValV()*0.5
-                    #     rerun_config['FIT'][k]['MIN'] = coeff_final.getValV()*1.5
+        for fittag in ['b','s']:
+            param_out = open(twoD.projPath+'rpf_params_'+twoD.name+'fit'+fittag+'.txt','w')
+            rerun_config = header.dictCopy(twoD.inputConfig)
 
-            # Next
-            coeff_final = coeffIter_final.Next()
+            try:
+                coeffs_final = TFile.Open(projDir+'/fitDiagnostics.root').Get('fit_'+fittag).floatParsFinal()
+                coeffIter_final = coeffs_final.createIterator()
+                coeff_final = coeffIter_final.Next()
+                while coeff_final:
+                    if coeff_final.GetName() in twoD.rpf.rpfVars.keys():
+                        # Text file
+                        param_out.write(coeff_final.GetName()+': ' + str(coeff_final.getValV()) + ' +/- ' + str(coeff_final.getError())+'\n')
+                        # Re run config
+                        for k in rerun_config['FIT'].keys():
+                            if k in coeff_final.GetName():
+                                rerun_config['FIT'][k]['ERROR'] = coeff_final.getError()
+                                rerun_config['FIT'][k]['NOMINAL'] = coeff_final.getValV()
+                                # if coeff_final.getValV() >= 0:
+                                rerun_config['FIT'][k]['MIN'] = coeff_final.getValV()-3*coeff_final.getError()
+                                rerun_config['FIT'][k]['MAX'] = coeff_final.getValV()+3*coeff_final.getError()
+                                # else:
+                                #     rerun_config['FIT'][k]['MAX'] = coeff_final.getValV()*0.5
+                                #     rerun_config['FIT'][k]['MIN'] = coeff_final.getValV()*1.5
 
-        # Close text file
-        param_out.close()
-        # Write out dictionary
-        rerun_out = open(twoD.projPath+'rerunConfig_fit'+fittag+'.json', 'w')
-        json.dump(rerun_config,rerun_out,indent=2, sort_keys=True)
-        rerun_out.close()
+                    # Next
+                    coeff_final = coeffIter_final.Next()
+            except:
+                print 'Unable to write fit_'+fittag+ ' parameters to text file'
+
+            # Close text file
+            param_out.close()
+            # Write out dictionary
+            rerun_out = open(twoD.projPath+'rerunConfig_fit'+fittag+'.json', 'w')
+            json.dump(rerun_config,rerun_out,indent=2, sort_keys=True)
+            rerun_out.close()
 
     if not skipPlots:
         if plotOn == '':

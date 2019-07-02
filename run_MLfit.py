@@ -24,10 +24,6 @@ parser.add_option("--recycleAll", action="store_true",
                 default =   False,
                 dest    =   "recycleAll",
                 help    =   "Recycle everything from the previous run with this tag")
-parser.add_option("--prerun", action="store_true", 
-                default =   False,
-                dest    =   "prerun",
-                help    =   "Does prerun fit of individual instances and then reruns full fit with Rp/f from these prerun fits")
 parser.add_option("--skipFit", action="store_true", 
                 default =   False,
                 dest    =   "skipFit",
@@ -48,7 +44,6 @@ inputConfigs = args
 print 'Setting on-fly parameters:'
 print '\ttag\t\t = '+options.quicktag
 print '\trecycleAll\t = '+str(options.recycleAll)
-print '\trerun\t = '+str(options.rerun)
 print '\tskipFit\t\t = '+str(options.skipFit)
 print 'Remaining arguments:'
 for i in inputConfigs:
@@ -84,13 +79,7 @@ if len(inputConfigs) > 1:
             subprocess.call(["sed -i 's/ch"+str(num)+"_//g' card_"+thistag+".txt"],shell=True)
 
     if not options.skipFit:
-        # Do the prerun which fits all 2D instances individually and later uses their configs for a full fit
-        if options.prerun:
-            for t in twoDinstances:
-                runMLFit([t],options.rMin,options.rMax,skipPlots=options.skipPlots)
-            
-        else:
-            runMLFit(twoDinstances,options.rMin,options.rMax,skipPlots=options.skipPlots)
+        runMLFit(twoDinstances,options.rMin,options.rMax,skipPlots=options.skipPlots)
 
     # Plot
     if not options.skipPlots:
