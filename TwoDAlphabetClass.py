@@ -106,14 +106,12 @@ class TwoDAlphabet:
             self.newXbins = self._readIn('newXbins')
             self.newYbins = self._readIn('newYbins')
 
-        print self.newXbins
-
         # Get one list of the x bins over the full range
-        self.full_x_bins = list(self.newXbins['LOW']) # need list() to make a copy - not a reference
+        self.fullXbins = list(self.newXbins['LOW']) # need list() to make a copy - not a reference
         for c in ['SIG','HIGH']:
-            self.full_x_bins.extend(self.newXbins[c][1:])
+            self.fullXbins.extend(self.newXbins[c][1:])
 
-        print self.full_x_bins
+        print self.fullXbins
 
         # Make systematic uncertainty plots
         if self.plotUncerts and not recycleAll:
@@ -408,7 +406,7 @@ class TwoDAlphabet:
         # newXbins[cat][xbin] = upper wall of xbin
         # full_x_bins.index(newXbins[cat][xbin]) = index of upper global wall OR index of bin win want in the the histogram (remember those bin indices start at 1 not 0)
 
-        return self.full_x_bins.index(self.newXbins[c][xbin])
+        return self.fullXbins.index(self.newXbins[c][xbin])
 
     def _getOption(self,optionName):
         # If it's in the config, just set it
@@ -456,7 +454,7 @@ class TwoDAlphabet:
 
         # bins
         self.pickleDict['newXbins'] = self.newXbins
-        self.pickleDict['full_x_bins'] = self.full_x_bins
+        self.pickleDict['full_x_bins'] = self.fullXbins
         self.pickleDict['newYbins'] = self.newYbins
 
         # rpf - Don't do this - takes up +5 GB
@@ -1542,7 +1540,7 @@ class TwoDAlphabet:
         y_turnon_endBin = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').ProjectionY().GetMaximumBin()
         y_tail_beginningBin = int((y_nbins - y_turnon_endBin)/2.0 + y_turnon_endBin)
         print 'Finding start and end bin indexes of signal range. Looking for '+str(self.sigStart)+', '+str(self.sigEnd)
-        for ix,xwall in enumerate(self.full_x_bins):
+        for ix,xwall in enumerate(self.fullXbins):
             if xwall == self.sigStart:
                 print 'Assigning start bin as '+str(ix+1)
                 x_sigstart_bin = ix+1
@@ -1588,12 +1586,12 @@ class TwoDAlphabet:
 
                 # First rebuild the 2D distributions
                 if self.blindedPlots and process == 'data_obs':
-                    hist_dict[process][cat]['prefit_2D'] = header.stitchHistsInX(process+'_'+cat+'_prefit2D',self.full_x_bins,self.newYbins,x_slice_list_pre,blinded=[1])
-                    hist_dict[process][cat]['postfit_2D'] = header.stitchHistsInX(process+'_'+cat+'_postfit2D',self.full_x_bins,self.newYbins,x_slice_list_post,blinded=[1])
+                    hist_dict[process][cat]['prefit_2D'] = header.stitchHistsInX(process+'_'+cat+'_prefit2D',self.fullXbins,self.newYbins,x_slice_list_pre,blinded=[1])
+                    hist_dict[process][cat]['postfit_2D'] = header.stitchHistsInX(process+'_'+cat+'_postfit2D',self.fullXbins,self.newYbins,x_slice_list_post,blinded=[1])
 
                 else:
-                    hist_dict[process][cat]['prefit_2D'] = header.stitchHistsInX(process+'_'+cat+'_prefit2D',self.full_x_bins,self.newYbins,x_slice_list_pre,blinded=[])
-                    hist_dict[process][cat]['postfit_2D'] = header.stitchHistsInX(process+'_'+cat+'_postfit2D',self.full_x_bins,self.newYbins,x_slice_list_post,blinded=[])
+                    hist_dict[process][cat]['prefit_2D'] = header.stitchHistsInX(process+'_'+cat+'_prefit2D',self.fullXbins,self.newYbins,x_slice_list_pre,blinded=[])
+                    hist_dict[process][cat]['postfit_2D'] = header.stitchHistsInX(process+'_'+cat+'_postfit2D',self.fullXbins,self.newYbins,x_slice_list_post,blinded=[])
 
                 hist_dict[process][cat]['prefit_2D'].SetMinimum(0)
                 hist_dict[process][cat]['postfit_2D'].SetMinimum(0)
@@ -1703,7 +1701,7 @@ class TwoDAlphabet:
                     
                     ## Need to do this ##
                     # if 'x' in plotType:
-                    #     hist_dict['qcd'][cat][plotType+str(regionNum)].GetXaxis().Set(len(self.full_x_bins)-1,array.array('d',self.full_x_bins))
+                    #     hist_dict['qcd'][cat][plotType+str(regionNum)].GetXaxis().Set(len(self.fullXbins)-1,array.array('d',self.fullXbins))
                     # elif 'y' in plotType:
                     #     hist_dict['qcd'][cat][plotType+str(regionNum)].GetXaxis().Set(len(self.newYbins)-1,array.array('d',self.newYbins))
                     ## otherwise a bunch of dumb warnings are thrown about bin limits ##
@@ -1756,10 +1754,10 @@ class TwoDAlphabet:
         #    Rp/f    #
         ##############
         # Need to sample the space to get the Rp/f with proper errors (1000 samples)
-        rpf_xnbins = len(self.full_x_bins)-1
+        rpf_xnbins = len(self.fullXbins)-1
         rpf_ynbins = len(self.newYbins)-1
         rpf_zbins = [i/1000. for i in range(0,1001)]
-        rpf_samples = TH3F('rpf_samples','rpf_samples',rpf_xnbins, array.array('d',self.full_x_bins), rpf_ynbins, array.array('d',self.newYbins), len(rpf_zbins)-1, array.array('d',rpf_zbins))# TH3 to store samples
+        rpf_samples = TH3F('rpf_samples','rpf_samples',rpf_xnbins, array.array('d',self.fullXbins), rpf_ynbins, array.array('d',self.newYbins), len(rpf_zbins)-1, array.array('d',rpf_zbins))# TH3 to store samples
         sample_size = 500
 
         # Collect all final parameter values
@@ -1861,7 +1859,7 @@ class TwoDAlphabet:
                 del chebSum
 
         print '\n'
-        rpf_final = TH2F('rpf_final','rpf_final',rpf_xnbins, array.array('d',self.full_x_bins), rpf_ynbins, array.array('d',self.newYbins))
+        rpf_final = TH2F('rpf_final','rpf_final',rpf_xnbins, array.array('d',self.fullXbins), rpf_ynbins, array.array('d',self.newYbins))
         # Now loop over all x,y bin in rpf_samples, project onto Z axis, 
         # get the mean and RMS and set as the bin content and error in rpf_final
         for xbin in range(1,rpf_final.GetNbinsX()+1):
