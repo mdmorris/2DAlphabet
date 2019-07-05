@@ -40,7 +40,7 @@ for i,c in enumerate(inputConfigsAndArgs):
 
 print 'tag                              = ' + str(options.quicktag)
 print 'Location of b-only fit workspace = ' + postfitWorkspaceDir 
-print 'Unblind data points                = '+ str(unblindData)
+print 'Unblind data points                = '+ str(options.unblindData)
 print 'Config Replacements:'
 for s in stringSwaps.keys():
     print '\t'+ s + ' -> ' + stringSwaps[s]
