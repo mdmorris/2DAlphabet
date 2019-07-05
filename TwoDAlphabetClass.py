@@ -76,12 +76,13 @@ class TwoDAlphabet:
         self.overwrite = self._getOption('overwrite')
         self.recycle = self._getOption('recycle')
         self.plotTogether = self._getOption('plotTogether')
+        self.recycleAll = recycleAll
 
         # Setup a directory to save
         self.projPath = self._projPath()
 
         # Pickle reading if recycling
-        if self.recycle != [] or recycleAll:
+        if self.recycle != [] or self.recycleAll:
             self.pickleFile = pickle.load(open(self.projPath+'saveOut.p','rb'))
         
         # Dict to pickle at the end
@@ -94,7 +95,7 @@ class TwoDAlphabet:
         # Replace signal with command specified
 
         # Global var replacement
-        if not recycleAll or 'runConfig' not in self.recycle:
+        if not self.recycleAll or 'runConfig' not in self.recycle:
             self._configGlobalVarReplacement()
         else:
             self.inputConfig = self._readIn('runConfig')
@@ -114,21 +115,21 @@ class TwoDAlphabet:
         print self.fullXbins
 
         # Make systematic uncertainty plots
-        if self.plotUncerts and not recycleAll:
+        if self.plotUncerts and not self.recycleAll:
             self._makeSystematicPlots()
 
         # Run pseudo2D for fit guesses and make the config to actually run on
-        if ("runConfig" not in self.recycle and not recycleAll):
+        if ("runConfig" not in self.recycle and not self.recycleAll):
             self._makeFitGuesses()
 
         # Initialize rpf class
-        if 'organizedDict' not in self.recycle and not recycleAll:
+        if 'organizedDict' not in self.recycle and not self.recycleAll:
         #     self.rpf = self._readIn('rpf')
         # else:
             self.rpf = RpfHandler.RpfHandler(self.inputConfig['FIT'],self.name)
 
         # Organize everything for workspace building
-        if 'organizedDict' in self.recycle or recycleAll:
+        if 'organizedDict' in self.recycle or self.recycleAll:
             self.organizedDict = self._readIn('organizedDict')
             self.orgFile = TFile.Open(self.projPath+'organized_hists.root') # have to save out the histograms to keep them persistent past this function
         else:
@@ -137,18 +138,18 @@ class TwoDAlphabet:
             self._inputOrganizer()
 
         # Build the workspace
-        if 'workspace' in self.recycle or recycleAll:
+        if 'workspace' in self.recycle or self.recycleAll:
             self.workspace = self._readIn('workspace')
             self.floatingBins = self._readIn('floatingBins')
         else:
             self._buildFitWorkspace()
 
         # Make the card
-        if 'card' not in self.recycle and not recycleAll:
+        if 'card' not in self.recycle and not self.recycleAll:
             self._makeCard()
 
         # Do a prerun where we fit just this pass-fail pair and set the rpf to result
-        if self.prerun and not recycleAll:
+        if self.prerun and not self.recycleAll:
             print 'Pre-running '+self.tag+' '+self.name+' to get a better estimate of the transfer function'
             self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
             runMLFit([self],'0','5',skipPlots=True)    
@@ -175,7 +176,7 @@ class TwoDAlphabet:
                 raw_input('WARNING: Pre-run for '+self.tag+' '+self.name+'failed. Using original Rp/f parameters. Press any key to continue.')
 
         # Save out at the end
-        if not recycleAll:
+        if not self.recycleAll:
             self._saveOut()
             pickle.dump(self.pickleDict, open(self.projPath+'saveOut.p','wb'))
 
@@ -429,10 +430,12 @@ class TwoDAlphabet:
         elif optionName == 'verbosity':
             option_return = 0
         else:
-            print 'WARNING: '+optionName+' boolean not set explicitely. Default to False.'
-            option_return = False
             if optionName == 'recycle':
+                print 'WARNING: '+optionName+' boolean not set explicitely. Default to [].'
                 option_return = []
+            else:
+                print 'WARNING: '+optionName+' boolean not set explicitely. Default to False.'
+                option_return = False
             
 
         return option_return

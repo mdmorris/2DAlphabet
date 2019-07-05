@@ -63,7 +63,7 @@ twoDinstances = []
 if len(inputConfigs) > 1:
     # Instantiate all class instances
     for i in inputConfigs:
-        instance = TwoDAlphabet(i,options.quicktag,stringSwaps)
+        instance = TwoDAlphabet(i,options.quicktag,stringSwaps=stringSwaps)
         twoDinstances.append(instance)
 
     # For each instance, check tags match and if they don't, ask the user for one
@@ -90,5 +90,5 @@ if len(inputConfigs) > 1:
 
 # If single fit
 else:
-    instance = TwoDAlphabet(inputConfigs[0],options.quicktag,stringSwaps)
+    instance = TwoDAlphabet(inputConfigs[0],options.quicktag,stringSwaps=stringSwaps)
     runLimit([instance],postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local')
