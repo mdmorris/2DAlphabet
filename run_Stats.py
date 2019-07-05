@@ -171,73 +171,14 @@ with header.cd(projDir):
     # Toy diagnositics and signal injection #
     #########################################
     if options.diagnosticsWithToys or options.signalInjection != '':
-        if not options.post:
+        if options.diagnosticsWithToys:
+            expectSignal = '0'
+            run_name = 'diagnosticsWithToys'
+        elif options.signalInjection != '':
+            expectSignal = options.signalInjection
+            run_name = 'signalInjection'+expectSignal
+        if not options.plotOnly:
             projtag = projDir.split('/')[0]
-            if options.diagnosticsWithToys:
-                expectSignal = '0'
-                run_name = 'diagnosticsWithToys'
-            elif options.signalInjection != '':
-                expectSignal = options.signalInjection
-                run_name = 'signalInjection'+expectSignal
-
-
-
-            # #####################################################################################
-            # # First get the postfit plots and use TotalBkg to make RPH2Ds to generate toys from #
-            # # - Make workspace and card pieces simultaneously                                   #                                                 #
-            # #####################################################################################
-            # toy_gen_workspace = RooWorkspace('w_toys')
-
-            # postfit_plot_file = TFile.Open('postfitshapes_b.root')
-            # folder_iterator = TIter(postfit_plot_file.GetListOfKeys())
-            
-            # channel_key = folder_iterator.Begin() # channel_key = <pass/fail>_<LOW/SIG/HIGH>_<name>_<pre/postfit>
-            # channels = []
-            # while channel_key:
-            #     channelInfo = pickle.load(open(channel_key.GetName().split('_')[2]+'/saveOut.p','r'))
-            #     xvar_name = channelInfo['xVarName']+'_'+channel_key.GetName().split('_')[1]+'_'+channelInfo['name']
-            #     yvar_name = channelInfo['yVarName']+'_'+channelInfo['name']
-
-            #     # Get postfit TotalBkg
-            #     if 'postfit' in channel_key.GetName():
-            #         # Get hist
-            #         this_bkg = postfit_plot_file.Get(channel_key.GetName()+'/TotalBkg')
-            #         this_data = postfit_plot_file.Get(channel_key.GetName()+'/data_obs')
-            #         # Build var list
-            #         xvar = RooRealVar(xvar_name, xvar_name, this_bkg.GetXaxis().GetXmin(), this_bkg.GetXaxis().GetXmax())
-            #         yvar = RooRealVar(yvar_name, yvar_name, this_bkg.GetYaxis().GetXmin(), this_bkg.GetYaxis().GetXmax())
-            #         this_varList = RooArgList(xvar, yvar)
-            #         # Make RDH
-            #         this_bkgRDH = header.makeRDH(this_bkg, this_varList, 'TotalBkg_'+channel_key.GetName().replace('_postfit',''))
-            #         this_dataRDH = header.makeRDH(this_data, this_varList, 'data_obs_'+channel_key.GetName().replace('_postfit',''))
-            #         # Import to workspace
-            #         getattr(toy_gen_workspace,'import')(this_bkgRDH,RooFit.RecycleConflictNodes(),RooFit.Silence())
-            #         getattr(toy_gen_workspace,'import')(this_dataRDH,RooFit.RecycleConflictNodes(),RooFit.Silence())
-
-            #         channels.append(channel_key.GetName().replace('_postfit',''))
-                    
-            #     # Get prefit TotalSig
-            #     elif 'prefit' in channel_key.GetName():
-            #         # Get hist
-            #         this_sig = postfit_plot_file.Get(channel_key.GetName()+'/TotalSig')
-            #         # Build var list
-            #         xvar = RooRealVar(xvar_name, xvar_name, this_sig.GetXaxis().GetXmin(), this_sig.GetXaxis().GetXmax())
-            #         yvar = RooRealVar(yvar_name, yvar_name, this_sig.GetYaxis().GetXmin(), this_sig.GetYaxis().GetXmax())
-            #         this_varList = RooArgList(xvar, yvar)
-            #         # Make RDH
-            #         this_sigRDH = header.makeRDH(this_sig, this_varList, 'TotalSig_'+channel_key.GetName().replace('_prefit',''))
-            #         # Import to workspace
-            #         getattr(toy_gen_workspace,'import')(this_sigRDH,RooFit.RecycleConflictNodes(),RooFit.Silence())
-
-            #     # Next
-            #     channel_key = folder_iterator.Next()
-
-            # toy_gen_workspace.writeToFile('toy_gen_workspace.root',True)          
-            # del toy_gen_workspace
-            # ##################################################################
-            # # Now make a card to reference the workspace and give to Combine #
-            # ##################################################################
-            # header.makeToyCard(channels)
 
             ########################################################################
             # First morph the base workspace to post-fit according to MLfit result #
@@ -286,6 +227,32 @@ with header.cd(projDir):
             # header.executeCmd(gen_command,options.dryrun)
             fit_command = 'combine '+run_name+'workspace.root -M FitDiagnostics --cminDefaultMinimizerStrategy 0 --expectSignal '+expectSignal+' -t '+options.toys+' --rMin '+options.rMin+' --rMax '+options.rMax+' --noErrors --minos none --skipBOnlyFit -n '+run_name
             header.executeCmd(fit_command,options.dryrun)
+
+        ################################
+        # Plot and save out the result #
+        ################################
+        result_can = TCanvas('sigpull_can','sigpull_can',800,700)
+        fitdaig_out = TFile.Open('fitDiagnostics'+run_name+'.root')
+        tree_fit_sb = fitdaig_out.Get('tree_fit_sb')
+        tree_fit_sb.Draw("(r-"+expectSignal+")/rErr>>sigpull(20,-5,5)")
+        tree_fit_sb.Draw("(r-"+expectSignal+")/rErr>>sigstrength(20,-5,5)")
+        hsigpull = gDirectory.Get('sigpull')
+        hsignstrength = gDirectory.Get('sigstrength')
+
+        hsigpull.Fit("gaus")
+        hsigpull.SetTitle(run_name)
+        hsigpull.GetXaxis().SetTitle('(r-'+expectSignal+')/rErr')
+        result_can.cd()
+        hsigpull.Draw('pe')
+        result_can.Print(run_name+'_sigpull.pdf','pdf')
+
+        hsignstrength.Fit("gaus")
+        hsignstrength.SetTitle(run_name)
+        hsignstrength.GetXaxis().SetTitle('r-'+expectSignal)
+        result_can.cd()
+        hsignstrength.Draw('pe')
+        result_can.Print(run_name+'_sigstrength.pdf','pdf')
+
 
             # command_to_diagnose = open('FitDiagnostics_command.txt','r').readline()
             # command_to_diagnose += ' --toysFile -n '+run_name+' -t '+options.toys+' --toysFrequentist --expectSignal 0 --noErrors --minos none'
