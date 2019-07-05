@@ -148,7 +148,7 @@ class TwoDAlphabet:
             self._makeCard()
 
         # Do a prerun where we fit just this pass-fail pair and set the rpf to result
-        if self.prerun:
+        if self.prerun and not recycleAll:
             print 'Pre-running '+self.tag+' '+self.name+' to get a better estimate of the transfer function'
             self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
             runMLFit([self],'0','5',skipPlots=True)    
@@ -871,8 +871,6 @@ class TwoDAlphabet:
                     for i,chunk in enumerate(chunkedProjX):
                         header.makeCan('fitSlices_'+str(i*6)+'-'+str(6*(i+1)),self.projPath,chunk,xtitle=self.xVarName)
 
-                pseudo2D_results.Close()
-
                 ########################################################
                 # And now fit these parameters as a function of y axis #
                 ########################################################
@@ -953,6 +951,7 @@ class TwoDAlphabet:
                     quit()
 
             # Finally draw the surface
+            pseudo2D_results.Close()
             header.makeCan('pseudo2D_Rpf',self.projPath,[pseudo2D_Rpf],xtitle=self.xVarName,ytitle=self.yVarName)
 
     def _inputOrganizer(self):
