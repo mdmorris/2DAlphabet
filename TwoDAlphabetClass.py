@@ -2132,7 +2132,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
 
     current_dir = os.getcwd()
 
-    aL_cmd = 'combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option# + sig_option 
+    aL_cmd = 'combine -M AsymptoticLimits limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option# + sig_option 
 
     # Run combine if not on condor
     if location == 'local':    
