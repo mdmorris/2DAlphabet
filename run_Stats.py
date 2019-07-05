@@ -269,8 +269,11 @@ with header.cd(projDir):
                     #         var.setError(abs(min(postfit_vars[idx].getError(),postfit_vars[idx].getValV())))
                     #         print 'Setting '+par_name+' to '+str(postfit_vars[idx].getValV())+' +/- '+str(abs(min(postfit_vars[idx].getError(),postfit_vars[idx].getValV())))
                     #     else:
-                    var.setError(postfit_vars[idx].getError())
-                    print 'Setting '+par_name+' to '+str(postfit_vars[idx].getValV())+' +/- '+str(postfit_vars[idx].getError())
+                    if 'Fail_' in par_name and (postfit_vars[idx].getValV() - postfit_vars[idx].getError()) < 0:
+                        var.setError(postfit_vars[idx].getValV()-0.001)
+                    else:
+                        var.setError(postfit_vars[idx].getError())
+                    print 'Setting '+par_name+' to '+str(var.getValV())+' +/- '+str(var.getError())
 
 
             prefit_file.Close()
@@ -281,7 +284,7 @@ with header.cd(projDir):
             seed = random.randint(100000,999999)
             # gen_command = 'combine card_toygen.txt -M GenerateOnly -t '+options.toys+' --expectSignal '+expectSignal+'  --saveToys -m 120 -s '+str(seed)+' -n '+run_name
             # header.executeCmd(gen_command,options.dryrun)
-            fit_command = 'combine '+run_name+'workspace.root -M FitDiagnostics -t '+options.toys+' --rMin '+options.rMin+' --rMax '+options.rMax+' --noErrors --minos none --skipBOnlyFit -n '+run_name
+            fit_command = 'combine '+run_name+'workspace.root -M FitDiagnostics --cminDefaultMinimizerStrategy 0 --expectSignal '+expectSignal+' -t '+options.toys+' --rMin '+options.rMin+' --rMax '+options.rMax+' --noErrors --minos none --skipBOnlyFit -n '+run_name
             header.executeCmd(fit_command,options.dryrun)
 
             # command_to_diagnose = open('FitDiagnostics_command.txt','r').readline()
