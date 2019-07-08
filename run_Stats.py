@@ -235,7 +235,7 @@ with header.cd(projDir):
         fitdaig_out = TFile.Open('fitDiagnostics'+run_name+'.root')
         tree_fit_sb = fitdaig_out.Get('tree_fit_sb')
         tree_fit_sb.Draw("(r-"+expectSignal+")/rErr>>sigpull(20,-5,5)")
-        tree_fit_sb.Draw("(r-"+expectSignal+")/rErr>>sigstrength(20,-5,5)")
+        tree_fit_sb.Draw("(r-"+expectSignal+")>>sigstrength(20,-5,5)")
         hsigpull = gDirectory.Get('sigpull')
         hsignstrength = gDirectory.Get('sigstrength')
 
