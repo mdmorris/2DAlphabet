@@ -69,7 +69,7 @@ for this_index, this_name in enumerate(signal_names):
     # Setup call for one of the signal
     this_xsec = signal_xsecs[this_index]
     this_mass = signal_mass[this_index]
-    this_output = TFile.Open(this_name+'/higgsCombineTest.Asymptotic.mH120.root')
+    this_output = TFile.Open(this_name+'/higgsCombineTest.AsymptoticLimits.mH120.root')
     this_tree = this_output.Get('limit')
     
     # Set the mass (x axis)
