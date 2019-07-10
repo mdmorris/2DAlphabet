@@ -102,7 +102,7 @@ def ascii_encode_dict(data):
 
 #     return histCopy
 
-def copyHistWithNewXbins(thisHist,newXbins,copyName,oldBinWidth):
+def copyHistWithNewXbins(thisHist,newXbins,copyName):
     # Make a copy with the same Y bins but new X bins
     ybins = []
     for iy in range(1,thisHist.GetNbinsY()+1):
@@ -142,8 +142,8 @@ def copyHistWithNewXbins(thisHist,newXbins,copyName,oldBinWidth):
                     new_bin_content += thisHist.GetBinContent(old_xbin,ybin)
                     new_bin_errorsq += thisHist.GetBinError(old_xbin,ybin)**2
 
-            new_bin_content /= bins_added
-            new_bin_errorsq /= bins_added
+            # new_bin_content /= bins_added
+            # new_bin_errorsq /= bins_added
 
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             if new_bin_content > 0:
@@ -158,7 +158,7 @@ def copyHistWithNewXbins(thisHist,newXbins,copyName,oldBinWidth):
 
     return hist_copy
 
-def copyHistWithNewYbins(thisHist,newYbins,copyName,oldBinWidth):
+def copyHistWithNewYbins(thisHist,newYbins,copyName):
     # Make a copy with the same X bins but new Y bins
     xbins = []
     for ix in range(1,thisHist.GetNbinsX()+1):
@@ -198,8 +198,8 @@ def copyHistWithNewYbins(thisHist,newYbins,copyName,oldBinWidth):
                     new_bin_content += thisHist.GetBinContent(xbin,old_ybin)
                     new_bin_errorsq += thisHist.GetBinError(xbin,old_ybin)**2
 
-            new_bin_content /= bins_added
-            new_bin_errorsq /= bins_added
+            # new_bin_content /= bins_added
+            # new_bin_errorsq /= bins_added
 
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             if new_bin_content > 0:

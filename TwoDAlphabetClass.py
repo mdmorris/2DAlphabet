@@ -694,11 +694,11 @@ class TwoDAlphabet:
         print ybins_pseudo
 
         # Rebin x and y
-        rebinned_x_pass = header.copyHistWithNewXbins(data_pass,xbins_pseudo,'rebinned_x_pass',self.oldXwidth)
-        rebinned_x_fail = header.copyHistWithNewXbins(data_fail,xbins_pseudo,'rebinned_x_fail',self.oldXwidth)
+        rebinned_x_pass = header.copyHistWithNewXbins(data_pass,xbins_pseudo,'rebinned_x_pass')#,self.oldXwidth)
+        rebinned_x_fail = header.copyHistWithNewXbins(data_fail,xbins_pseudo,'rebinned_x_fail')#,self.oldXwidth)
 
-        rebinned_pass = header.copyHistWithNewYbins(rebinned_x_pass,ybins_pseudo,'rebinned_pass',self.oldYwidth)
-        rebinned_fail = header.copyHistWithNewYbins(rebinned_x_fail,ybins_pseudo,'rebinned_fail',self.oldYwidth)
+        rebinned_pass = header.copyHistWithNewYbins(rebinned_x_pass,ybins_pseudo,'rebinned_pass')#,self.oldYwidth)
+        rebinned_fail = header.copyHistWithNewYbins(rebinned_x_fail,ybins_pseudo,'rebinned_fail')#,self.oldYwidth)
 
         ######################################################
         #   Rebin the distributions according to new y bins  #
@@ -1126,7 +1126,7 @@ class TwoDAlphabet:
 
                     # If there are user specified y bins...
                     if self.newYbins != False:
-                        temp_hist = header.copyHistWithNewYbins(dict_hists[process][cat][dist],self.newYbins,temp_histname,self.oldYwidth)
+                        temp_hist = header.copyHistWithNewYbins(dict_hists[process][cat][dist],self.newYbins,temp_histname)#,self.oldYwidth)
                     else:
                         temp_hist = dict_hists[process][cat][dist]
 
@@ -1137,7 +1137,7 @@ class TwoDAlphabet:
                         if dist != 'nominal':                           # if not nominal dist
                             histname = histname + '_' + dist
                         print 'Making '+histname
-                        finalhist = header.copyHistWithNewXbins(temp_hist,self.newXbins[c],histname,self.oldYwidth)
+                        finalhist = header.copyHistWithNewXbins(temp_hist,self.newXbins[c],histname)#,self.oldYwidth)
 
                         # Test if histogram is non-zero
                         if finalhist.Integral() <= 0:
