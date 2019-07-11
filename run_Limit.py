@@ -86,9 +86,11 @@ if len(inputConfigs) > 1:
         for num in range(1,len(twoDinstances)+1):
             subprocess.call(["sed -i 's/ch"+str(num)+"_//g' card_"+thistag+".txt"],shell=True)
 
-    runLimit(twoDinstances,postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local')
+    if 'condor' in os.getcwd(): runLimit(twoDinstances,postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='condor')
+    else: runLimit(twoDinstances,postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local')
 
 # If single fit
 else:
     instance = TwoDAlphabet(inputConfigs[0],options.quicktag,stringSwaps=stringSwaps)
-    runLimit([instance],postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local')
+    if 'condor' in os.getcwd(): runLimit([instance],postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='condor')
+    else: runLimit([instance],postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local')
