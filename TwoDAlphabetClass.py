@@ -126,7 +126,7 @@ class TwoDAlphabet:
         if 'organizedDict' not in self.recycle and not self.recycleAll:
         #     self.rpf = self._readIn('rpf')
         # else:
-            self.rpf = RpfHandler.RpfHandler(self.inputConfig['FIT'],self.name)
+            self.rpf = RpfHandler.RpfHandler(self.inputConfig['FIT'],self.name,self._dummyTH2())
 
         # Organize everything for workspace building
         if 'organizedDict' in self.recycle or self.recycleAll:
@@ -238,6 +238,9 @@ class TwoDAlphabet:
                                         if old_string in self.inputConfig[mainkey][subkey][subsubkey]:                               # check subsubkey val
                                             self.inputConfig[mainkey][subkey][subsubkey] = self.inputConfig[mainkey][subkey][subsubkey].replace(old_string,new_string) # replace it
 
+    def _dummyTH2(self): # stores binning of space
+        dummyTH2 = TH2F('dummyTH2','dummyTH2',len(self.fullXbins)-1,array.array('d',self.fullXbins),len(self.newYbins)-1,array.array('d',self.newYbins))
+        return dummyTH2
 
     def _getRRVs(self):
         xRRVs = {}

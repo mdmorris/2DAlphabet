@@ -4,7 +4,7 @@ from ROOT import *
 import header
 
 class RpfHandler():
-    def __init__ (self,fitDict,name):
+    def __init__ (self,fitDict,name,dummy_TH2=None):
         self.fitDict = fitDict
         self.fitType = self.fitType()
         self.name = name
