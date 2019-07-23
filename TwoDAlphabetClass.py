@@ -2077,7 +2077,7 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
                 sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f '+plotOn_depth+'fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
                 header.executeCmd(sshapes_cmd)
 
-def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
+def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
     # Set verbosity - chosen from first of configs
     verbose = ''
     if twoDs[0].verbosity != False:
@@ -2146,7 +2146,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
         with header.cd(projDir):
             header.executeCmd(aL_cmd)
     # If on condor, write a script to run (python will then release its memory usage)
-    else:
+    elif location == 'condor':
         # Do all of the project specific shell scripting here
         shell_finisher = open('shell_finisher.sh','w')
         shell_finisher.write('#!/bin/sh\n')
