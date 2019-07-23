@@ -254,10 +254,15 @@ with header.cd(projDir):
         result_can.Print(run_name+'_sigstrength.pdf','pdf')
 
 
-            # command_to_diagnose = open('FitDiagnostics_command.txt','r').readline()
-            # command_to_diagnose += ' --toysFile -n '+run_name+' -t '+options.toys+' --toysFrequentist --expectSignal 0 --noErrors --minos none'
-        # Need to write bit to plot
-        # else:
+    # If on condor, write a script to run (python will then release its memory usage)
+    if 'condor' in os.getcwd():
+        identifier = projDir + '_'+run_name
+        # Do all of the project specific shell scripting here
+        shell_finisher = open('shell_finisher.sh','w')
+        shell_finisher.write('#!/bin/sh\n')
+        shell_finisher.write('tar -czvf '+identifier+'.tgz '+projDir+'/hig'++'\n')
+        shell_finisher.write('cp '+identifier+'.tgz $CMSSW_BASE/../')
+        shell_finisher.close()
 
  
 
