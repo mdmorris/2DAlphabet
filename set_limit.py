@@ -37,7 +37,7 @@ parser.add_option('-l', '--lumi', metavar='F', type='string', action='store',
 parser.add_option('-m', '--mod', metavar='F', type='string', action='store',
                 default       =       '',
                 dest          =       'mod',
-                help          =       'Modification to limit. For example, different handedness of the signal')
+                help          =       'Modification to limit title on y-axis. For example, different handedness of the signal')
 
 (options, args) = parser.parse_args()
 
@@ -138,6 +138,7 @@ g_mclimit.SetMarkerSize(0.)
 
 # Observed
 if not options.blind:
+    print 'Not blinded'
     g_limit = TGraph(len(x_mass), x_mass, y_limit)
     g_limit.SetTitle("")
     g_limit.SetMarkerStyle(0)
@@ -145,19 +146,18 @@ if not options.blind:
     g_limit.SetLineColor(1)
     g_limit.SetLineWidth(3)
     g_limit.SetMarkerSize(0.5) #0.5
-    g_limit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
-    g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
     g_limit.GetYaxis().SetRangeUser(0., 80.)
     g_limit.GetXaxis().SetRangeUser(1, 3.2)
-    g_limit.SetMinimum(3.0e-3) #0.005
-    g_limit.SetMaximum(7000.)
+    g_limit.SetMinimum(1.0e-3) #0.005
+    g_limit.SetMaximum(700.)
 else:
+    print 'Blinded'
     g_mclimit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
     g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
     g_mclimit.GetYaxis().SetRangeUser(0., 80.)
     g_mclimit.GetXaxis().SetRangeUser(1, 3.2)
-    g_mclimit.SetMinimum(3.0e-3) #0.005
-    g_mclimit.SetMaximum(7000.)
+    g_mclimit.SetMinimum(1.0e-3) #0.005
+    g_mclimit.SetMaximum(700.)
 # Expected
 # g_mclimit = TGraph(len(x_mass), x_mass, y_mclimit)
 # g_mclimit.SetTitle("")
@@ -188,8 +188,8 @@ graphWP.SetMarkerColor(4)
 graphWP.SetMarkerSize(0.5)
 graphWP.GetYaxis().SetRangeUser(0., 80.)
 graphWP.GetXaxis().SetRangeUser(1, 3.2)
-graphWP.SetMinimum(3.0e-3) #0.005
-graphWP.SetMaximum(7000.)
+graphWP.SetMinimum(1.0e-3) #0.005
+graphWP.SetMaximum(700.)
 q = 0
 for index,mass in enumerate(signal_mass):
     xsec = signal_xsecs[index]
@@ -251,6 +251,8 @@ g_error.SetFillColor( kGreen)
 g_error.SetLineColor(0)
 
 if not options.blind:
+    g_limit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
+    g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
     g_limit.Draw('al')
     g_error95.Draw("lf")
     g_error.Draw("lf")
@@ -260,12 +262,14 @@ if not options.blind:
     g_limit.GetYaxis().SetTitleOffset(1.4)
 
 else:
-    g_mclimit.GetYaxis().SetTitleOffset(1.4)
+    g_mclimit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
+    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
     g_mclimit.Draw("al")
     g_error95.Draw("lf")
     g_error.Draw("lf")
     g_mclimit.Draw("l")
     graphWP.Draw("l")
+    g_mclimit.GetYaxis().SetTitleOffset(1.4)
     
 # graphWP.Draw("l")
 
@@ -274,7 +278,7 @@ else:
 # graphWPdown.Draw("l")
 
 
-legend = TLegend(0.5, 0.45, 0.86, 0.84, '')
+legend = TLegend(0.55, 0.50, 0.87, 0.80, '')
 if not options.blind:
     legend.AddEntry(g_limit, "Observed", "l")
 legend.AddEntry(g_mclimit, "Expected (95% CL)","l")
