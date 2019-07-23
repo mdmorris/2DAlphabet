@@ -38,8 +38,17 @@ parser.add_option("--plotOn", metavar='F', type='string', action='store',
                 help    =   "Plot the fit result of this fit onto the workspace from project in directory provided")
 
 (options, args) = parser.parse_args()
+inputConfigsAndArgs = args
 
-inputConfigs = args
+# Assign and summarize input
+stringSwaps = {}
+inputConfigs = []
+for i,c in enumerate(inputConfigsAndArgs):
+    if ':' in c: # specify string swap
+        stringSwaps[c.split(':')[0]] = c.split(':')[1]
+        print c.split(':')[0] +' = '+c.split(':')[1]
+    elif '.json' in c:
+        inputConfigs.append(c)
 
 print 'Setting on-fly parameters:'
 print '\ttag\t\t = '+options.quicktag
@@ -55,7 +64,7 @@ twoDinstances = []
 if len(inputConfigs) > 1:
     # Instantiate all class instances
     for i in inputConfigs:
-        instance = TwoDAlphabet(i,options.quicktag,options.recycleAll)
+        instance = TwoDAlphabet(i,options.quicktag,options.recycleAll,stringSwaps=stringSwaps)
         twoDinstances.append(instance)
 
     # For each instance, check tags match and if they don't, ask the user for one
@@ -102,7 +111,7 @@ if len(inputConfigs) > 1:
 
 # If single fit
 else:
-    instance = TwoDAlphabet(inputConfigs[0],options.quicktag,options.recycleAll)
+    instance = TwoDAlphabet(inputConfigs[0],options.quicktag,options.recycleAll,stringSwaps=stringSwaps)
     
     if not options.skipFit:
         runMLFit([instance],options.rMin,options.rMax,skipPlots=options.skipPlots)
