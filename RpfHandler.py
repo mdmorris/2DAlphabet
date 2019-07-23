@@ -151,6 +151,7 @@ class RpfHandler():
             gFormula = gFormula.replace('-x','-@'+str(nCoeffs)).replace('-y','-@'+str(nCoeffs+1))
             gFormula = gFormula.replace('/x','/@'+str(nCoeffs)).replace('/y','/@'+str(nCoeffs+1))
             gFormula = gFormula.replace('(x','(@'+str(nCoeffs)).replace('(y','(@'+str(nCoeffs+1))
+            gFormula = gFormula.replace(' x',' @'+str(nCoeffs)).replace(' y',' @'+str(nCoeffs+1))
             return gFormula
         elif self.fitType == 'cheb':
             return False    # No string form for this. Dependencies already built into chebyshevBasis class
