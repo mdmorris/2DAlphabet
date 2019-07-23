@@ -143,8 +143,8 @@ def copyHistWithNewXbins(thisHist,newXbins,copyName):
                         new_bin_content += thisHist.GetBinContent(old_xbin,ybin)
                         new_bin_errorsq += thisHist.GetBinError(old_xbin,ybin)**2
 
-            # new_bin_content /= bins_added
-            # new_bin_errorsq /= bins_added
+            new_bin_content /= bins_added
+            new_bin_errorsq /= bins_added
 
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             if new_bin_content > 0:
@@ -200,8 +200,8 @@ def copyHistWithNewYbins(thisHist,newYbins,copyName):
                         new_bin_content += thisHist.GetBinContent(xbin,old_ybin)
                         new_bin_errorsq += thisHist.GetBinError(xbin,old_ybin)**2
 
-            # new_bin_content /= bins_added
-            # new_bin_errorsq /= bins_added
+            new_bin_content /= bins_added
+            new_bin_errorsq /= bins_added
 
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             if new_bin_content > 0:
