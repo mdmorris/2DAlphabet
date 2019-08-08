@@ -1572,7 +1572,9 @@ class TwoDAlphabet:
             tree_fit_sb.GetEntry(0)
             signal_strength = tree_fit_sb.r
         else:
-            signal_strength = 0
+            tree_fit_b = fd_file.Get('tree_fit_b')
+            tree_fit_b.GetEntry(0)
+            signal_strength = tree_fit_b.r
 
         #####################
         #    Data vs Bkg    #
