@@ -177,6 +177,13 @@ with header.cd(projDir):
         elif options.signalInjection != '':
             expectSignal = options.signalInjection
             run_name = 'signalInjection'+expectSignal
+        if ',' in options.toys: 
+            run_name+='_'+options.toys.split(',')[0]+'-'+options.toys.split(',')[1]
+            ntoys = int(options.toys.split(',')[1]) - int(options.toys.split(',')[0])
+        else:
+            run_name+='1-'+str(int(options.toys.split(',')[1]+1))
+            ntoys = int(options.toys)
+
         if not options.plotOnly:
             projtag = projDir.split('/')[0]
 
@@ -225,7 +232,7 @@ with header.cd(projDir):
             seed = random.randint(100000,999999)
             # gen_command = 'combine card_toygen.txt -M GenerateOnly -t '+options.toys+' --expectSignal '+expectSignal+'  --saveToys -m 120 -s '+str(seed)+' -n '+run_name
             # header.executeCmd(gen_command,options.dryrun)
-            fit_command = 'combine '+run_name+'workspace.root -M FitDiagnostics --cminDefaultMinimizerStrategy 0 --expectSignal '+expectSignal+' -t '+options.toys+' --rMin '+options.rMin+' --rMax '+options.rMax+' --noErrors --minos none --skipBOnlyFit -n '+run_name
+            fit_command = 'combine '+run_name+'workspace.root -M FitDiagnostics --cminDefaultMinimizerStrategy 0 --expectSignal '+expectSignal+' -t '+str(ntoys)+' --rMin '+options.rMin+' --rMax '+options.rMax+' --noErrors --minos none --skipBOnlyFit -n '+run_name
             header.executeCmd(fit_command,options.dryrun)
 
         ################################
@@ -254,15 +261,24 @@ with header.cd(projDir):
         result_can.Print(run_name+'_sigstrength.pdf','pdf')
 
 
-    # If on condor, write a script to run (python will then release its memory usage)
-    if 'condor' in os.getcwd():
-        identifier = projDir + '_'+run_name
-        # Do all of the project specific shell scripting here
-        shell_finisher = open('shell_finisher.sh','w')
-        shell_finisher.write('#!/bin/sh\n')
-        shell_finisher.write('tar -czvf '+identifier+'.tgz '+projDir+'/hig'++'\n')
-        shell_finisher.write('cp '+identifier+'.tgz $CMSSW_BASE/../')
-        shell_finisher.close()
+# If on condor, write a script to run (python will then release its memory usage)
+if 'condor' in os.getcwd() and (options.diagnosticsWithToys or options.signalInjection != ''):
+    identifier = tag + '_'+run_name
+    files_to_grab = [
+        run_name+'workspace.root',
+        'fitDiagnostics'+run_name+'.root',
+        'higgsCombine'+run_name+'.FitDiagnostics.mH120.123456.root',
+        run_name+'_sigstrength.pdf',
+        run_name+'_sigpull.pdf'
+    ]
+    tar_cmd = 'tar -czvf '+identifier+'.tgz '
+    for f in files_to_grab: tar_cmd+=projDir+'/'+f+' '
+    # Do all of the project specific shell scripting here
+    shell_finisher = open('shell_finisher.sh','w')
+    shell_finisher.write('#!/bin/sh\n')
+    shell_finisher.write(tar_cmd+'\n')
+    shell_finisher.write('cp '+identifier+'.tgz $CMSSW_BASE/../')
+    shell_finisher.close()
 
  
 
