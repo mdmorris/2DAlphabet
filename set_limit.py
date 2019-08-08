@@ -31,7 +31,7 @@ parser.add_option('-b', '--blind', action="store_true",
                 dest      =   'blind',
                 help      =   'Only plot observed limit if false')
 parser.add_option('-l', '--lumi', metavar='F', type='string', action='store',
-                default       =       '137052',
+                default       =       '137.44',
                 dest          =       'lumi',
                 help          =       'Luminosity option')
 parser.add_option('-m', '--mod', metavar='F', type='string', action='store',
@@ -70,6 +70,7 @@ for this_index, this_name in enumerate(signal_names):
     this_xsec = signal_xsecs[this_index]
     this_mass = signal_mass[this_index]
     this_output = TFile.Open(this_name+'/higgsCombineTest.AsymptoticLimits.mH120.root')
+    if not this_output: continue
     this_tree = this_output.Get('limit')
     
     # Set the mass (x axis)
@@ -296,11 +297,11 @@ legend.Draw("same")
 text1 = ROOT.TLatex()
 text1.SetNDC()
 text1.SetTextFont(42)
-text1.DrawLatex(0.2,0.84, "#scale[1.0]{CMS, L = "+options.lumi+" pb^{-1} at  #sqrt{s} = 13 TeV}") # NOT GENERIC
+text1.DrawLatex(0.2,0.84, "#scale[1.0]{CMS, L = "+options.lumi+" fb^{-1} at  #sqrt{s} = 13 TeV}") # NOT GENERIC
 
 TPT.Draw()      
 climits.RedrawAxis()
-climits.SaveAs("limits_combine_"+options.lumi+"pb_"+options.signals[options.signals.find('/')+1:options.signals.find('.')]+".pdf")
+climits.SaveAs("limits_combine_"+options.lumi+"fb_"+options.signals[options.signals.find('/')+1:options.signals.find('.')]+'_'+cstr+".pdf")
 
 # Finally calculate the intercept
 expectedLimit = Inter(g_mclimit,graphWP)[0]
