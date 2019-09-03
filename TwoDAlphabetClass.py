@@ -1572,7 +1572,9 @@ class TwoDAlphabet:
             tree_fit_sb.GetEntry(0)
             signal_strength = tree_fit_sb.r
         else:
-            signal_strength = 0
+            tree_fit_b = fd_file.Get('tree_fit_b')
+            tree_fit_b.GetEntry(0)
+            signal_strength = tree_fit_b.r
 
         #####################
         #    Data vs Bkg    #
@@ -1618,10 +1620,10 @@ class TwoDAlphabet:
                 hist_dict[process][cat]['prefit_projx3'] = hist_dict[process][cat]['prefit_2D'].ProjectionX(base_proj_name_pre+'projx_'+y_tail_beginningVal+'-'+str(y_high),         y_tail_beginningBin+1,  y_nbins,'e')
 
                 hist_dict[process][cat]['prefit_projy1'] = hist_dict[process][cat]['prefit_LOW'].ProjectionY(base_proj_name_pre+'projy_'+str(x_low)+'-'+str(self.sigStart),          1,                      hist_dict[process][cat]['prefit_LOW'].GetNbinsX(),'e')
-                # if self.blindedPlots:
-                #     hist_dict[process][cat]['prefit_projy2'] = hist_dict[process][cat]['prefit_2D'].ProjectionY(base_proj_name_pre+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd), x_sigstart_bin,           x_sigend_bin,'e')
-                # else:
-                hist_dict[process][cat]['prefit_projy2'] = hist_dict[process][cat]['prefit_SIG'].ProjectionY(base_proj_name_pre+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd),    1,                      hist_dict[process][cat]['prefit_SIG'].GetNbinsX(),'e')
+                if self.blindedPlots:
+                    hist_dict[process][cat]['prefit_projy2'] = hist_dict[process][cat]['prefit_2D'].ProjectionY(base_proj_name_pre+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd), x_sigstart_bin,           x_sigend_bin,'e')
+                else:
+                    hist_dict[process][cat]['prefit_projy2'] = hist_dict[process][cat]['prefit_SIG'].ProjectionY(base_proj_name_pre+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd),    1,                      hist_dict[process][cat]['prefit_SIG'].GetNbinsX(),'e')
                 hist_dict[process][cat]['prefit_projy3'] = hist_dict[process][cat]['prefit_HIGH'].ProjectionY(base_proj_name_pre+'projy_'+str(self.sigEnd)+'-'+str(x_high),          1,                      hist_dict[process][cat]['prefit_HIGH'].GetNbinsX(),'e')
 
                 hist_dict[process][cat]['postfit_projx1'] = hist_dict[process][cat]['postfit_2D'].ProjectionX(base_proj_name_post+'projx_'+str(y_low)+'-'+y_turnon_endVal,           1,                      y_turnon_endBin, 'e')
@@ -1629,10 +1631,10 @@ class TwoDAlphabet:
                 hist_dict[process][cat]['postfit_projx3'] = hist_dict[process][cat]['postfit_2D'].ProjectionX(base_proj_name_post+'projx_'+y_tail_beginningVal+'-'+str(y_high),      y_tail_beginningBin+1,  y_nbins,'e')
 
                 hist_dict[process][cat]['postfit_projy1'] = hist_dict[process][cat]['postfit_LOW'].ProjectionY(base_proj_name_post+'projy_'+str(x_low)+'-'+str(self.sigStart),       1,                      hist_dict[process][cat]['postfit_LOW'].GetNbinsX(),'e')
-                # if self.blindedPlots:
-                #     hist_dict[process][cat]['postfit_projy2'] = hist_dict[process][cat]['postfit_2D'].ProjectionY(base_proj_name_pre+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd), x_sigstart_bin,           x_sigend_bin,'e')
-                # else:
-                hist_dict[process][cat]['postfit_projy2'] = hist_dict[process][cat]['postfit_SIG'].ProjectionY(base_proj_name_post+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd), 1,                      hist_dict[process][cat]['postfit_SIG'].GetNbinsX(),'e')
+                if self.blindedPlots:
+                    hist_dict[process][cat]['postfit_projy2'] = hist_dict[process][cat]['postfit_2D'].ProjectionY(base_proj_name_pre+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd), x_sigstart_bin,           x_sigend_bin,'e')
+                else:
+                    hist_dict[process][cat]['postfit_projy2'] = hist_dict[process][cat]['postfit_SIG'].ProjectionY(base_proj_name_post+'projy_'+str(self.sigStart)+'-'+str(self.sigEnd), 1,                      hist_dict[process][cat]['postfit_SIG'].GetNbinsX(),'e')
                 hist_dict[process][cat]['postfit_projy3'] = hist_dict[process][cat]['postfit_HIGH'].ProjectionY(base_proj_name_post+'projy_'+str(self.sigEnd)+'-'+str(x_high),       1,                      hist_dict[process][cat]['postfit_HIGH'].GetNbinsX(),'e')
 
                 x_edges = [x_low,self.sigStart,self.sigEnd,x_high]
@@ -1703,11 +1705,11 @@ class TwoDAlphabet:
                             if (process != 'qcd' and self.inputConfig['PROCESS'][process]['CODE'] != 0):
                                 bkg_process_list.append(hist_dict[process][cat][plotType+str(regionNum)])
                             elif (process != 'qcd' and self.inputConfig['PROCESS'][process]['CODE'] == 0):
-                                if fittag == 'fit_s':
-                                    hist_dict[process][cat][plotType+str(regionNum)].Scale(signal_strength)
-                                    signal_list.append(hist_dict[process][cat][plotType+str(regionNum)])
-                                else:
-                                    signal_list.append(hist_dict[process][cat][plotType.replace('post','pre')+str(regionNum)])
+                                # if fittag == 'fit_s':
+                                hist_dict[process][cat][plotType+str(regionNum)].Scale(signal_strength)
+                                signal_list.append(hist_dict[process][cat][plotType+str(regionNum)])
+                                # else:
+                                    # signal_list.append(hist_dict[process][cat][plotType+str(regionNum)]) #.replace('post','pre')
 
                         else:
                             dataList.append(hist_dict[process][cat][plotType+str(regionNum)])
@@ -2061,21 +2063,21 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
             json.dump(rerun_config,rerun_out,indent=2, sort_keys=True)
             rerun_out.close()
 
-    if not skipPlots:
-        if plotOn == '':
-            with header.cd(projDir):
-                bshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
-                header.executeCmd(bshapes_cmd)
-                sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
-                header.executeCmd(sshapes_cmd)
+    # if not skipPlots:
+    if plotOn == '':
+        with header.cd(projDir):
+            bshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
+            header.executeCmd(bshapes_cmd)
+            sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
+            header.executeCmd(sshapes_cmd)
 
-        else:
-            with header.cd(plotOn):
-                print 'Plotting fit result from '+projDir+' onto workspace from '+card_name
-                bshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f '+plotOn_depth+'fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
-                header.executeCmd(bshapes_cmd)
-                sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f '+plotOn_depth+'fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
-                header.executeCmd(sshapes_cmd)
+    else:
+        with header.cd(plotOn):
+            print 'Plotting fit result from '+projDir+' onto workspace from '+card_name
+            bshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f '+plotOn_depth+'fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
+            header.executeCmd(bshapes_cmd)
+            sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f '+plotOn_depth+'fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
+            header.executeCmd(sshapes_cmd)
 
 def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
     # Set verbosity - chosen from first of configs
