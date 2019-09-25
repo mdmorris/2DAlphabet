@@ -133,15 +133,13 @@ def copyHistWithNewXbins(thisHist,newXbins,copyName):
             new_bin_max = hist_copy.GetXaxis().GetBinUpEdge(xbin)
 
             # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
-            bins_added = 0
             for old_xbin in range(1,thisHist.GetNbinsX()+1):
                 if thisHist.GetXaxis().GetBinLowEdge(old_xbin) >= new_bin_min and thisHist.GetXaxis().GetBinUpEdge(old_xbin) <= new_bin_max:
                     # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
                     # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
-                    bins_added +=1
-                    if thisHist.GetBinContent(old_xbin,ybin) >= 0.0:
-                        new_bin_content += thisHist.GetBinContent(old_xbin,ybin)
-                        new_bin_errorsq += thisHist.GetBinError(old_xbin,ybin)**2
+                    # if thisHist.GetBinContent(old_xbin,ybin) >= 0.0:
+                    new_bin_content += thisHist.GetBinContent(old_xbin,ybin)
+                    new_bin_errorsq += thisHist.GetBinError(old_xbin,ybin)**2
 
             # new_bin_content /= bins_added
             # new_bin_errorsq /= bins_added
@@ -190,15 +188,13 @@ def copyHistWithNewYbins(thisHist,newYbins,copyName):
             new_bin_max = hist_copy.GetYaxis().GetBinUpEdge(ybin)
 
             # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
-            bins_added = 0
             for old_ybin in range(1,thisHist.GetNbinsY()+1):
                 if thisHist.GetYaxis().GetBinLowEdge(old_ybin) >= new_bin_min and thisHist.GetYaxis().GetBinUpEdge(old_ybin) <= new_bin_max:
                     # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
                     # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
-                    bins_added += 1
-                    if thisHist.GetBinContent(xbin,old_ybin) >= 0.0:
-                        new_bin_content += thisHist.GetBinContent(xbin,old_ybin)
-                        new_bin_errorsq += thisHist.GetBinError(xbin,old_ybin)**2
+                    # if thisHist.GetBinContent(xbin,old_ybin) >= 0.0:
+                    new_bin_content += thisHist.GetBinContent(xbin,old_ybin)
+                    new_bin_errorsq += thisHist.GetBinError(xbin,old_ybin)**2
 
             # new_bin_content /= bins_added
             # new_bin_errorsq /= bins_added
