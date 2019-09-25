@@ -126,7 +126,7 @@ class TwoDAlphabet:
         if 'organizedDict' not in self.recycle and not self.recycleAll:
         #     self.rpf = self._readIn('rpf')
         # else:
-            self.rpf = RpfHandler.RpfHandler(self.inputConfig['FIT'],self.name,self._dummyTH2())
+            self.rpf = RpfHandler.RpfHandler(self.inputConfig['FIT'],self.name,self._dummyTH2(),self.tag)
 
         # Organize everything for workspace building
         if 'organizedDict' in self.recycle or self.recycleAll:
@@ -1260,17 +1260,16 @@ class TwoDAlphabet:
                         x_center_mapped = (x_center - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
                         y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
 
-                        x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center_mapped)
-                        y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center_mapped)
 
+
+                        # And now get the Rpf function value for this bin 
+                        # chebyshev class takes different input
+                        x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center if self.rpf.fitType == 'cheb' else x_center_mapped)
+                        y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center if self.rpf.fitType == 'cheb' else y_center_mapped)
+                        
                         self.allVars.append(x_const)
                         self.allVars.append(y_const)
-
-                        # # And now get the Rpf function value for this bin 
-                        if self.rpf.fitType == 'cheb':
-                            this_rpf = self.rpf.evalRpf(x_center_mapped, y_center_mapped,this_full_xbin,ybin) # chebyshev class takes different input
-                        else:
-                            this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
+                        this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
 
                         this_bin_pass = RooConstVar(pass_bin_name, pass_bin_name, 1e-9)
                         bin_list_pass.add(this_bin_pass)
@@ -1312,22 +1311,22 @@ class TwoDAlphabet:
                         x_center_mapped = (x_center - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
                         y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
 
-                        x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center_mapped)
-                        y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center_mapped)
+                        # And now get the Rpf function value for this bin 
+                        # chebyshev class takes different input
+                        x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center if self.rpf.fitType == 'cheb' else x_center_mapped)
+                        y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center if self.rpf.fitType == 'cheb' else y_center_mapped)
 
                         self.allVars.append(x_const)
                         self.allVars.append(y_const)
 
-                        # And now get the Rpf function value for this bin 
-                        if self.rpf.fitType == 'cheb':
-                            this_rpf = self.rpf.evalRpf(x_center_mapped, y_center_mapped,this_full_xbin,ybin) # chebyshev class takes different input
-                        else:
-                            this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
+                        this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
 
                         formula_arg_list = RooArgList(binRRV,this_rpf)
                         this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1",formula_arg_list)
                         bin_list_pass.add(this_bin_pass)
+                        self.allVars.append(formula_arg_list)
                         self.allVars.append(this_bin_pass)
+                        self.allVars.append(this_rpf)
 
 
             print "Making RPH2Ds"
@@ -1806,8 +1805,8 @@ class TwoDAlphabet:
                         thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
                         thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
 
-                        thisXMapped = (thisXCenter - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
-                        thisYMapped = (thisYCenter - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
+                        # thisXMapped = (thisXCenter - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
+                        # thisYMapped = (thisYCenter - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
 
                         # Determine the category
                         if thisXCenter > self.newXbins['LOW'][0] and thisXCenter < self.newXbins['LOW'][-1]: # in the LOW category
@@ -1823,7 +1822,7 @@ class TwoDAlphabet:
 
         elif self.rpf.fitType == 'cheb':
             # Import the basis shapes
-            cheb_shapes = TFile.Open(globalDir+'basis_plots/basis_shapes.root')
+            cheb_shapes = TFile.Open(self.projPath+'basis_plots/basis_shapes.root')
             first_shape_name = cheb_shapes.GetListOfKeys().First().GetName()
             first_shape = cheb_shapes.Get(first_shape_name) # just used to grab binning and such
             cheb_xnbins = first_shape.GetNbinsX()
@@ -1841,38 +1840,68 @@ class TwoDAlphabet:
                 # Randomize the parameters
                 param_sample = fit_result.randomizePars()
 
-                # Make TH2 for this sample
-                chebSum = TH2F('chebSum','chebSum',cheb_xnbins,cheb_xmin,cheb_xmax,cheb_ynbins,cheb_ymin,cheb_ymax)
+                # Set params of the Rpf object
+                coeffIter_sample = param_sample.createIterator()
+                coeff_sample = coeffIter_sample.Next()
+                while coeff_sample:
+                    # Set the rpf parameter to the sample value
+                    if coeff_sample.GetName() in self.rpf.rpfVars.keys():
+                        self.rpf.setRpfParam(coeff_sample.GetName(), coeff_sample.getValV())
+                    coeff_sample = coeffIter_sample.Next()
 
-                # Grab relevant coefficients and loop over them to sum over the shapes
-                chebCoeffs = param_sample.selectByName('ChebCoeff_*x*y*'+suffix)        # Another trick here - if suffix='', this will grab everything including those
-                if suffix == '':                                                        # polyCoeffs with the suffix. Need to remove those by explicitely grabbing them
-                    chebCoeffsToRemove = param_sample.selectByName('ChebCoeff_*x*y*_*') # and using .remove(collection)
-                    chebCoeffs.remove(chebCoeffsToRemove)
+                # Loop over bins and fill
+                for xbin in range(1,rpf_xnbins+1):
+                    for ybin in range(1,rpf_ynbins+1):
+                        bin_val = 0
 
-                # Looping...
-                chebIter = chebCoeffs.createIterator()
-                chebCoeff = chebIter.Next()
-                while chebCoeff:
-                    chebName = chebCoeff.GetName()
-                    xLabel = chebName[len('chebCoeff_'):len('chebCoeff_')+2] 
-                    yLabel = chebName[len('chebCoeff_'+xLabel):len('chebCoeff_'+xLabel)+2]
-
-                    # Grab and scale the basis shape
-                    tempScaled = cheb_shapes.Get('cheb_Tx'+xLabel[-1]+'_Ty'+yLabel[-1]).Clone()
-                    tempScaled.Scale(chebCoeffs.find(chebName).getValV())
-
-                    # Add to the sum
-                    chebSum.Add(tempScaled)
-                    chebCoeff = chebIter.Next()
-
-                for xbin in range(1,chebSum.GetNbinsX()+1):
-                    for ybin in range(1,chebSum.GetNbinsY()+1):
                         thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
                         thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
-                        rpf_samples.Fill(thisXCenter,thisYCenter,chebSum.GetBinContent(xbin,ybin))
 
-                del chebSum
+                        thisXMapped = (thisXCenter - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
+                        thisYMapped = (thisYCenter - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
+
+                        # Determine the category
+                        if thisXCenter > self.newXbins['LOW'][0] and thisXCenter < self.newXbins['LOW'][-1]: # in the LOW category
+                            thisxcat = 'LOW'
+                        elif thisXCenter > self.newXbins['SIG'][0] and thisXCenter < self.newXbins['SIG'][-1]: # in the SIG category
+                            thisxcat = 'SIG'
+                        elif thisXCenter > self.newXbins['HIGH'][0] and thisXCenter < self.newXbins['HIGH'][-1]: # in the HIGH category
+                            thisxcat = 'HIGH'
+
+                        bin_val = self.rpf.getRpfBinVal(thisxcat,xbin,ybin)
+
+                        rpf_samples.Fill(thisXCenter,thisYCenter,bin_val)
+
+
+                # # Make TH2 for this sample
+                # chebSum = TH2F('chebSum','chebSum',cheb_xnbins,cheb_xmin,cheb_xmax,cheb_ynbins,cheb_ymin,cheb_ymax)
+
+                # # Grab relevant coefficients and loop over them to sum over the shapes
+                # chebCoeffs = param_sample.selectByName('ChebCoeff_*x*y*'+self.name)        # Another trick here - if suffix='', this will grab everything including those
+                
+                # # Looping...
+                # chebIter = chebCoeffs.createIterator()
+                # chebCoeff = chebIter.Next()
+                # while chebCoeff:
+                #     chebName = chebCoeff.GetName()
+                #     xLabel = chebName[len('ChebCoeff_'):len('ChebCoeff_')+2] 
+                #     yLabel = chebName[len('ChebCoeff_'+xLabel):len('hebCoeff_'+xLabel)+2]
+
+                #     # Grab and scale the basis shape
+                #     tempScaled = cheb_shapes.Get('cheb_Tx'+xLabel[-1]+'_Ty'+yLabel[-1]).Clone()
+                #     tempScaled.Scale(chebCoeffs.find(chebName).getValV())
+
+                #     # Add to the sum
+                #     chebSum.Add(tempScaled)
+                #     chebCoeff = chebIter.Next()
+
+                # for xbin in range(1,chebSum.GetNbinsX()+1):
+                #     for ybin in range(1,chebSum.GetNbinsY()+1):
+                #         thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
+                #         thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
+                #         rpf_samples.Fill(thisXCenter,thisYCenter,chebSum.GetBinContent(xbin,ybin))
+
+                # del chebSum
 
         print '\n'
         rpf_final = TH2F('rpf_final','rpf_final',rpf_xnbins, array.array('d',self.fullXbins), rpf_ynbins, array.array('d',self.newYbins))
@@ -1892,7 +1921,7 @@ class TwoDAlphabet:
 
         if os.path.isfile(self.projPath+'plots/rpf_comparisons.root'):
 
-            rpf_file = TFile.Open(globalDir+'/plots/rpf_comparisons.root','UPDATE')
+            rpf_file = TFile.Open(self.projPath+'/plots/rpf_comparisons.root','UPDATE')
 
             # Do a ratio and diff with pre-fit
             prefit_rpf = rpf_file.Get('RpfToRemap_unit')
@@ -1908,7 +1937,7 @@ class TwoDAlphabet:
 
             # rpf_ratio_c = TCanvas('rpf_ratio_c','Ratio of post-fit to pre-fit R_{P/F}',800,700)
             # rpf_ratio.Draw('surf')
-            # rpf_ratio_c.Print(globalDir+'/plots/rpf_post-to-pre_ratio.pdf','pdf')
+            # rpf_ratio_c.Print(self.projPath+'/plots/rpf_post-to-pre_ratio.pdf','pdf')
 
             rpf_file.cd()
             rpf_final.Write()

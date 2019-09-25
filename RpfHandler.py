@@ -1,11 +1,12 @@
 import ROOT
 from ROOT import *
 
-import header
+import header, os, subprocess
 
 class RpfHandler():
-    def __init__ (self,fitDict,name,dummy_TH2=None):
+    def __init__ (self,fitDict,name,dummy_TH2=None,tag=''):
         self.fitDict = fitDict
+        self.projDir = name+'/'+tag
         self.fitType = self.fitType()
         self.name = name
         self.rpfVars = {}
@@ -120,11 +121,19 @@ class RpfHandler():
             
         elif self.fitType == 'cheb':
             # Make a dummy TH2 for binning to be used by the chebyshevBasis class
-            chebBasis = chebyshevBasis('chebBasis','chebBasis',self.fitDict['CHEBYSHEV']['XORDER'],self.fitDict['CHEBYSHEV']['YORDER'],dummy_TH2)
-            chebBasis.drawBasis('basis_plots/basis_shapes.root')
+            self.chebBasis = chebyshevBasis(name,'chebBasis',self.fitDict['CHEBYSHEV']['XORDER'],self.fitDict['CHEBYSHEV']['YORDER'],dummy_TH2)
+            if os.path.isdir(self.projDir+'/basis_plots'): header.executeCmd('rm -rf %s/basis_plots'%self.projDir)
+            header.executeCmd('mkdir %s/basis_plots'%self.projDir)
+
+            self.chebBasis.drawBasis(self.projDir+'/basis_plots')
 
             # This class handles the RRV management itself so we just keep track of the class instance
-            self.rpfVars['cheb'] = chebBasis
+            cheb_coeffs = self.chebBasis.getCoeffs()
+            i = 0
+            while cheb_coeffs.at(i):
+                c = cheb_coeffs.at(i)
+                self.rpfVars[c.GetName()] = c
+                i += 1
 
     def fitType(self):
         if 'XPFORM' in self.fitDict.keys() and 'YPFORM' in self.fitDict.keys():
@@ -216,8 +225,10 @@ class RpfHandler():
 
         elif self.fitType == 'cheb':
             # chebBasis.getBinVal() returns a RooAddition with the proper construction to be the sum of the shapes with floating coefficients
-            rpf_val = chebBasis.getBinVal(xConst, yConst)
-        
+            cheb_val = self.chebBasis.getBinVal(xConst.getValV(), yConst.getValV())
+            rpf_val = RooFormulaVar(full_formula_name,full_formula_name,'(1+@0)/2',RooArgList(cheb_val)) # translate the [-1,1] range to [0,1] to guarantee positivity
+            self.allVars.append(cheb_val)
+
         self.storeRpfBin(rpf_val,full_formula_name)         
 
         return rpf_val
