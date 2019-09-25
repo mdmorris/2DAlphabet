@@ -154,7 +154,7 @@ if not options.blind:
 else:
     print 'Blinded'
     g_mclimit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
-    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
+    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [fb]") # NOT GENERIC
     g_mclimit.GetYaxis().SetRangeUser(0., 80.)
     g_mclimit.GetXaxis().SetRangeUser(1, 3.2)
     g_mclimit.SetMinimum(1.0e-3) #0.005
@@ -253,7 +253,7 @@ g_error.SetLineColor(0)
 
 if not options.blind:
     g_limit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
-    g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
+    g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [fb]") # NOT GENERIC
     g_limit.Draw('al')
     g_error95.Draw("lf")
     g_error.Draw("lf")
@@ -264,7 +264,7 @@ if not options.blind:
 
 else:
     g_mclimit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
-    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
+    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [fb]") # NOT GENERIC
     g_mclimit.Draw("al")
     g_error95.Draw("lf")
     g_error.Draw("lf")
@@ -304,8 +304,8 @@ climits.RedrawAxis()
 climits.SaveAs("limits_combine_"+options.lumi+"fb_"+options.signals[options.signals.find('/')+1:options.signals.find('.')]+'_'+cstr+".pdf")
 
 # Finally calculate the intercept
-expectedLimit = Inter(g_mclimit,graphWP)[0]
-upLimit = Inter(g_mcminus,graphWP)[0]
-lowLimit = Inter(g_mcplus,graphWP)[0]
+expectedLimit = Inter(g_mclimit,graphWP)[0] if len(Inter(g_mclimit,graphWP)) > 0 else -1.0
+upLimit = Inter(g_mcminus,graphWP)[0] if len(Inter(g_mcminus,graphWP)) > 0 else -1.0
+lowLimit = Inter(g_mcplus,graphWP)[0] if len(Inter(g_mcplus,graphWP)) > 0 else -1.0
 
 print 'Expected limit: '+str(expectedLimit/1000.) + ' +'+str(upLimit/1000.-expectedLimit/1000.) +' -'+str(expectedLimit/1000.-lowLimit/1000.) + ' TeV' # NOT GENERIC
