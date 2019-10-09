@@ -190,7 +190,7 @@ class RpfHandler():
             y_formula_var = RooFormulaVar(y_formula_name, y_formula_name, self.fitDict['YPFORM'].replace('y','@0'), y_param_list)
             self.allVars.extend([y_formula_var, y_param_list])
 
-            rpf_val = RooProduct(full_formula_name, full_formula_name, RooArgList(x_formula_var, y_formula_var))
+            rpf_val = RooFormulaVar(full_formula_name, full_formula_name, "max(0.000001,@0*@1)", RooArgList(x_formula_var, y_formula_var))
 
 
         elif self.fitType == 'fullPoly':
@@ -210,8 +210,10 @@ class RpfHandler():
                 self.allVars.append(x_poly_var)
 
             # Now make a polynomial out of the x polynomials
-            rpf_val = RooPolyVar(full_formula_name,full_formula_name,yConst,x_poly_list)
-
+            this_x_polyvar_label = "yPol_y"+str(y_coeff)+'_'+c+"_bin_"+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
+            rpf_val_poly = RooPolyVar(this_x_polyvar_label,this_x_polyvar_label,yConst,x_poly_list)
+            self.allVars.append(rpf_val_poly)
+            rpf_val = RooFormulaVar(full_formula_name,full_formula_name,"max(0.000001,@0)",RooArgList(rpf_val_poly))
 
         elif self.fitType == 'generic':
             formula_list = RooArgList()
@@ -221,7 +223,7 @@ class RpfHandler():
             generic_formula = self.getRooFunctionForm()
             formula_list.add(xConst)
             formula_list.add(yConst)
-            rpf_val = RooFormulaVar(full_formula_name,full_formula_name,generic_formula,formula_list)
+            rpf_val = RooFormulaVar(full_formula_name,full_formula_name,"max(0.000001,"+generic_formula+")",formula_list)
 
         elif self.fitType == 'cheb':
             # chebBasis.getBinVal() returns a RooAddition with the proper construction to be the sum of the shapes with floating coefficients
