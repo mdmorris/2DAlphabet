@@ -212,6 +212,90 @@ def copyHistWithNewYbins(thisHist,newYbins,copyName):
 
     return hist_copy
 
+def smoothHist2D(name,histToSmooth):
+    smoothed_hist = histToSmooth.Clone(name)
+    smoothed_hist.Reset()
+    smoothed_hist.Sumw2()
+
+    for ix in range(1,histToSmooth.GetNbinsX()+1):
+        for iy in range(1,histToSmooth.GetNbinsY()+1):
+            bin_contents = []
+
+            if ix == 1:
+                if iy == 1: # lower left corner
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                elif iy == histToSmooth.GetNbinsY(): # upper left corner
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+                else: # left wall
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+            
+            elif ix == histToSmooth.GetNbinsX():
+                if iy == 1: # lower right corner
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                elif iy == histToSmooth.GetNbinsY(): # upper right corner
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+                else: # right wall
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+            else:
+                if iy == 1: # bottom wall
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                elif iy == histToSmooth.GetNbinsY(): # top wall
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                else: # full square
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
+
+            avg = 0
+            for b in bin_contents: avg += b
+            avg = avg/len(bin_contents)
+
+            smoothed_hist.SetBinContent(ix,iy,avg)
+
+    return smoothed_hist
+
+def zeroNegativeBins(name,inhist):
+    outhist = inhist.Clone(name)
+    outhist.Reset()
+    for ix in range(1,inhist.GetNbinsX()):
+        for iy in range(1,inhist.GetNbinsY()):
+            content = max(0,inhist.GetBinContent(ix,iy))
+            outhist.SetBinContent(ix,iy,content)
+            if content == 0: outhist.SetBinError(ix,iy,0)
+            else: outhist.SetBinError(ix,iy,inhist.GetBinError(ix,iy))
+
+    return outhist
+
 def stitchHistsInX(name,xbins,ybins,thisHistList,blinded=[]):
     # Required that thisHistList be in order of desired stitching
     # `blinded` is a list of the index of regions you wish to skip/blind

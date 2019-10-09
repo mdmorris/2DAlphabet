@@ -76,6 +76,7 @@ class TwoDAlphabet:
         self.overwrite = self._getOption('overwrite')
         self.recycle = self._getOption('recycle')
         self.plotTogether = self._getOption('plotTogether')
+        self.rpfRatio = self._getOption('rpfRatio')
         self.recycleAll = recycleAll
 
         # Setup a directory to save
@@ -427,7 +428,7 @@ class TwoDAlphabet:
             print 'WARNING: '+optionName+' boolean not set explicitely. Default to True.'
             option_return = True
         # Default to false
-        elif optionName in ['freezeFail','fitGuesses','plotUncerts','prerun']:
+        elif optionName in ['freezeFail','fitGuesses','plotUncerts','prerun','rpfRatio']:
             print 'WARNING: '+optionName+' boolean not set explicitely. Default to False.'
             option_return = False
         elif optionName == 'verbosity':
@@ -971,8 +972,11 @@ class TwoDAlphabet:
 
         # Grab all process names and loop through
         processes = [process for process in self.inputConfig['PROCESS'].keys() if process != "HELP"]
+        if self.rpfRatio != False: processes.append('qcdmc')
+
         for process in processes:
-            this_process_dict = self.inputConfig['PROCESS'][process]
+            if process == 'qcdmc': this_process_dict = self.inputConfig['OPTIONS']['rpfRatio']
+            else: this_process_dict = self.inputConfig['PROCESS'][process]
             
             dict_hists[process] = {  
                 'file': 0,
@@ -1008,7 +1012,7 @@ class TwoDAlphabet:
 
 
             # If there are systematics
-            if len(this_process_dict['SYSTEMATICS']) == 0:
+            if process == 'qcdmc' or len(this_process_dict['SYSTEMATICS']) == 0:
                 print 'No systematics for process ' + process
             else:
                 # Loop through them and grab info from inputConfig['SYSTEMATIC']
@@ -1202,6 +1206,11 @@ class TwoDAlphabet:
         for r in ['pass','fail']:
             for c in ['LOW','SIG','HIGH']:
                 Roo_dict['qcd'][r+'_'+c] = {}
+
+        TH2_qcdmc_ratios = {}
+        TH2_data_ratios = {}
+        TH2_data_passes = {}
+        TH2_data_fails = {}
         # Need to build for each category
         for c in ['LOW','SIG','HIGH']:
             bin_list_fail = RooArgList()
@@ -1209,6 +1218,42 @@ class TwoDAlphabet:
 
             TH2_data_fail = self.orgFile.Get(self.organizedDict['data_obs']['fail_'+c]['nominal'])
             TH2_data_pass = self.orgFile.Get(self.organizedDict['data_obs']['pass_'+c]['nominal'])
+            
+            TH2_data_fail_clone = TH2_data_fail.Clone()
+            TH2_data_pass_clone = TH2_data_pass.Clone()
+
+            # for process in self.organizedDict.keys():
+            #     if process == 'qcdmc': continue
+            #     elif self.inputConfig['PROCESS'][process]['CODE'] == 2: 
+            #         to_subtract_fail = self.orgFile.Get(self.organizedDict[process]['fail_'+c]['nominal'])
+            #         to_subtract_pass = self.orgFile.Get(self.organizedDict[process]['pass_'+c]['nominal'])
+                    
+            #         TH2_data_fail_clone.Add(to_subtract_fail,-0.8)
+            #         TH2_data_pass_clone.Add(to_subtract_pass,-0.8)
+
+            
+            if self.rpfRatio != False:
+                # "TH2_data_fail" is now going to be the true fail multiplied by the pass/fail ratio of the MC
+                TH2_qcdmc_fail = self.orgFile.Get(self.organizedDict['qcdmc']['fail_'+c]['nominal'])
+                TH2_qcdmc_pass = self.orgFile.Get(self.organizedDict['qcdmc']['pass_'+c]['nominal'])
+
+                if 'SMOOTH' in self.inputConfig['OPTIONS']['rpfRatio'].keys() and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']:
+                    TH2_qcdmc_fail = header.smoothHist2D('smooth_qcdmc_fail_'+c,TH2_qcdmc_fail)
+                    TH2_qcdmc_pass = header.smoothHist2D('smooth_qcdmc_pass_'+c,TH2_qcdmc_pass)
+
+                    TH2_data_fail_clone = header.smoothHist2D('smooth_data_fail_'+c,TH2_data_fail_clone)
+                    TH2_data_pass_clone = header.smoothHist2D('smooth_data_pass_'+c,TH2_data_pass_clone)
+
+                TH2_qcdmc_ratios[c] = TH2_qcdmc_pass.Clone()
+                TH2_qcdmc_ratios[c].Divide(TH2_qcdmc_fail)
+
+                TH2_qcdmc_ratio = TH2_qcdmc_ratios[c]
+
+                TH2_data_ratios[c] = TH2_data_pass_clone.Clone()
+                TH2_data_ratios[c].Divide(TH2_data_fail_clone)
+            else:
+                TH2_data_fails[c] = TH2_data_fail_clone
+                TH2_data_passes[c] = TH2_data_pass_clone
 
             # Get each bin
             for ybin in range(1,len(self.newYbins)):
@@ -1312,7 +1357,6 @@ class TwoDAlphabet:
                         y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
 
                         # And now get the Rpf function value for this bin 
-                        # chebyshev class takes different input
                         x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center if self.rpf.fitType == 'cheb' else x_center_mapped)
                         y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center if self.rpf.fitType == 'cheb' else y_center_mapped)
 
@@ -1321,8 +1365,16 @@ class TwoDAlphabet:
 
                         this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
 
-                        formula_arg_list = RooArgList(binRRV,this_rpf)
-                        this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1",formula_arg_list)
+                        if self.rpfRatio == False:
+                            formula_arg_list = RooArgList(binRRV,this_rpf)
+                            this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1",formula_arg_list)
+                            
+                        else:
+                            mc_ratio_var = RooConstVar("mc_ratio_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, "mc_ratio_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, TH2_qcdmc_ratio.GetBinContent(xbin,ybin))
+                            formula_arg_list = RooArgList(binRRV,this_rpf,mc_ratio_var)
+                            this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1*@2",formula_arg_list)
+                            self.allVars.append(mc_ratio_var)
+
                         bin_list_pass.add(this_bin_pass)
                         self.allVars.append(formula_arg_list)
                         self.allVars.append(this_bin_pass)
@@ -1338,11 +1390,27 @@ class TwoDAlphabet:
             Roo_dict['qcd']['pass_'+c]['RPH2D'] = RooParametricHist2D('qcd_pass_'+c+'_'+self.name,'qcd_pass_'+c+'_'+self.name,x_vars[c], y_var, bin_list_pass, TH2_data_fail)
             Roo_dict['qcd']['pass_'+c]['norm']  = RooAddition('qcd_pass_'+c+'_'+self.name+'_norm','qcd_pass_'+c+'_'+self.name+'_norm',bin_list_pass)
 
+        if self.rpfRatio != False:
+            mc_rpf = header.stitchHistsInX('mc_ratio',self.fullXbins,self.newYbins,[TH2_qcdmc_ratios['LOW'],TH2_qcdmc_ratios['SIG'],TH2_qcdmc_ratios['HIGH']])
+            data_rpf = header.stitchHistsInX('data_ratio',self.fullXbins,self.newYbins,[TH2_data_ratios['LOW'],TH2_data_ratios['SIG'],TH2_data_ratios['HIGH']],blinded=[1] if self.blindedPlots else [])
+            mc_rpf.SetMaximum(2)
+            data_rpf.SetMaximum(2)
+
+            rpf_ratio = data_rpf.Clone()
+            rpf_ratio.Divide(mc_rpf)
+            header.makeCan('rpf_ratio',self.projPath,[data_rpf,mc_rpf,rpf_ratio],titles=["Data Ratio","MC Ratio","Ratio of ratios"])
+        else: 
+            data_fail = header.stitchHistsInX('data_fail',self.fullXbins,self.newYbins,[TH2_data_fails['LOW'],TH2_data_fails['SIG'],TH2_data_fails['HIGH']],blinded=[1] if self.blindedPlots else [])
+            data_pass = header.stitchHistsInX('data_fail',self.fullXbins,self.newYbins,[TH2_data_passes['LOW'],TH2_data_passes['SIG'],TH2_data_passes['HIGH']],blinded=[1] if self.blindedPlots else [])
+            data_rpf = data_pass.Clone()
+            data_rpf.Divide(data_fail)
+            header.makeCan('data_ratio',self.projPath,[data_pass,data_fail,data_rpf],titles=["Data Pass","Data Fail","R_{P/F}"])
+
         print "Making workspace..."
         # Make workspace to save in
         self.workspace = RooWorkspace("w_"+self.name)
         for process in Roo_dict.keys():
-            for cat in [k for k in Roo_dict[process].keys() if 'file' not in k]:
+            for cat in [k for k in Roo_dict[process].keys() if 'file' not in k and 'FULL' not in k]:
                 if process == 'qcd':
                     rooObj = Roo_dict[process][cat]
                     # if type(rooObj) != dict:
@@ -1771,7 +1839,8 @@ class TwoDAlphabet:
         # Need to sample the space to get the Rp/f with proper errors (1000 samples)
         rpf_xnbins = len(self.fullXbins)-1
         rpf_ynbins = len(self.newYbins)-1
-        rpf_zbins = [i/1000. for i in range(0,1001)]
+        if self.rpfRatio == False: rpf_zbins = [i/1000. for i in range(0,1001)]
+        else: rpf_zbins = [i/1000. for i in range(0,5001)]
         rpf_samples = TH3F('rpf_samples','rpf_samples',rpf_xnbins, array.array('d',self.fullXbins), rpf_ynbins, array.array('d',self.newYbins), len(rpf_zbins)-1, array.array('d',rpf_zbins))# TH3 to store samples
         sample_size = 500
 
