@@ -115,13 +115,9 @@ class TwoDAlphabet:
 
         print self.fullXbins
 
-        # Make systematic uncertainty plots
-        if self.plotUncerts and not self.recycleAll:
-            self._makeSystematicPlots()
-
         # Run pseudo2D for fit guesses and make the config to actually run on
         if ("runConfig" not in self.recycle and not self.recycleAll):
-            self._makeFitGuesses()
+            if self.fitGuesses: self._makeFitGuesses()
 
         # Initialize rpf class
         if 'organizedDict' not in self.recycle and not self.recycleAll:
@@ -137,6 +133,10 @@ class TwoDAlphabet:
             self.orgFile = TFile(self.projPath+'organized_hists.root','RECREATE') # have to save out the histograms to keep them persistent past this function
             self.organizedDict = {}
             self._inputOrganizer()
+
+        # Make systematic uncertainty plots
+        if self.plotUncerts and not self.recycleAll:
+            self._makeSystematicPlots()
 
         # Build the workspace
         if 'workspace' in self.recycle or self.recycleAll:
@@ -218,7 +218,7 @@ class TwoDAlphabet:
             
             if old_string != "HELP":                                            # For each key in GLOBAL that is not HELP
                 for mainkey in self.inputConfig.keys():                         # For each main (top level) key in config that isn't GLOBAL
-                    if mainkey != 'GLOBAL' and mainkey != 'OPTIONS':            # Mainkeys are all unchangeable (uppercase) so no check performed
+                    if mainkey != 'GLOBAL':            # Mainkeys are all unchangeable (uppercase) so no check performed
                         for subkey in self.inputConfig[mainkey].keys():         # For each subkey of main key dictionary
                             if old_string in subkey:                            # Check subkey for old_string
                                 self.inputConfig[mainkey][subkey.replace(old_string,new_string)] = self.inputConfig[mainkey].pop(subkey)  # replace it
@@ -226,7 +226,7 @@ class TwoDAlphabet:
 
                             # If the subkey value is not a dict, then check one more time
                             if type(self.inputConfig[mainkey][subkey]) != dict:
-                                if old_string in self.inputConfig[mainkey][subkey]:
+                                if type(self.inputConfig[mainkey][subkey]) == str and old_string in self.inputConfig[mainkey][subkey]:
                                     self.inputConfig[mainkey][subkey] = self.inputConfig[mainkey][subkey].replace(old_string,new_string)
                             # If it is a dict, go deeper
                             else:
@@ -1280,10 +1280,9 @@ class TwoDAlphabet:
                         this_TH2 = self.orgFile.Get(self.organizedDict[process]['fail_'+c]['nominal'])
 
                         # Check the code and change bin content and errors accordingly
-                        if self.inputConfig['PROCESS'][process]['CODE'] == 0: # signal
-                            continue
-                        elif self.inputConfig['PROCESS'][process]['CODE'] == 1: # data
-                            continue
+                        if process == 'qcdmc': continue
+                        elif self.inputConfig['PROCESS'][process]['CODE'] == 0: continue # signal
+                        elif self.inputConfig['PROCESS'][process]['CODE'] == 1: continue # data
                         elif self.inputConfig['PROCESS'][process]['CODE'] == 2: # MC
                             bin_content    = bin_content     - this_TH2.GetBinContent(xbin,ybin)
                             bin_range_up   = bin_range_up    - 0.5*this_TH2.GetBinContent(xbin,ybin)
@@ -1297,7 +1296,7 @@ class TwoDAlphabet:
                         bin_list_fail.add(binRRV)
                         self.allVars.append(binRRV)
 
-                        # Then get bin center and assign it to a RooConstVar
+                        # Then get bin center 
                         x_center = TH2_data_fail.GetXaxis().GetBinCenter(xbin)
                         y_center = TH2_data_fail.GetYaxis().GetBinCenter(ybin)
 
@@ -1305,13 +1304,11 @@ class TwoDAlphabet:
                         x_center_mapped = (x_center - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
                         y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
 
-
-
-                        # And now get the Rpf function value for this bin 
-                        # chebyshev class takes different input
+                        # And assign it to a RooConstVar 
                         x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center if self.rpf.fitType == 'cheb' else x_center_mapped)
                         y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center if self.rpf.fitType == 'cheb' else y_center_mapped)
                         
+                        # Now get the Rpf function value for this bin 
                         self.allVars.append(x_const)
                         self.allVars.append(y_const)
                         this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
@@ -1984,9 +1981,11 @@ class TwoDAlphabet:
 
         rpf_c = TCanvas('rpf_c','Post-fit R_{P/F}',800,700)
         rpf_final.Draw('lego')
-        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_lego.pdf','pdf')
+        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_lego.png','png')
+        rpf_final.Draw('surf')
+        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_surf.png','png')
         rpf_final.Draw('pe')
-        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_errs.pdf','pdf')
+        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_errs.png','png')
 
         if os.path.isfile(self.projPath+'plots/rpf_comparisons.root'):
 
