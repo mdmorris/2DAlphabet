@@ -513,72 +513,129 @@ class TwoDAlphabet:
 
                     print proc + '_'+syst
 
-                    # If code 2 or 3 (shape based), grab the up and down shapes for passing and project onto the Y axis
-                    if self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 2:
-                        thisFile = TFile.Open(self.inputConfig['PROCESS'][proc]['FILE'])
-                        passUp2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS_UP'])
-                        passDown2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS_DOWN'])
-                        passUp = passUp2D.ProjectionY(proc + '_'+syst,21,28)
-                        passDown = passDown2D.ProjectionY(proc + '_'+syst+'_down',21,28)
+                    if self.inputConfig['SYSTEMATIC'][syst]['CODE'] < 2: continue
 
-                    elif self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 3:
-                        if 'FILE_UP_'+proc in self.inputConfig['SYSTEMATIC'][syst]:
-                            thisFileUp = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_UP_'+proc])
-                            thisFileDown = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_DOWN_'+proc])
+                    tracking_dict = {
+                        "pass": {
+                            "X": {"nom": None, "up": None, "down": None},
+                            "Y": {"nom": None, "up": None, "down": None}
+                        },
+                        "fail": {
+                            "X": {"nom": None, "up": None, "down": None},
+                            "Y": {"nom": None, "up": None, "down": None}
+                        }
+                    }
 
-                        elif 'FILE_UP_*' in self.inputConfig['SYSTEMATIC'][syst]:
-                            thisFileUp = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_UP_*'].replace('*',proc))
-                            thisFileDown = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_DOWN_*'].replace('*',proc))
+                    for r in ['pass','fail']:
+                        for v in ['nom','up','down']:
+                            for x in ['X','Y']:
+                                if x == 'Y': 
+                                    reg = 'SIG'
+                                    if v == 'nom': tracking_dict[r][x][v] = self.orgFile.Get(self.organizedDict[proc][r+'_'+reg]['nominal']).ProjectionY(proc +'_'+r+ '_'+syst+'_'+x+'_'+v)
+                                    else: tracking_dict[r][x][v] = self.orgFile.Get(self.organizedDict[proc][r+'_'+reg][syst+v.capitalize()]).ProjectionY(proc +'_'+r+ '_'+syst+'_'+x+'_'+v)
 
-                        else:
-                            print 'Could not identify file for ' + proc +', '+syst
+                                elif x == 'X': 
+                                    reg = 'FULL'
+                                    if v == 'nom': tracking_dict[r][x][v] = self.orgFile.Get(self.organizedDict[proc][r+'_'+reg]['nominal']).ProjectionX(proc +'_'+r+ '_'+syst+'_'+x+'_'+v)
+                                    else: tracking_dict[r][x][v] = self.orgFile.Get(self.organizedDict[proc][r+'_'+reg][syst+v.capitalize()]).ProjectionX(proc +'_'+r+ '_'+syst+'_'+x+'_'+v)
 
-                        passUp = thisFileUp.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionY(proc + '_'+syst,21,28)
-                        passDown = thisFileDown.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionY(proc + '_'+syst+'_down',21,28)
+                    # self.orgFile.Get(self.organizedDict['data_obs']['fail_'+c]['nominal'])
 
-                    else:
-                        continue
+                    # # If code 2 or 3 (shape based), grab the up and down shapes for passing and project onto the Y axis
+                    # if self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 2:
+                    #     thisFile = TFile.Open(self.inputConfig['PROCESS'][proc]['FILE'])
+                    #     passUp2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS_UP'])
+                    #     passDown2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS_DOWN'])
+                    #     passUpY = passUp2D.ProjectionY(proc + '_pass_'+syst+'_y_up',x_sigstart_bin,x_sigend_bin)
+                    #     passDownY = passDown2D.ProjectionY(proc + '_pass_'+syst+'_y_down',x_sigstart_bin,x_sigend_bin)
+                    #     passUpX = passUp2D.ProjectionX(proc + '_pass_'+syst+'_x_up')
+                    #     passDownX = passDown2D.ProjectionX(proc + '_pass_'+syst+'_x_down')
 
-                    # Setup the nominal shape (consistent across all of the pltos)
-                    fileNom = TFile.Open(self.inputConfig['PROCESS'][proc]['FILE'])
-                    passNom = fileNom.Get(self.inputConfig['PROCESS'][proc]['HISTPASS']).ProjectionY(proc + '_'+syst+'_nom',21,28)
+                    #     failUp2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTFAIL_UP'])
+                    #     failDown2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTFAIL_DOWN'])
+                    #     failUpY = failUp2D.ProjectionY(proc + '_fail_'+syst+'_y_up',x_sigstart_bin,x_sigend_bin)
+                    #     failDownY = failDown2D.ProjectionY(proc + '_fail_'+syst+'_y_down',x_sigstart_bin,x_sigend_bin)
+                    #     failUpX = failUp2D.ProjectionX(proc + '_fail_'+syst+'_x_up')
+                    #     failDownX = failDown2D.ProjectionX(proc + '_fail_'+syst+'_x_down')
 
-                    thisCan = TCanvas('canvas_'+proc+'_'+syst,'canvas_'+proc+'_'+syst,700,600)
-                    thisCan.cd()
-                    passNom.SetLineColor(kBlack)
-                    passNom.SetFillColor(kYellow-9)
-                    passUp.SetLineColor(kRed)
-                    passDown.SetLineColor(kBlue)
+                    # elif self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 3:
+                    #     if 'FILE_UP_'+proc in self.inputConfig['SYSTEMATIC'][syst]:
+                    #         thisFileUp = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_UP_'+proc])
+                    #         thisFileDown = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_DOWN_'+proc])
 
-                    passUp.SetLineStyle(9)
-                    passDown.SetLineStyle(9)
-                    passUp.SetLineWidth(2)
-                    passDown.SetLineWidth(2)
+                    #     elif 'FILE_UP_*' in self.inputConfig['SYSTEMATIC'][syst]:
+                    #         thisFileUp = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_UP_*'].replace('*',proc))
+                    #         thisFileDown = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_DOWN_*'].replace('*',proc))
 
-                    histList = [passNom,passUp,passDown]
+                    #     else:
+                    #         print 'Could not identify file for ' + proc +', '+syst
 
-                    # Set the max of the range so we can see all three histograms on the same plot
-                    yMax = histList[0].GetMaximum()
-                    maxHist = histList[0]
-                    for h in range(1,len(histList)):
-                        if histList[h].GetMaximum() > yMax:
-                            yMax = histList[h].GetMaximum()
-                            maxHist = histList[h]
-                    for h in histList:
-                        h.SetMaximum(yMax*1.1)
+                    #     passUpY = thisFileUp.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionY(proc + '_pass_'+syst+'_y_up',x_sigstart_bin,x_sigend_bin)
+                    #     passDownY = thisFileDown.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionY(proc + '_pass_'+syst+'_y_down',x_sigstart_bin,x_sigend_bin)
+                    #     passUpX = thisFileUp.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionX(proc + '_pass_'+syst+'_x_up')
+                    #     passDownX = thisFileDown.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionX(proc + '_pass_'+syst+'_x_down')
 
-                    passNom.SetXTitle(self.inputConfig['BINNING']['Y']['TITLE'])
-                    # passUp.SetXTitle(inputConfig['BINNING']['Y']['TITLE'])
-                    # passDown.SetXTitle(inputConfig['BINNING']['Y']['TITLE'])
-                    passNom.SetTitle(proc + ' - ' + syst + ' uncertainty')
-                    passNom.SetTitleOffset(1.2,"X")
+                    #     failUpY = thisFileUp.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTFAIL']).ProjectionY(proc + '_fail_'+syst+'_y_up',x_sigstart_bin,x_sigend_bin)
+                    #     failDownY = thisFileDown.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTFAIL']).ProjectionY(proc + '_fail_'+syst+'_y_down',x_sigstart_bin,x_sigend_bin)
+                    #     failUpX = thisFileUp.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTFAIL']).ProjectionX(proc + '_fail_'+syst+'_x_up')
+                    #     failDownX = thisFileDown.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTFAIL']).ProjectionX(proc + '_fail_'+syst+'_x_down')
 
-                    passNom.Draw('hist')
-                    passUp.Draw('same hist')
-                    passDown.Draw('same hist')
-                    
+                    # else:
+                    #     continue
 
-                    thisCan.Print(self.projPath+'/UncertPlots/Uncertainty_'+proc+'_'+syst+'.pdf','pdf')
+                    # # Setup the nominal shape (consistent across all of the pltos)
+                    # fileNom = TFile.Open(self.inputConfig['PROCESS'][proc]['FILE'])
+                    # passNomY = fileNom.Get(self.inputConfig['PROCESS'][proc]['HISTPASS']).ProjectionY(proc + '_pass_'+syst+'_y_nom',x_sigstart_bin,x_sigend_bin)
+                    # passNomX = fileNom.Get(self.inputConfig['PROCESS'][proc]['HISTPASS']).ProjectionX(proc + '_pass_'+syst+'_x_nom')
+                    # failNomY = fileNom.Get(self.inputConfig['PROCESS'][proc]['HISTFAIL']).ProjectionY(proc + '_fail_'+syst+'_y_nom',x_sigstart_bin,x_sigend_bin)
+                    # failNomX = fileNom.Get(self.inputConfig['PROCESS'][proc]['HISTFAIL']).ProjectionX(proc + '_fail_'+syst+'_x_nom')
+
+                    for i,r in enumerate(['fail','pass']):
+                        for j,x in enumerate(['X','Y']):
+                            thisCan = TCanvas('canvas_'+proc+'_'+syst,'canvas_'+proc+'_'+syst,800,700)
+                            ipad = i+j+1
+
+                            thisPad = tracking_dict[r][x]
+                            nom = thisPad['nom']
+                            up = thisPad['up']
+                            down = thisPad['down']
+
+                            nom.SetLineColor(kBlack)
+                            nom.SetFillColor(kYellow-9)
+                            up.SetLineColor(kRed)
+                            down.SetLineColor(kBlue)
+
+                            up.SetLineStyle(9)
+                            down.SetLineStyle(9)
+                            up.SetLineWidth(2)
+                            down.SetLineWidth(2)
+
+                            histList = [nom,up,down]
+
+                            # Set the max of the range so we can see all three histograms on the same plot
+                            yMax = histList[0].GetMaximum()
+                            maxHist = histList[0]
+                            for h in range(1,len(histList)):
+                                if histList[h].GetMaximum() > yMax:
+                                    yMax = histList[h].GetMaximum()
+                                    maxHist = histList[h]
+                            for h in histList:
+                                h.SetMaximum(yMax*1.1)
+
+                            if x == 'X': nom.SetXTitle(self.inputConfig['BINNING']['X']['TITLE'])
+                            elif x == 'Y': nom.SetXTitle(self.inputConfig['BINNING']['Y']['TITLE'])
+
+                            nom.SetTitle(proc + ' - ' + syst + ' uncertainty')
+                            nom.SetTitleOffset(1.2,"X")
+
+                            nom.Draw('hist')
+                            # if proc == 'ttbar': raw_input(axis+' nom')
+                            up.Draw('same hist')
+                            # if proc == 'ttbar': raw_input(axis+' up')
+                            down.Draw('same hist')
+                            # if proc == 'ttbar': raw_input(axis+' down')
+                            
+                            thisCan.Print(self.projPath+'/UncertPlots/Uncertainty_'+proc+'_'+syst+r+x+'.png','png')
 
     def _makeFitGuesses(self,nslices=6,sigma=5):
         # Grab everything
