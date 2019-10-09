@@ -1188,7 +1188,7 @@ class TwoDAlphabet:
 
         # For each process, category, and dist (nominal, systUp, etc)
         for process in dict_hists.keys():
-            self.organizedDict[process] = {'pass_LOW':{}, 'pass_SIG':{}, 'pass_HIGH':{}, 'fail_LOW':{}, 'fail_SIG':{}, 'fail_HIGH':{}}
+            self.organizedDict[process] = {'pass_FULL':{}, 'pass_LOW':{}, 'pass_SIG':{}, 'pass_HIGH':{}, 'fail_FULL':{}, 'fail_LOW':{}, 'fail_SIG':{}, 'fail_HIGH':{}}
             for cat in ['pass','fail']:
                 for dist in dict_hists[process][cat].keys():
                     print 'Making ' + process +', ' + cat + ', ' + dist
@@ -1205,13 +1205,14 @@ class TwoDAlphabet:
                         temp_hist = dict_hists[process][cat][dist]
 
                     # If there are user specified x bins...
-                    for c in ['LOW','SIG','HIGH']: 
+                    for c in ['FULL','LOW','SIG','HIGH']: 
                         # Get new names
                         histname = process + '_' + cat+'_'+c+'_'+self.name
                         if dist != 'nominal':                           # if not nominal dist
                             histname = histname + '_' + dist
                         print 'Making '+histname
-                        finalhist = header.copyHistWithNewXbins(temp_hist,self.newXbins[c],histname)#,self.oldYwidth)
+                        if c != 'FULL': finalhist = header.copyHistWithNewXbins(temp_hist,self.newXbins[c],histname)#,self.oldYwidth)
+                        else: finalhist = header.copyHistWithNewXbins(temp_hist,self.fullXbins,histname)
 
                         # Test if histogram is non-zero
                         if finalhist.Integral() <= 0:
