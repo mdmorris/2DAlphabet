@@ -1150,7 +1150,17 @@ class TwoDAlphabet:
                         else:
                             dict_hists[process]['fail'][syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL_DOWN_' + process])
 
-        
+                    if this_syst_dict['CODE'] > 1:
+                        if "SCALE" in this_process_dict.keys():
+                            dict_hists[process]['pass'][syst+'Up'].Scale(this_proc_scale)
+                            dict_hists[process]['pass'][syst+'Down'].Scale(this_proc_scale)
+                            dict_hists[process]['fail'][syst+'Up'].Scale(this_proc_scale)
+                            dict_hists[process]['fail'][syst+'Down'].Scale(this_proc_scale)
+                        elif "SCALEPASS" in this_process_dict.keys() and "SCALEFAIL" in this_process_dict.keys():
+                            dict_hists[process]['pass'][syst+'Up'].Multiply(this_proc_scale_pass)
+                            dict_hists[process]['pass'][syst+'Down'].Multiply(this_proc_scale_pass)
+                            dict_hists[process]['fail'][syst+'Up'].Multiply(this_proc_scale_fail)
+                            dict_hists[process]['fail'][syst+'Down'].Multiply(this_proc_scale_fail)
 
         #####################################################################
         # With dictionary made, we can split around the signal region and   #
