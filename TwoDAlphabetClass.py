@@ -2107,7 +2107,7 @@ class TwoDAlphabet:
         return histDict
 
 # WRAPPER FUNCTIONS
-def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
+def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,plotOn=''):
     # Set verbosity - chosen from first of configs
     verbose = ''
     if twoDs[0].verbosity != False:
@@ -2162,10 +2162,15 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
         if plotOn[-1] != '/': plotOn_depth = '../'*(len(plotOn.count('/'))+1)
         else: plotOn_depth = '../'*(len(plotOn.count('/')))
 
+    # Determine if any nuisance/sysetmatic parameters should be set before fitting
+    if systsToSet != '':
+        if blind_option != '': blind_option = blind_option+','+systsToSet
+        else: blind_option = '--setParameters '+systsToSet
+
     # Run Combine
     print 'cd '+projDir
     FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace --cminDefaultMinimizerStrategy 0' + sig_option +verbose #+syst_option -> now out of date
-    print 'Executing '+FitDiagnostics_command
+    # print 'Executing '+FitDiagnostics_command
 
     with header.cd(projDir):
         command_saveout = open('FitDiagnostics_command.txt','w')

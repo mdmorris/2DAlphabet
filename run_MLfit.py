@@ -12,6 +12,10 @@ parser.add_option('-q', '--tag', metavar='F', type='string', action='store',
                 default =   '',
                 dest    =   'quicktag',
                 help    =   'Assigns a tag for this run')
+parser.add_option('-s', '--setParameter', metavar='F', type='string', action='store',
+                default =   '',
+                dest    =   'setParameter',
+                help    =   'String of parameters to set pre-fit. Uses same comma separated format as Combine (V1=1.0,V2=1.0...)')
 parser.add_option('--rMin', metavar='F', type='string', action='store',
                 default =   '0',
                 dest    =   'rMin',
@@ -88,7 +92,7 @@ if len(inputConfigs) > 1:
             subprocess.call(["sed -i 's/ch"+str(num)+"_//g' card_"+thistag+".txt"],shell=True)
 
     if not options.skipFit:
-        runMLFit(twoDinstances,options.rMin,options.rMax,skipPlots=options.skipPlots)
+        runMLFit(twoDinstances,options.rMin,options.rMax,systsToSet=options.setParameter,skipPlots=options.skipPlots)
 
     # Plot
     if not options.skipPlots:
@@ -114,7 +118,7 @@ else:
     instance = TwoDAlphabet(inputConfigs[0],options.quicktag,options.recycleAll,stringSwaps=stringSwaps)
     
     if not options.skipFit:
-        runMLFit([instance],options.rMin,options.rMax,skipPlots=options.skipPlots)
+        runMLFit([instance],options.rMin,options.rMax,systsToSet=options.setParameter,skipPlots=options.skipPlots)
     thistag = instance.projPath
 
     # Plot
