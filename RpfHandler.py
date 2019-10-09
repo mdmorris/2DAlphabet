@@ -154,7 +154,11 @@ class RpfHandler():
         elif self.fitType == 'fullPoly':
             return self.fitDict['PFORM']
         elif self.fitType == 'generic':
-            nCoeffs = max([int(param) for param in self.fitDict.keys() if param != 'FORM' and param != 'HELP'])+1
+            params = [int(param) for param in self.fitDict.keys() if param != 'FORM' and param != 'HELP']
+            if len(params) > 0:
+                nCoeffs = max([int(param) for param in self.fitDict.keys() if param != 'FORM' and param != 'HELP'])+1
+            else: nCoeffs = 0
+            
             gFormula = self.fitDict['FORM'].replace('+x','+@'+str(nCoeffs)).replace('+y','+@'+str(nCoeffs+1))
             gFormula = gFormula.replace('*x','*@'+str(nCoeffs)).replace('*y','*@'+str(nCoeffs+1))
             gFormula = gFormula.replace('-x','-@'+str(nCoeffs)).replace('-y','-@'+str(nCoeffs+1))
@@ -162,6 +166,7 @@ class RpfHandler():
             gFormula = gFormula.replace('(x','(@'+str(nCoeffs)).replace('(y','(@'+str(nCoeffs+1))
             gFormula = gFormula.replace(' x',' @'+str(nCoeffs)).replace(' y',' @'+str(nCoeffs+1))
             return gFormula
+
         elif self.fitType == 'cheb':
             return False    # No string form for this. Dependencies already built into chebyshevBasis class
 
