@@ -180,7 +180,7 @@ class RpfHandler():
             # Make var lists
             x_param_list = RooArgList(xConst)
             y_param_list = RooArgList(yConst)
-            for v in self.rpfVars.keys():
+            for v in self.getRpfVarNames():
                 if 'splitPolyX' in v:
                     x_param_list.add(self.rpfVars[v])
                 elif 'splitPolyY' in v:
@@ -222,7 +222,7 @@ class RpfHandler():
 
         elif self.fitType == 'generic':
             formula_list = RooArgList()
-            for c in self.rpfVars.keys():
+            for c in self.getRpfVarNames():
                 formula_list.add(self.rpfVars[c])
 
             generic_formula = self.getRooFunctionForm()
