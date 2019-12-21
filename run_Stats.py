@@ -248,6 +248,8 @@ with header.cd(projDir):
                 toyOutput = TFile.Open('higgsCombine'+run_name+'.GoodnessOfFit.mH120.'+str(seed)+'.root')
                 toyLimitTree = toyOutput.Get('limit')
 
+            gStyle.SetOptStat(0)
+
             # Now to analyze the output
             # Get observation
             gofOutput = TFile.Open('higgsCombinegof_data.GoodnessOfFit.mH120.root')
