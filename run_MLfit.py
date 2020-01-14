@@ -36,10 +36,6 @@ parser.add_option("--skipPlots", action="store_true",
                 default =   False,
                 dest    =   "skipPlots",
                 help    =   "Skip plotting")
-parser.add_option("--plotOn", metavar='F', type='string', action='store',
-                default =   '',
-                dest    =   "plotOn",
-                help    =   "Plot the fit result of this fit onto the workspace from project in directory provided")
 
 (options, args) = parser.parse_args()
 inputConfigsAndArgs = args

@@ -2121,7 +2121,7 @@ class TwoDAlphabet:
         return histDict
 
 # WRAPPER FUNCTIONS
-def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,plotOn='',prerun=False):
+def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,prerun=False):
     # Set verbosity - chosen from first of configs
     verbose = ''
     if twoDs[0].verbosity != False:
@@ -2157,24 +2157,8 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,plotOn='',prerun=False):
         blind_option = '--text2workspace "--channel-masks" --setParameters' + blind_option
 
     # Set card name and project directory
-    if plotOn == '':
-        # if len(twoDs) > 1:
-        card_name = 'card_'+twoDs[0].tag+'.txt' if not prerun else 'card_'+twoDs[0].name+'.txt'
-        projDir = twoDs[0].tag if not prerun else twoDs[0].projPath
-        # else:
-        #     card_name = 'card_'+twoDs[0].name+'.txt'
-        #     projDir = twoDs[0].projPath
-    else:
-        # if len(twoDs) > 1:
-        card_name = 'card_'+plotOn.split('/')[1]+'.txt' if not prerun else 'card_'+plotOn.split('/')[1]+'.txt'
-        projDir = twoDs[0].tag if not prerun else twoDs[0].projPath
-
-        # else:
-        #     card_name = 'card_'+plotOn.split('/')[1]+'.txt'
-        #     projDir = twoDs[0].projPath
-
-        if plotOn[-1] != '/': plotOn_depth = '../'*(len(plotOn.count('/'))+1)
-        else: plotOn_depth = '../'*(len(plotOn.count('/')))
+    card_name = 'card_'+twoDs[0].tag+'.txt' if not prerun else 'card_'+twoDs[0].name+'.txt'
+    projDir = twoDs[0].tag if not prerun else twoDs[0].projPath
 
     # Determine if any nuisance/sysetmatic parameters should be set before fitting
     if systsToSet != '':
@@ -2246,21 +2230,13 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,plotOn='',prerun=False):
             json.dump(rerun_config,rerun_out,indent=2, sort_keys=True)
             rerun_out.close()
 
-    # if not skipPlots:
-    if plotOn == '':
+    if not skipPlots:
         with header.cd(projDir):
-            bshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
+            bshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --samples 100 --print 2> PostFitShapes2D_stderr_b.txt'
             header.executeCmd(bshapes_cmd)
-            sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
+            sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --samples 100 --print 2> PostFitShapes2D_stderr_s.txt'
             header.executeCmd(sshapes_cmd)
 
-    else:
-        with header.cd(plotOn):
-            print 'Plotting fit result from '+projDir+' onto workspace from '+card_name
-            bshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f '+plotOn_depth+'fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
-            header.executeCmd(bshapes_cmd)
-            sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f '+plotOn_depth+'fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
-            header.executeCmd(sshapes_cmd)
 
 def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
     # Set verbosity - chosen from first of configs
