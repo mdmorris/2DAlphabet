@@ -153,7 +153,7 @@ class TwoDAlphabet:
         if self.prerun and not self.recycleAll:
             print 'Pre-running '+self.tag+' '+self.name+' to get a better estimate of the transfer function'
             self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
-            runMLFit([self],'0','5',skipPlots=True)    
+            runMLFit([self],'0','5','',skipPlots=True,prerun=True)    
             prerun_file = TFile.Open(self.projPath+'/fitDiagnostics.root')
             if prerun_file:
                 if prerun_file.GetListOfKeys().Contains('fit_b'):
@@ -1695,7 +1695,7 @@ class TwoDAlphabet:
            
         card_new.close() # need to add masking if blinded
 
-    def plotFitResults(self,fittag,simfit=False): # fittag means 'b' or 's'
+    def plotFitResults(self,fittag):#,simfit=False): # fittag means 'b' or 's'
         allVars = []
 
         #####################
@@ -1703,12 +1703,12 @@ class TwoDAlphabet:
         #####################
 
         # File with histograms and RooFitResult parameters
-        if simfit == False:
-            post_file = TFile.Open(self.projPath+'/postfitshapes_'+fittag+'.root')
-            fd_file = TFile.Open(self.projPath+'/fitDiagnostics.root')
-        else:
-            post_file = TFile.Open(self.tag+'/postfitshapes_'+fittag+'.root')
-            fd_file = TFile.Open(self.tag+'/fitDiagnostics.root')
+        # if simfit == False:
+        #     post_file = TFile.Open(self.projPath+'/postfitshapes_'+fittag+'.root')
+        #     fd_file = TFile.Open(self.projPath+'/fitDiagnostics.root')
+        # else:
+        post_file = TFile.Open(self.tag+'/postfitshapes_'+fittag+'.root')
+        fd_file = TFile.Open(self.tag+'/fitDiagnostics.root')
 
         fit_result = fd_file.Get('fit_'+fittag)
 
@@ -1842,7 +1842,7 @@ class TwoDAlphabet:
             if isSignal and fittag != 's':
                 continue
             else:
-                header.makeCan('fit_'+fittag+'/'+process+'_fit'+fittag+'_2D',self.projPath,twoDList,xtitle=self.xVarTitle,ytitle=self.yVarTitle)
+                header.makeCan('plots/fit_'+fittag+'/'+process+'_fit'+fittag+'_2D',self.projPath,twoDList,xtitle=self.xVarTitle,ytitle=self.yVarTitle)
 
         # Invert the last two items (unique to b*) - customize as needed
         process_list[-1],process_list[-2] = process_list[-2],process_list[-1]
@@ -1909,11 +1909,11 @@ class TwoDAlphabet:
 
 
             if 'x' in plotType:
-                header.makeCan('fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=self.xVarTitle)
-                header.makeCan('fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=self.xVarTitle,logy=True)
+                header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=self.xVarTitle)
+                header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=self.xVarTitle,logy=True)
             elif 'y' in plotType:
-                header.makeCan('fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=self.yVarTitle)
-                header.makeCan('fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=self.yVarTitle,logy=True)
+                header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=self.yVarTitle)
+                header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=self.yVarTitle,logy=True)
 
         # Make comparisons for each background process of pre and post fit projections
         for plotType in ['projx','projy']:
@@ -1933,8 +1933,8 @@ class TwoDAlphabet:
                             else:
                                 prepostcolors = [kYellow]
 
-                    if 'x' in plotType: header.makeCan('fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=self.xVarTitle,datastyle='histe')
-                    if 'y' in plotType: header.makeCan('fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=self.yVarTitle,datastyle='histe')
+                    if 'x' in plotType: header.makeCan('plots/fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=self.xVarTitle,datastyle='histe')
+                    if 'y' in plotType: header.makeCan('plots/fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=self.yVarTitle,datastyle='histe')
 
 
         ##############
@@ -2125,7 +2125,7 @@ class TwoDAlphabet:
         return histDict
 
 # WRAPPER FUNCTIONS
-def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,plotOn=''):
+def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,plotOn='',prerun=False):
     # Set verbosity - chosen from first of configs
     verbose = ''
     if twoDs[0].verbosity != False:
@@ -2162,20 +2162,20 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,plotOn=''):
 
     # Set card name and project directory
     if plotOn == '':
-        if len(twoDs) > 1:
-            card_name = 'card_'+twoDs[0].tag+'.txt'
-            projDir = twoDs[0].tag
-        else:
-            card_name = 'card_'+twoDs[0].name+'.txt'
-            projDir = twoDs[0].projPath
+        # if len(twoDs) > 1:
+        card_name = 'card_'+twoDs[0].tag+'.txt' if not prerun else 'card_'+twoDs[0].name+'.txt'
+        projDir = twoDs[0].tag if not prerun else twoDs[0].projPath
+        # else:
+        #     card_name = 'card_'+twoDs[0].name+'.txt'
+        #     projDir = twoDs[0].projPath
     else:
-        if len(twoDs) > 1:
-            card_name = 'card_'+plotOn.split('/')[1]+'.txt'
-            projDir = twoDs[0].tag
+        # if len(twoDs) > 1:
+        card_name = 'card_'+plotOn.split('/')[1]+'.txt' if not prerun else 'card_'+plotOn.split('/')[1]+'.txt'
+        projDir = twoDs[0].tag if not prerun else twoDs[0].projPath
 
-        else:
-            card_name = 'card_'+plotOn.split('/')[1]+'.txt'
-            projDir = twoDs[0].projPath
+        # else:
+        #     card_name = 'card_'+plotOn.split('/')[1]+'.txt'
+        #     projDir = twoDs[0].projPath
 
         if plotOn[-1] != '/': plotOn_depth = '../'*(len(plotOn.count('/'))+1)
         else: plotOn_depth = '../'*(len(plotOn.count('/')))
@@ -2187,7 +2187,7 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,plotOn=''):
 
     # Run Combine
     print 'cd '+projDir
-    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace --cminDefaultMinimizerStrategy 0' + sig_option +verbose #+syst_option -> now out of date
+    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace --cminDefaultMinimizerStrategy 0 ' + sig_option +verbose #+syst_option -> now out of date
     # print 'Executing '+FitDiagnostics_command
 
     with header.cd(projDir):

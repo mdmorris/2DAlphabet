@@ -803,9 +803,9 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                     mains[hist_index].SetLogy()
 
     if rootfile:
-        myCan.Print(tag+'plots/'+name+'.root','root')
+        myCan.Print(tag+'/'+name+'.root','root')
     else:
-        myCan.Print(tag+'plots/'+name+'.png','png')
+        myCan.Print(tag+'/'+name+'.png','png')
 
 def FindCommonString(string_list):
     to_match = ''   # initialize the string we're looking for/building
