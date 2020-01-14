@@ -154,7 +154,7 @@ if not options.blind:
 else:
     print 'Blinded'
     g_mclimit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
-    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [fb]") # NOT GENERIC
+    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
     g_mclimit.GetYaxis().SetRangeUser(0., 80.)
     g_mclimit.GetXaxis().SetRangeUser(1, 3.2)
     g_mclimit.SetMinimum(1.0e-3) #0.005
@@ -253,7 +253,7 @@ g_error.SetLineColor(0)
 
 if not options.blind:
     g_limit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
-    g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [fb]") # NOT GENERIC
+    g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
     g_limit.Draw('al')
     g_error95.Draw("lf")
     g_error.Draw("lf")
@@ -264,7 +264,7 @@ if not options.blind:
 
 else:
     g_mclimit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
-    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [fb]") # NOT GENERIC
+    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
     g_mclimit.Draw("al")
     g_error95.Draw("lf")
     g_error.Draw("lf")
@@ -301,7 +301,7 @@ text1.DrawLatex(0.2,0.84, "#scale[1.0]{CMS, L = "+options.lumi+" fb^{-1} at  #sq
 
 TPT.Draw()      
 climits.RedrawAxis()
-climits.SaveAs("limits_combine_"+options.lumi+"fb_"+options.signals[options.signals.find('/')+1:options.signals.find('.')]+'_'+cstr+".pdf")
+climits.SaveAs("limits_combine_"+options.lumi.replace('.','p')+"fb_"+options.signals[options.signals.find('/')+1:options.signals.find('.')]+'_'+cstr+".pdf")
 
 # Finally calculate the intercept
 expectedLimit = Inter(g_mclimit,graphWP)[0] if len(Inter(g_mclimit,graphWP)) > 0 else -1.0
