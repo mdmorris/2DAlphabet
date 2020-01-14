@@ -1357,10 +1357,10 @@ class TwoDAlphabet:
 
                     # Initialize contents by subtracting minor non-QCD components (code 2)
                     bin_content    = TH2_data_fail.GetBinContent(xbin,ybin)
-                    bin_range_up   = bin_content + TH2_data_fail.GetBinErrorUp(xbin,ybin)*5
-                    bin_range_down = bin_content - TH2_data_fail.GetBinErrorLow(xbin,ybin)*5
-                    bin_err_up     = bin_content + TH2_data_fail.GetBinErrorUp(xbin,ybin)
-                    bin_err_down   = bin_content - TH2_data_fail.GetBinErrorLow(xbin,ybin)
+                    bin_range_up   = bin_content*3 #+ TH2_data_fail.GetBinErrorUp(xbin,ybin)*5
+                    bin_range_down = 1e-9#bin_content #- TH2_data_fail.GetBinErrorLow(xbin,ybin)*5
+                    bin_err_up     = TH2_data_fail.GetBinErrorUp(xbin,ybin)#bin_content + TH2_data_fail.GetBinErrorUp(xbin,ybin)
+                    bin_err_down   = TH2_data_fail.GetBinErrorLow(xbin,ybin)#bin_content - TH2_data_fail.GetBinErrorLow(xbin,ybin)
 
                     # Now subtract away the parts that we don't want
                     for process in self.organizedDict.keys():
@@ -1372,10 +1372,8 @@ class TwoDAlphabet:
                         elif self.inputConfig['PROCESS'][process]['CODE'] == 1: continue # data
                         elif self.inputConfig['PROCESS'][process]['CODE'] == 2: # MC
                             bin_content    = bin_content     - this_TH2.GetBinContent(xbin,ybin)
-                            bin_range_up   = bin_range_up    - 0.5*this_TH2.GetBinContent(xbin,ybin)
-                            bin_range_down = bin_range_down  - 1.5*this_TH2.GetBinContent(xbin,ybin)
-                            bin_err_up     = bin_err_up      - this_TH2.GetBinContent(xbin,ybin) + this_TH2.GetBinErrorUp(xbin,ybin)             # Just propagate errors normally
-                            bin_err_down   = bin_err_down    - this_TH2.GetBinContent(xbin,ybin) - this_TH2.GetBinErrorLow(xbin,ybin)
+                            bin_err_up     = bin_err_up      + this_TH2.GetBinErrorUp(xbin,ybin) #- this_TH2.GetBinContent(xbin,ybin)             # Just propagate errors normally
+                            bin_err_down   = bin_err_down    - this_TH2.GetBinErrorLow(xbin,ybin) #- this_TH2.GetBinContent(xbin,ybin)
 
                     # If bin content is <= 0, treat this bin as a RooConstVar at value close to 0
                     if (bin_content <= 0) or (this_pass_bin_zero == True):
@@ -1409,24 +1407,22 @@ class TwoDAlphabet:
                         if self.freezeFail:
                             binRRV = RooConstVar(fail_bin_name, fail_bin_name, bin_content)
 
-                        elif bin_content < 1: # Give larger floating to range to bins with fewer events
-                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,0.1), 1e-9, 10)
-                            print fail_bin_name + ' < 1'
-
-                        elif bin_content < 10: # Give larger floating to range to bins with fewer events
-                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,1), 1e-9, 50)
-                            print fail_bin_name + ' < 10'
                         else:
-                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, bin_content, max(1,bin_range_down), bin_range_up)
+                            if bin_content < 1: # Give larger floating to range to bins with fewer events
+                                binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,0.1), 1e-9, 10)
+                                print fail_bin_name + ' < 1'
 
+                            elif bin_content < 10: # Give larger floating to range to bins with fewer events
+                                binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,1), 1e-9, 50)
+                                print fail_bin_name + ' < 10'
+                            else:
+                                binRRV = RooRealVar(fail_bin_name, fail_bin_name, bin_content, max(1e-9,bin_range_down), bin_range_up)
 
-                        if not self.freezeFail and bin_content >= 10:
-                            if bin_content - bin_err_down < 0.001:
-                                bin_err_down = bin_content - 0.001#binRRV.getMin()     # For the rare case when bin error is larger than the content
+                            if bin_content - bin_err_down < 0.0001:
+                                bin_err_down = bin_content - 0.0001#binRRV.getMin()     # For the rare case when bin error is larger than the content
                             
                             binRRV.setAsymError(bin_err_down,bin_err_up)
                             self.floatingBins.append(fail_bin_name)
-
 
                         # Store the bin
                         bin_list_fail.add(binRRV)
