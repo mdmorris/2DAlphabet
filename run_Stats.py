@@ -215,7 +215,7 @@ with header.cd(projDir):
             #     print 'ERROR: '+projDir+'/fitDiagnostics.root does not exist. Please check that run_MLfit.py finished correctly. Quitting...'
             #     quit()
 
-            gof_data_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated --toysFrequentist '+freeze_r_string +mask_string+ ' -n gof_data'
+            gof_data_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated '+freeze_r_string +mask_string+ ' -n gof_data'
             header.executeCmd(gof_data_cmd,options.dryrun)
             gof_toy_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated --toysFrequentist --saveWorkspace --saveToys '+freeze_r_string+mask_string+' -t '+str(ntoys)+' -s '+str(seed) +' -n '+run_name
 
@@ -283,7 +283,7 @@ with header.cd(projDir):
                 xmin = toyLimits.GetXaxis().GetXmin()
                 new_xmax = int(gofLimit*1.1)
                 new_nbins = int((new_xmax-xmin)/binwidth)
-                toyLimitTree.Draw('limit>>hlimitrebin('+str(new_nbins)+', '+str(xmin)+', '+str(new_xmax)+')') 
+                toyLimitTree.Draw('limit>>hlimitrebin('+str(new_nbins)+', '+str(xmin)+', '+str(new_xmax)+')','limit>0') 
                 toyLimits = gDirectory.Get('hlimitrebin')
                 toyLimits.Fit("gaus")
                 gaus = toyLimits.GetFunction("gaus")
@@ -293,7 +293,7 @@ with header.cd(projDir):
             arrow.SetLineWidth(2)
 
             # Legend
-            leg = TLegend(0.6,0.6,0.89,0.89)
+            leg = TLegend(0.1,0.7,0.4,0.9)
             leg.SetLineColor(kWhite)
             leg.SetLineWidth(0)
             leg.SetFillStyle(0)
