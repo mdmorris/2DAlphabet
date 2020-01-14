@@ -120,15 +120,16 @@ def copyHistWithNewYbins(thisHist,newYbins,copyName):
 
     return hist_copy
 
-def smoothHist2D(name,histToSmooth):
+def smoothHist2D(name,histToSmooth,renormalize=True):
+    print "Smoothing "+name
+    if renormalize: norm = histToSmooth.Integral()
     smoothed_hist = histToSmooth.Clone(name)
     smoothed_hist.Reset()
     smoothed_hist.Sumw2()
 
     for ix in range(1,histToSmooth.GetNbinsX()+1):
         for iy in range(1,histToSmooth.GetNbinsY()+1):
-            bin_contents = []
-
+            bin_contents = [histToSmooth.GetBinContent(ix,iy)]
             if ix == 1:
                 if iy == 1: # lower left corner
                     bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
@@ -178,7 +179,7 @@ def smoothHist2D(name,histToSmooth):
                     bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
                     bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
                     bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
-                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy  ))
+                    # bin_contents.append(histToSmooth.GetBinContent(ix  ,iy  ))
                     bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
                     bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
                     bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
@@ -190,6 +191,9 @@ def smoothHist2D(name,histToSmooth):
 
             smoothed_hist.SetBinContent(ix,iy,avg)
 
+    if renormalize:
+        smoothed_norm = smoothed_hist.Integral()
+        smoothed_hist.Scale(norm/smoothed_norm)
     return smoothed_hist
 
 def zeroNegativeBins(name,inhist):

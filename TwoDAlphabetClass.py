@@ -1063,6 +1063,14 @@ class TwoDAlphabet:
                 hist_pass.Multiply(this_proc_scale_pass)
                 hist_fail.Multiply(this_proc_scale_fail)
 
+            # Smooth
+            if 'SMOOTH' in this_process_dict.keys() and self.inputConfig['OPTIONS']['rpfRatio'] != False and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']: smooth_this = True
+            else: smooth_this = False
+
+            if smooth_this:
+                hist_pass = header.smoothHist2D('smooth_'+process+'_pass',hist_pass,renormalize=False)
+                hist_fail = header.smoothHist2D('smooth_'+process+'_fail',hist_fail,renormalize=False)
+
             dict_hists[process]['file'] = file_nominal
             dict_hists[process]['pass']['nominal'] = hist_pass
             dict_hists[process]['fail']['nominal'] = hist_fail
@@ -1086,13 +1094,21 @@ class TwoDAlphabet:
                             print 'Quiting'
                             quit()
 
+                    # Handle case where pass and fail are uncorrelated
+                    if 'UNCORRELATED' in this_syst_dict and this_syst_dict['UNCORRELATED']:
+                        pass_syst = syst+'_pass'
+                        fail_syst = syst+'_fail'
+                    else:
+                        pass_syst = syst
+                        fail_syst = syst
 
-                    # Only care about syst (right now) if it's a shape (CODE == 2 or 3)
+                    # Only care about syst if it's a shape (CODE == 2 or 3)
                     if this_syst_dict['CODE'] == 2:   # same file as norm, different hist names
-                        dict_hists[process]['pass'][syst+'Up']   = file_nominal.Get(this_syst_dict['HISTPASS_UP'])
-                        dict_hists[process]['pass'][syst+'Down'] = file_nominal.Get(this_syst_dict['HISTPASS_DOWN'])
-                        dict_hists[process]['fail'][syst+'Up']   = file_nominal.Get(this_syst_dict['HISTFAIL_UP'])
-                        dict_hists[process]['fail'][syst+'Down'] = file_nominal.Get(this_syst_dict['HISTFAIL_DOWN'])
+
+                        dict_hists[process]['pass'][pass_syst+'Up']   = file_nominal.Get(this_syst_dict['HISTPASS_UP'])
+                        dict_hists[process]['pass'][pass_syst+'Down'] = file_nominal.Get(this_syst_dict['HISTPASS_DOWN'])
+                        dict_hists[process]['fail'][fail_syst+'Up']   = file_nominal.Get(this_syst_dict['HISTFAIL_UP'])
+                        dict_hists[process]['fail'][fail_syst+'Down'] = file_nominal.Get(this_syst_dict['HISTFAIL_DOWN'])
 
                     if this_syst_dict['CODE'] == 3:   # different file as norm and different files for each process if specified, same hist name if not specified in inputConfig
                         # User will most likely have different file for each process but maybe not so check
@@ -1115,52 +1131,58 @@ class TwoDAlphabet:
                         dict_hists[process]['file_'+syst+'Down'] = file_down
 
                         if 'HISTPASS_UP' in this_syst_dict:
-                            dict_hists[process]['pass'][syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP'])            # try to grab hist name from SYSTEMATIC dictionary
+                            dict_hists[process]['pass'][pass_syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP'])            # try to grab hist name from SYSTEMATIC dictionary
                         elif 'HISTPASS' in this_syst_dict:
-                            dict_hists[process]['pass'][syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS'])               # else use the same one as nominal distribution
+                            dict_hists[process]['pass'][pass_syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS'])               # else use the same one as nominal distribution
                         elif 'HISTPASS_UP_*' in this_syst_dict:
-                            dict_hists[process]['pass'][syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP_*'].replace('*',process))
+                            dict_hists[process]['pass'][pass_syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP_*'].replace('*',process))
                         else: 
-                            dict_hists[process]['pass'][syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP_'+process])   # or use process specific name
+                            dict_hists[process]['pass'][pass_syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP_'+process])   # or use process specific name
 
                         if 'HISTPASS_DOWN' in this_syst_dict:
-                            dict_hists[process]['pass'][syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS_DOWN'])
+                            dict_hists[process]['pass'][pass_syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS_DOWN'])
                         elif 'HISTPASS' in this_syst_dict:
-                            dict_hists[process]['pass'][syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS'])
+                            dict_hists[process]['pass'][pass_syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS'])
                         elif 'HISTPASS_DOWN_*' in this_syst_dict:
-                            dict_hists[process]['pass'][syst+'Down'] = file_up.Get(this_syst_dict['HISTPASS_DOWN_*'].replace('*',process))
+                            dict_hists[process]['pass'][pass_syst+'Down'] = file_up.Get(this_syst_dict['HISTPASS_DOWN_*'].replace('*',process))
                         else:
-                            dict_hists[process]['pass'][syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS_DOWN_' + process])
+                            dict_hists[process]['pass'][pass_syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS_DOWN_' + process])
 
                         if 'HISTFAIL_UP' in this_syst_dict:
-                            dict_hists[process]['fail'][syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP'])
+                            dict_hists[process]['fail'][fail_syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP'])
                         elif 'HISTFAIL' in this_syst_dict:
-                            dict_hists[process]['fail'][syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL'])
+                            dict_hists[process]['fail'][fail_syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL'])
                         elif 'HISTFAIL_UP_*' in this_syst_dict:
-                            dict_hists[process]['fail'][syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP_*'].replace('*',process))    
+                            dict_hists[process]['fail'][fail_syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP_*'].replace('*',process))    
                         else:
-                            dict_hists[process]['fail'][syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP_' + process])
+                            dict_hists[process]['fail'][fail_syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP_' + process])
 
                         if 'HISTFAIL_DOWN' in this_syst_dict:
-                            dict_hists[process]['fail'][syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL_DOWN'])
+                            dict_hists[process]['fail'][fail_syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL_DOWN'])
                         elif 'HISTFAIL' in this_syst_dict:
-                            dict_hists[process]['fail'][syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL'])
+                            dict_hists[process]['fail'][fail_syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL'])
                         elif 'HISTFAIL_DOWN_*' in this_syst_dict:
-                            dict_hists[process]['fail'][syst+'Down'] = file_up.Get(this_syst_dict['HISTFAIL_DOWN_*'].replace('*',process))
+                            dict_hists[process]['fail'][fail_syst+'Down'] = file_up.Get(this_syst_dict['HISTFAIL_DOWN_*'].replace('*',process))
                         else:
-                            dict_hists[process]['fail'][syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL_DOWN_' + process])
+                            dict_hists[process]['fail'][fail_syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL_DOWN_' + process])
 
                     if this_syst_dict['CODE'] > 1:
+                        if smooth_this:
+                            dict_hists[process]['pass'][pass_syst+'Up'] = header.smoothHist2D('smooth_'+process+'_pass_'+syst+'Up',dict_hists[process]['pass'][pass_syst+'Up'],renormalize=False)
+                            dict_hists[process]['pass'][pass_syst+'Down'] = header.smoothHist2D('smooth_'+process+'_pass_'+syst+'Down',dict_hists[process]['pass'][pass_syst+'Down'],renormalize=False)
+                            dict_hists[process]['fail'][fail_syst+'Up']   = header.smoothHist2D('smooth_'+process+'_fail_'+syst+'Up',dict_hists[process]['fail'][fail_syst+'Up'],renormalize=False)
+                            dict_hists[process]['fail'][fail_syst+'Down'] = header.smoothHist2D('smooth_'+process+'_fail_'+syst+'Down',dict_hists[process]['fail'][fail_syst+'Down'],renormalize=False)
+
                         if "SCALE" in this_process_dict.keys():
-                            dict_hists[process]['pass'][syst+'Up'].Scale(this_proc_scale)
-                            dict_hists[process]['pass'][syst+'Down'].Scale(this_proc_scale)
-                            dict_hists[process]['fail'][syst+'Up'].Scale(this_proc_scale)
-                            dict_hists[process]['fail'][syst+'Down'].Scale(this_proc_scale)
+                            dict_hists[process]['pass'][pass_syst+'Up'].Scale(this_proc_scale)
+                            dict_hists[process]['pass'][pass_syst+'Down'].Scale(this_proc_scale)
+                            dict_hists[process]['fail'][fail_syst+'Up'].Scale(this_proc_scale)
+                            dict_hists[process]['fail'][fail_syst+'Down'].Scale(this_proc_scale)
                         elif "SCALEPASS" in this_process_dict.keys() and "SCALEFAIL" in this_process_dict.keys():
-                            dict_hists[process]['pass'][syst+'Up'].Multiply(this_proc_scale_pass)
-                            dict_hists[process]['pass'][syst+'Down'].Multiply(this_proc_scale_pass)
-                            dict_hists[process]['fail'][syst+'Up'].Multiply(this_proc_scale_fail)
-                            dict_hists[process]['fail'][syst+'Down'].Multiply(this_proc_scale_fail)
+                            dict_hists[process]['pass'][pass_syst+'Up'].Multiply(this_proc_scale_pass)
+                            dict_hists[process]['pass'][pass_syst+'Down'].Multiply(this_proc_scale_pass)
+                            dict_hists[process]['fail'][fail_syst+'Up'].Multiply(this_proc_scale_fail)
+                            dict_hists[process]['fail'][fail_syst+'Down'].Multiply(this_proc_scale_fail)
 
         #####################################################################
         # With dictionary made, we can split around the signal region and   #
@@ -1276,9 +1298,9 @@ class TwoDAlphabet:
                 Roo_dict['qcd'][r+'_'+c] = {}
 
         TH2_qcdmc_ratios = {}
-        TH2_data_ratios = {}
-        TH2_data_passes = {}
-        TH2_data_fails = {}
+        TH2_data_toy_ratios = {}
+        TH2_data_pass_toys = {}
+        TH2_data_fail_toys = {}
         # Need to build for each category
         for c in ['LOW','SIG','HIGH']:
             bin_list_fail = RooArgList()
@@ -1287,17 +1309,17 @@ class TwoDAlphabet:
             TH2_data_fail = self.orgFile.Get(self.organizedDict['data_obs']['fail_'+c]['nominal'])
             TH2_data_pass = self.orgFile.Get(self.organizedDict['data_obs']['pass_'+c]['nominal'])
             
-            TH2_data_fail_clone = TH2_data_fail.Clone()
-            TH2_data_pass_clone = TH2_data_pass.Clone()
+            TH2_data_fail_toy = TH2_data_fail.Clone()
+            TH2_data_pass_toy = TH2_data_pass.Clone()
 
-            # for process in self.organizedDict.keys():
-            #     if process == 'qcdmc': continue
-            #     elif self.inputConfig['PROCESS'][process]['CODE'] == 2: 
-            #         to_subtract_fail = self.orgFile.Get(self.organizedDict[process]['fail_'+c]['nominal'])
-            #         to_subtract_pass = self.orgFile.Get(self.organizedDict[process]['pass_'+c]['nominal'])
+            for process in self.organizedDict.keys():
+                if process == 'qcdmc': continue
+                elif self.inputConfig['PROCESS'][process]['CODE'] == 2: 
+                    to_subtract_fail = self.orgFile.Get(self.organizedDict[process]['fail_'+c]['nominal'])
+                    to_subtract_pass = self.orgFile.Get(self.organizedDict[process]['pass_'+c]['nominal'])
                     
-            #         TH2_data_fail_clone.Add(to_subtract_fail,-0.8)
-            #         TH2_data_pass_clone.Add(to_subtract_pass,-0.8)
+                    TH2_data_fail_toy.Add(to_subtract_fail,-1)
+                    TH2_data_pass_toy.Add(to_subtract_pass,-1)
 
             
             if self.rpfRatio != False:
@@ -1305,23 +1327,20 @@ class TwoDAlphabet:
                 TH2_qcdmc_fail = self.orgFile.Get(self.organizedDict['qcdmc']['fail_'+c]['nominal'])
                 TH2_qcdmc_pass = self.orgFile.Get(self.organizedDict['qcdmc']['pass_'+c]['nominal'])
 
-                if 'SMOOTH' in self.inputConfig['OPTIONS']['rpfRatio'].keys() and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']:
-                    TH2_qcdmc_fail = header.smoothHist2D('smooth_qcdmc_fail_'+c,TH2_qcdmc_fail)
-                    TH2_qcdmc_pass = header.smoothHist2D('smooth_qcdmc_pass_'+c,TH2_qcdmc_pass)
-
-                    TH2_data_fail_clone = header.smoothHist2D('smooth_data_fail_'+c,TH2_data_fail_clone)
-                    TH2_data_pass_clone = header.smoothHist2D('smooth_data_pass_'+c,TH2_data_pass_clone)
+                # if 'SMOOTH' in self.inputConfig['OPTIONS']['rpfRatio'].keys() and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']:
+                #     TH2_qcdmc_fail = header.smoothHist2D('smooth_qcdmc_fail_'+c,TH2_qcdmc_fail)
+                #     TH2_qcdmc_pass = header.smoothHist2D('smooth_qcdmc_pass_'+c,TH2_qcdmc_pass)
 
                 TH2_qcdmc_ratios[c] = TH2_qcdmc_pass.Clone()
                 TH2_qcdmc_ratios[c].Divide(TH2_qcdmc_fail)
 
                 TH2_qcdmc_ratio = TH2_qcdmc_ratios[c]
 
-                TH2_data_ratios[c] = TH2_data_pass_clone.Clone()
-                TH2_data_ratios[c].Divide(TH2_data_fail_clone)
+                TH2_data_toy_ratios[c] = TH2_data_pass_toy.Clone()
+                TH2_data_toy_ratios[c].Divide(TH2_data_fail_toy)
             else:
-                TH2_data_fails[c] = TH2_data_fail_clone
-                TH2_data_passes[c] = TH2_data_pass_clone
+                TH2_data_fail_toys[c] = TH2_data_fail_toy
+                TH2_data_pass_toys[c] = TH2_data_pass_toy
 
             # Get each bin
             for ybin in range(1,len(self.newYbins)):
@@ -1457,7 +1476,7 @@ class TwoDAlphabet:
 
         if self.rpfRatio != False:
             mc_rpf = header.stitchHistsInX('mc_ratio',self.fullXbins,self.newYbins,[TH2_qcdmc_ratios['LOW'],TH2_qcdmc_ratios['SIG'],TH2_qcdmc_ratios['HIGH']])
-            data_rpf = header.stitchHistsInX('data_ratio',self.fullXbins,self.newYbins,[TH2_data_ratios['LOW'],TH2_data_ratios['SIG'],TH2_data_ratios['HIGH']],blinded=[1] if self.blindedPlots else [])
+            data_rpf = header.stitchHistsInX('data_ratio',self.fullXbins,self.newYbins,[TH2_data_toy_ratios['LOW'],TH2_data_toy_ratios['SIG'],TH2_data_toy_ratios['HIGH']],blinded=[1] if self.blindedPlots else [])
             mc_rpf.SetMaximum(2)
             data_rpf.SetMaximum(2)
 
@@ -1465,8 +1484,8 @@ class TwoDAlphabet:
             rpf_ratio.Divide(mc_rpf)
             header.makeCan('rpf_ratio',self.projPath,[data_rpf,mc_rpf,rpf_ratio],titles=["Data Ratio","MC Ratio","Ratio of ratios"])
         else: 
-            data_fail = header.stitchHistsInX('data_fail',self.fullXbins,self.newYbins,[TH2_data_fails['LOW'],TH2_data_fails['SIG'],TH2_data_fails['HIGH']],blinded=[1] if self.blindedPlots else [])
-            data_pass = header.stitchHistsInX('data_fail',self.fullXbins,self.newYbins,[TH2_data_passes['LOW'],TH2_data_passes['SIG'],TH2_data_passes['HIGH']],blinded=[1] if self.blindedPlots else [])
+            data_fail = header.stitchHistsInX('data_fail',self.fullXbins,self.newYbins,[TH2_data_fail_toys['LOW'],TH2_data_fail_toys['SIG'],TH2_data_fail_toys['HIGH']],blinded=[1] if self.blindedPlots else [])
+            data_pass = header.stitchHistsInX('data_fail',self.fullXbins,self.newYbins,[TH2_data_pass_toys['LOW'],TH2_data_pass_toys['SIG'],TH2_data_pass_toys['HIGH']],blinded=[1] if self.blindedPlots else [])
             data_rpf = data_pass.Clone()
             data_rpf.Divide(data_fail)
             header.makeCan('data_ratio',self.projPath,[data_pass,data_fail,data_rpf],titles=["Data Pass","Data Fail","R_{P/F}"])
@@ -1515,7 +1534,8 @@ class TwoDAlphabet:
         # Get the length of the list of all process that have CODE 2 (and ignore "HELP" key) and add 1 for qcd (which won't be in the inputConfig)
         jmax = str(len([proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and self.inputConfig['PROCESS'][proc]['CODE'] == 2]) + 1)
         # Get the length of the lsit of all systematics (and ignore "HELP" key)
-        kmax = str(len([syst for syst in self.inputConfig['SYSTEMATIC'].keys() if syst != 'HELP']))
+        n_uncorr_systs = len([syst for syst in self.inputConfig['SYSTEMATIC'].keys() if syst != 'HELP' and 'UNCORRELATED' in self.inputConfig['SYSTEMATIC'][syst] and self.inputConfig['SYSTEMATIC'][syst]['UNCORRELATED']])
+        kmax = str(len([syst for syst in self.inputConfig['SYSTEMATIC'].keys() if syst != 'HELP'])+n_uncorr_systs)
 
         card_new.write('imax '+imax+'\n')      
         card_new.write('jmax '+jmax+'\n')
@@ -1573,7 +1593,12 @@ class TwoDAlphabet:
                 print 'Systematic ' + syst + ' does not have one of the four allowed codes (0,1,2,3). Quitting.'
                 quit()
             
-            syst_lines[syst] = syst + ' ' + syst_type + ' '
+            # NEW
+            if 'UNCORRELATED' in self.inputConfig['SYSTEMATIC'][syst].keys() and self.inputConfig['SYSTEMATIC'][syst]['UNCORRELATED']:
+                syst_lines[syst+'_pass'] = syst + '_pass ' + syst_type + ' '
+                syst_lines[syst+'_fail'] = syst + '_fail ' + syst_type + ' '
+            else:
+                syst_lines[syst] = syst + ' ' + syst_type + ' '
 
         signal_procs = [proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and proc != 'data_obs' and self.inputConfig['PROCESS'][proc]['CODE'] == 0]
         MC_bkg_procs = [proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and proc != 'data_obs' and (self.inputConfig['PROCESS'][proc]['CODE'] == 2 or self.inputConfig['PROCESS'][proc]['CODE'] == 3)]
@@ -1609,24 +1634,38 @@ class TwoDAlphabet:
 
                 # Fill systematic lines
                 for syst_line_key in syst_lines.keys():
+                    # Check for case when pass and fail are uncorrelated
+                    if syst_line_key.split('_')[-1] in ['pass','fail']:
+                        chan_specific = syst_line_key.split('_')[-1] 
+                    else:
+                        chan_specific = False
+
+                    if 'Trig' in syst_line_key: print '%s %s %s: '%(chan,proc,syst_line_key),
+
                     # If the systematic is applicable to the process
                     if proc != 'qcd':
-                        if syst_line_key in self.inputConfig['PROCESS'][proc]['SYSTEMATICS']:
+                        base_syst_line_key = syst_line_key.replace('_pass','').replace('_fail','')
+                        if base_syst_line_key in self.inputConfig['PROCESS'][proc]['SYSTEMATICS']:
+                            # If we have the pass(fail) specific systematic and this is a fail(pass) region, go to next and skip the rest below
+                            if chan_specific != False and chan_specific not in chan: 
+                                thisVal = '-'
+
                             # If symmetric lnN...
-                            if self.inputConfig['SYSTEMATIC'][syst_line_key]['CODE'] == 0:
-                                thisVal = str(self.inputConfig['SYSTEMATIC'][syst_line_key]['VAL'])
+                            elif self.inputConfig['SYSTEMATIC'][base_syst_line_key]['CODE'] == 0:
+                                thisVal = str(self.inputConfig['SYSTEMATIC'][base_syst_line_key]['VAL'])
                             # If asymmetric lnN...
-                            elif self.inputConfig['SYSTEMATIC'][syst_line_key]['CODE'] == 1:
-                                thisVal = str(self.inputConfig['SYSTEMATIC'][syst_line_key]['VALDOWN']) + '/' + str(self.inputConfig['SYSTEMATIC'][syst_line_key]['VALUP'])
+                            elif self.inputConfig['SYSTEMATIC'][base_syst_line_key]['CODE'] == 1:
+                                thisVal = str(self.inputConfig['SYSTEMATIC'][base_syst_line_key]['VALDOWN']) + '/' + str(self.inputConfig['SYSTEMATIC'][base_syst_line_key]['VALUP'])
                             # If shape...
                             else:
-                                thisVal = str(self.inputConfig['SYSTEMATIC'][syst_line_key]['SCALE'])
+                                thisVal = str(self.inputConfig['SYSTEMATIC'][base_syst_line_key]['SCALE'])
                         # Otherwise place a '-'
                         else:
                             thisVal = '-'  
                     else:
                         thisVal = '-' 
 
+                    if 'Trig' in syst_line_key: print thisVal
                     syst_lines[syst_line_key] += (thisVal+' ')
 
 
@@ -2055,32 +2094,10 @@ class TwoDAlphabet:
         rpf_final.Draw('pe')
         rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_errs.png','png')
 
-        if os.path.isfile(self.projPath+'plots/rpf_comparisons.root'):
-
-            rpf_file = TFile.Open(self.projPath+'/plots/rpf_comparisons.root','UPDATE')
-
-            # Do a ratio and diff with pre-fit
-            prefit_rpf = rpf_file.Get('RpfToRemap_unit')
-
-            # Ratio
-            rpf_ratio = rpf_final.Clone('rpf_ratio_fit'+fittag)
-            rpf_ratio.Divide(prefit_rpf)
-
-            # Difference
-            rpf_diff = rpf_final.Clone('rpf_diff_fit'+fittag)
-            rpf_diff.Add(prefit_rpf,-1)
-
-
-            # rpf_ratio_c = TCanvas('rpf_ratio_c','Ratio of post-fit to pre-fit R_{P/F}',800,700)
-            # rpf_ratio.Draw('surf')
-            # rpf_ratio_c.Print(self.projPath+'/plots/rpf_post-to-pre_ratio.pdf','pdf')
-
-            rpf_file.cd()
-            rpf_final.Write()
-            rpf_ratio.Write()
-            rpf_diff.Write()
-
-            rpf_file.Close()
+        rpf_file = TFile.Open(self.projPath+'/plots/postfit_rpf_fit'+fittag+'.root','RECREATE')
+        rpf_file.cd()
+        rpf_final.Write()
+        rpf_file.Close()
 
     def plotProcessesTogether(self,histDict):
         process_list = histDict.keys()
