@@ -2315,5 +2315,5 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
         shell_finisher.write(aL_cmd+'\n')
         shell_finisher.write('cd '+current_dir+'\n')
         shell_finisher.write('tar -czvf '+identifier+'.tgz '+projDir+'/\n')
-        shell_finisher.write('cp '+identifier+'.tgz ../../../')
+        shell_finisher.write('cp '+identifier+'.tgz $CMSSW_BASE/../')
         shell_finisher.close()

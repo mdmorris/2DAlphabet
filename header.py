@@ -1,7 +1,7 @@
 import ROOT
 from ROOT import *
 from contextlib import contextmanager
-import os, pickle, subprocess
+import os, pickle, subprocess, time,random
 import math
 from math import sqrt
 import array
@@ -413,11 +413,11 @@ def FStatCalc(filename1,filename2,p1,p2,n):
         tree2.GetEntry(i)
         print 'Limits ',tree1.limit,tree2.limit
         if tree1.limit-tree2.limit>0:
-            F = (tree1.limit-tree2.limit)/(p2-p1)/(lTree2.limit/(n-p2))
+            F = (tree1.limit-tree2.limit)/(p2-p1)/(tree2.limit/(n-p2))
             print 'Entry ',i, ":", tree2.limit, "-", tree1.limit, "=", tree2.limit-tree1.limit, "F =", F
             diffs.append(F)
         else:
-            print 'WARNING in calculationg of F statistic for entry %i. limit1-limit2 <=0 (%f - %f)' %(i,tree1.limit,tree2.limit)
+            print 'WARNING in calculation of F statistic for entry %i. limit1-limit2 <=0 (%f - %f)' %(i,tree1.limit,tree2.limit)
 
     print 'Diffs F stat: ',diffs
     return diffs
@@ -491,10 +491,10 @@ def makeToyCard(channelNames):
 
     toy_gen_card.close()
 
-def projInfoLookup(projDir,cardtag):
+def projInfoLookup(projDir,card_tag):
     # Check if there was more than one 2DAlphabet object run over
     more_than_one = False
-    run_card = open('card_'+card_tag+'.txt','r')
+    run_card = open(projDir+'/card_'+card_tag+'.txt','r')
     firstline = run_card.readline()
     if 'Combination of ' in firstline:
         more_than_one = True
@@ -504,7 +504,7 @@ def projInfoLookup(projDir,cardtag):
         # Look up all categories run in the most recent fit
         twoD_names = getTwoDAlphaNames(firstline)
         for n in twoD_names:
-            proj_info[n] = pickle.load(open(projDir+twoD_obj_name+'/saveOut.p','r'))
+            proj_info[n] = pickle.load(open(projDir+'/'+n+'/saveOut.p','r'))
 
     elif not more_than_one:
         proj_info[card_tag] = pickle.load(open(projDir+'/saveOut.p','r'))
@@ -513,7 +513,7 @@ def projInfoLookup(projDir,cardtag):
 
 def getTwoDAlphaNames(line):
     card_locs = [loc for loc in line.split(' ') if (loc != ' ' and loc != '' and 'txt' in loc)]
-    proj_names = [n.split('/') for n in card_locs]
+    proj_names = [n.split('/')[0] for n in card_locs]
     return proj_names
 
 def executeCmd(cmd,dryrun=False):
