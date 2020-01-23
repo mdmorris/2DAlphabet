@@ -1648,8 +1648,6 @@ class TwoDAlphabet:
                     else:
                         chan_specific = False
 
-                    if 'Trig' in syst_line_key: print '%s %s %s: '%(chan,proc,syst_line_key),
-
                     # If the systematic is applicable to the process
                     if proc != 'qcd':
                         base_syst_line_key = syst_line_key.replace('_pass','').replace('_fail','')
@@ -1673,7 +1671,6 @@ class TwoDAlphabet:
                     else:
                         thisVal = '-' 
 
-                    if 'Trig' in syst_line_key: print thisVal
                     syst_lines[syst_line_key] += (thisVal+' ')
 
 
