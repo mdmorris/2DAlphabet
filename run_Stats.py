@@ -25,32 +25,7 @@ def getMasks(filename):
     f.Close()
 
     return masked_regions
-
-def setSnapshot(base_workspace):
-    # header.executeCmd('combine -M MultiDimFit -d '+base_workspace+' --saveWorkspace --freezeParameters r --setParameters r=0,'+mask_string)
-    # f = TFile.Open('higgsCombineTest.MultiDimFit.mH120.root')
-    # w = f.Get('w')
-    # w.loadSnapshot("MultiDimFit")
-    # w.var("r").setConstant(0)
-    # w.var("r").setVal(0)
-    # w.var("r").setMin(-20)
-    # w.var("r").setMax(20)
-    # myargs = RooArgSet(w.allVars())
-    # myargs.add(w.allCats())
-    # w.saveSnapshot("initialFit",myargs)
-    # fout = TFile('initialFitWorkspace.root',"recreate")
-    # fout.WriteTObject(w,'w')
-    # fout.Close()
-    w_f = TFile.Open('higgsCombineTest.FitDiagnostics.mH120.root')
-    w = w_f.Get('w')
-    fr_f = TFile.Open('fitDiagnostics.root')
-    fr = fr_f.Get('fit_b')
-    myargs = RooArgSet(fr.floatParsFinal())
-    importPars = w.saveSnapshot('initialFit',myargs)
-    fout = TFile('initialFitWorkspace.root',"recreate")
-    fout.WriteTObject(w,'w')
-    fout.Close()
-    
+   
 
 from optparse import OptionParser
 
@@ -198,13 +173,13 @@ with header.cd(projDir):
     }
     gen_command = 'combine -M GenerateOnly'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --bypassFrequentistFit -t '+str(ntoys)+' --saveToys -s '+str(seed)+' --expectSignal '+expectSignal+' -n '+run_name
 
-    if not options.post and not options.plotOnly and not options.skipSnapshot: setSnapshot(workspace_name)
+    if not options.post and not options.plotOnly and not options.skipSnapshot: header.setSnapshot(workspace_name)
 
     #######
     # GOF #
     #######
     if options.gof:
-        if not options.plotOnly:
+        if not options.plotOnly and not options.post:
             commands = []
 
             ########################################################################

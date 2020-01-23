@@ -6,6 +6,32 @@ import math
 from math import sqrt
 import array
 import json
+import CMS_lumi, tdrstyle
+
+def setSnapshot(base_workspace):
+    # header.executeCmd('combine -M MultiDimFit -d '+base_workspace+' --saveWorkspace --freezeParameters r --setParameters r=0,'+mask_string)
+    # f = TFile.Open('higgsCombineTest.MultiDimFit.mH120.root')
+    # w = f.Get('w')
+    # w.loadSnapshot("MultiDimFit")
+    # w.var("r").setConstant(0)
+    # w.var("r").setVal(0)
+    # w.var("r").setMin(-20)
+    # w.var("r").setMax(20)
+    # myargs = RooArgSet(w.allVars())
+    # myargs.add(w.allCats())
+    # w.saveSnapshot("initialFit",myargs)
+    # fout = TFile('initialFitWorkspace.root',"recreate")
+    # fout.WriteTObject(w,'w')
+    # fout.Close()
+    w_f = TFile.Open('higgsCombineTest.FitDiagnostics.mH120.root')
+    w = w_f.Get('w')
+    fr_f = TFile.Open('fitDiagnostics.root')
+    fr = fr_f.Get('fit_b')
+    myargs = RooArgSet(fr.floatParsFinal())
+    importPars = w.saveSnapshot('initialFit',myargs)
+    fout = TFile('initialFitWorkspace.root',"recreate")
+    fout.WriteTObject(w,'w')
+    fout.Close()
 
 # Function stolen from https://stackoverflow.com/questions/9590382/forcing-python-json-module-to-work-with-ascii
 def openJSON(f):
