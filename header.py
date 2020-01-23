@@ -120,7 +120,7 @@ def copyHistWithNewYbins(thisHist,newYbins,copyName):
 
     return hist_copy
 
-def smoothHist2D(name,histToSmooth,renormalize=True):
+def smoothHist2D(name,histToSmooth,renormalize=True,iterate=1):
     print "Smoothing "+name
     if renormalize: norm = histToSmooth.Integral()
     smoothed_hist = histToSmooth.Clone(name)
@@ -194,6 +194,7 @@ def smoothHist2D(name,histToSmooth,renormalize=True):
     if renormalize:
         smoothed_norm = smoothed_hist.Integral()
         smoothed_hist.Scale(norm/smoothed_norm)
+    if iterate > 1: smoothed_hist = smoothHist2D(name+str(iterate),smoothed_hist,iterate=iterate-1)
     return smoothed_hist
 
 def zeroNegativeBins(name,inhist):

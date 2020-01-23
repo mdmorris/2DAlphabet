@@ -1064,17 +1064,16 @@ class TwoDAlphabet:
                 hist_fail.Multiply(this_proc_scale_fail)
 
             # Smooth
-            if 'SMOOTH' in this_process_dict.keys() and self.inputConfig['OPTIONS']['rpfRatio'] != False and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']: smooth_this = True
+            if 'SMOOTH' in this_process_dict.keys() and this_process_dict['SMOOTH']: smooth_this = True# and self.inputConfig['OPTIONS']['rpfRatio'] != False and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']: smooth_this = True
             else: smooth_this = False
 
             if smooth_this:
-                hist_pass = header.smoothHist2D('smooth_'+process+'_pass',hist_pass,renormalize=False)
-                hist_fail = header.smoothHist2D('smooth_'+process+'_fail',hist_fail,renormalize=False)
+                hist_pass = header.smoothHist2D('smooth_'+process+'_pass',hist_pass,renormalize=False,iterate = 1 if process != 'qcdmc' else 3)
+                hist_fail = header.smoothHist2D('smooth_'+process+'_fail',hist_fail,renormalize=False,iterate = 1 if process != 'qcdmc' else 3)
 
             dict_hists[process]['file'] = file_nominal
             dict_hists[process]['pass']['nominal'] = hist_pass
             dict_hists[process]['fail']['nominal'] = hist_fail
-
 
             # If there are systematics
             if process == 'qcdmc' or len(this_process_dict['SYSTEMATICS']) == 0:
@@ -1298,6 +1297,15 @@ class TwoDAlphabet:
                 Roo_dict['qcd'][r+'_'+c] = {}
 
         TH2_qcdmc_ratios = {}
+        if self.rpfRatio != False:
+            TH2_qcdmc_fail = self.orgFile.Get(self.organizedDict['qcdmc']['fail_FULL']['nominal'])
+            TH2_qcdmc_pass = self.orgFile.Get(self.organizedDict['qcdmc']['pass_FULL']['nominal'])
+            TH2_qcdmc_ratios['FULL'] = TH2_qcdmc_pass.Clone('qcdmc_rpf_full')
+            TH2_qcdmc_ratios['FULL'].Divide(TH2_qcdmc_fail)
+            #TH2_qcdmc_ratios['FULL'] =  = header.smoothHist2D('qcdmc_rpf_full_smooth',TH2_qcdmc_ratios['FULL'],renormalize=False)
+            for c in ['LOW','SIG','HIGH']:
+                TH2_qcdmc_ratios[c] = header.copyHistWithNewXbins(TH2_qcdmc_ratios['FULL'],self.newXbins[c],'qcdmc_rpf_'+c+'_smooth')
+        
         TH2_data_toy_ratios = {}
         TH2_data_pass_toys = {}
         TH2_data_fail_toys = {}
@@ -1324,17 +1332,20 @@ class TwoDAlphabet:
             
             if self.rpfRatio != False:
                 # "TH2_data_fail" is now going to be the true fail multiplied by the pass/fail ratio of the MC
-                TH2_qcdmc_fail = self.orgFile.Get(self.organizedDict['qcdmc']['fail_'+c]['nominal'])
-                TH2_qcdmc_pass = self.orgFile.Get(self.organizedDict['qcdmc']['pass_'+c]['nominal'])
+                # TH2_qcdmc_fail = self.orgFile.Get(self.organizedDict['qcdmc']['fail_'+c]['nominal'])
+                # TH2_qcdmc_pass = self.orgFile.Get(self.organizedDict['qcdmc']['pass_'+c]['nominal'])
 
                 # if 'SMOOTH' in self.inputConfig['OPTIONS']['rpfRatio'].keys() and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']:
                 #     TH2_qcdmc_fail = header.smoothHist2D('smooth_qcdmc_fail_'+c,TH2_qcdmc_fail)
                 #     TH2_qcdmc_pass = header.smoothHist2D('smooth_qcdmc_pass_'+c,TH2_qcdmc_pass)
 
-                TH2_qcdmc_ratios[c] = TH2_qcdmc_pass.Clone()
-                TH2_qcdmc_ratios[c].Divide(TH2_qcdmc_fail)
+                # TH2_qcdmc_ratios[c] = TH2_qcdmc_pass.Clone()
+                # TH2_qcdmc_ratios[c].Divide(TH2_qcdmc_fail)
 
-                TH2_qcdmc_ratio = TH2_qcdmc_ratios[c]
+                # if 'SMOOTH' in self.inputConfig['OPTIONS']['rpfRatio'].keys() and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']:
+                #     TH2_qcdmc_ratios[c] = header.smoothHist2D('smooth_rpf_MC',TH2_qcdmc_ratios[c],renormalize=False)
+
+                # TH2_qcdmc_ratio = TH2_qcdmc_ratios[c]
 
                 TH2_data_toy_ratios[c] = TH2_data_pass_toy.Clone()
                 TH2_data_toy_ratios[c].Divide(TH2_data_fail_toy)
@@ -1450,7 +1461,7 @@ class TwoDAlphabet:
                             this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1",formula_arg_list)
                             
                         else:
-                            mc_ratio_var = RooConstVar("mc_ratio_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, "mc_ratio_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, TH2_qcdmc_ratio.GetBinContent(xbin,ybin))
+                            mc_ratio_var = RooConstVar("mc_ratio_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, "mc_ratio_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, TH2_qcdmc_ratios[c].GetBinContent(xbin,ybin))
                             formula_arg_list = RooArgList(binRRV,this_rpf,mc_ratio_var)
                             this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1*@2",formula_arg_list)
                             self.allVars.append(mc_ratio_var)
@@ -1471,13 +1482,14 @@ class TwoDAlphabet:
             Roo_dict['qcd']['pass_'+c]['norm']  = RooAddition('qcd_pass_'+c+'_'+self.name+'_norm','qcd_pass_'+c+'_'+self.name+'_norm',bin_list_pass)
 
         if self.rpfRatio != False:
-            mc_rpf = header.stitchHistsInX('mc_ratio',self.fullXbins,self.newYbins,[TH2_qcdmc_ratios['LOW'],TH2_qcdmc_ratios['SIG'],TH2_qcdmc_ratios['HIGH']])
+            mc_rpf = TH2_qcdmc_ratios['FULL']#header.stitchHistsInX('mc_ratio',self.fullXbins,self.newYbins,[TH2_qcdmc_ratios['LOW'],TH2_qcdmc_ratios['SIG'],TH2_qcdmc_ratios['HIGH']])
             data_rpf = header.stitchHistsInX('data_ratio',self.fullXbins,self.newYbins,[TH2_data_toy_ratios['LOW'],TH2_data_toy_ratios['SIG'],TH2_data_toy_ratios['HIGH']],blinded=[1] if self.blindedPlots else [])
-            mc_rpf.SetMaximum(2)
-            data_rpf.SetMaximum(2)
-
             rpf_ratio = data_rpf.Clone()
             rpf_ratio.Divide(mc_rpf)
+            rpf_ratio.SetMaximum(2.5)
+            mc_rpf.SetMaximum(1)
+            data_rpf.SetMaximum(1)
+
             header.makeCan('rpf_ratio',self.projPath,[data_rpf,mc_rpf,rpf_ratio],titles=["Data Ratio","MC Ratio","Ratio of ratios"])
         else: 
             data_fail = header.stitchHistsInX('data_fail',self.fullXbins,self.newYbins,[TH2_data_fail_toys['LOW'],TH2_data_fail_toys['SIG'],TH2_data_fail_toys['HIGH']],blinded=[1] if self.blindedPlots else [])
