@@ -135,7 +135,7 @@ with header.cd(projDir):
     else: freeze_r_string = ''
 
     # Make a prefit workspace from the data card
-    if options.workspace == '':
+    if options.workspace == '' and not options.post:
         workspace_name = 'stats_workspace.root'
         t2w_cmd = 'text2workspace.py --channel-masks -b card_'+card_tag+'.txt -o '+workspace_name
         header.executeCmd(t2w_cmd,options.dryrun)
@@ -201,7 +201,8 @@ with header.cd(projDir):
                              'RpfHandler.py',
                              projDir+'/'+workspace_name]
 
-                header.StatsForCondor(run_name,toy_dict,tar_files,[gof_toy_cmd])
+                gof_toy_cmd = gof_toy_cmd.replace('GoodnessOfFit '+workspace_name,'GoodnessOfFit '+projDir+'/'+workspace_name)
+                header.StatsForCondor(run_name,projDir,toy_dict,tar_files,[gof_toy_cmd])
 
             else:
                 # header.executeCmd(gen_command,options.dryrun)
