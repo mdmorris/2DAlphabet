@@ -25,7 +25,7 @@ commands = []
 
 print options.args
 
-#if 'stats' not in options.runscript: commands.append('source condor/prep.csh')
+if 'limits' in options.runscript and 'bstar' in options.runscript: commands.append('source condor/prep.csh')
 
 # Tar stuff
 if options.inputs != '':
