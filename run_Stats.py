@@ -235,7 +235,7 @@ with header.cd(projDir):
             # Get toys
             # toyOutput = TFile.Open('higgsCombine'+run_name+'.GoodnessOfFit.mH120.'+str(seed)+'.root')
             # toyLimitTree = toyOutput.Get('limit')
-            toyLimitTree.Draw('limit>>hlimit') 
+            toyLimitTree.Draw('limit>>hlimit','limit>0.001') 
             toyLimits = gDirectory.Get('hlimit')
             time.sleep(1) # if you don't sleep the code moves too fast and won't perform the fit
             toyLimits.Fit("gaus")
