@@ -48,7 +48,7 @@ if not os.path.isdir(projDir):
 # So instead, we'll be a list of only the nuisance parameters and ask to just fit those
 
 if options.condor: 
-    header.executeCmd('tar -czvf tarball.tgz '+projDir)
+    header.executeCmd('tar --exclude="*.tgz" --exclude="*.std*" --exclude="run_combine*.sh" --exclude="*GoodnessOfFit*" --exclude="*.png" --exclude="*.pdf" --exclude="*.log" -czvf tarball.tgz '+projDir)
     header.executeCmd('mv tarball.tgz '+projDir)
 print 'cd '+projDir
 with header.cd(projDir):
@@ -62,9 +62,9 @@ with header.cd(projDir):
         # Remove old runs if they exist
         header.executeCmd('rm *_paramFit_*.root *_initialFit_*.root')
         # Build a post-fit workspace
-        header.executeCmd('text2workspace.py -b card_'+card_tag+'.txt -o impactworkspace.root')
-        header.setSnapshot('impactworkspace.root')
-        initialfit_cmd = 'combineTool.py -M Impacts -n '+taskName+' -d initialFitWorkspace.root --snapshotName initialFit --doInitialFit --robustFit 1 --freezeParameters "var{Fail_.*}" -m 2000 '+impactNuisanceString
+        #header.executeCmd('text2workspace.py -b card_'+card_tag+'.txt -o impactworkspace.root')
+        header.setSnapshot()
+        initialfit_cmd = 'combineTool.py -M Impacts -n '+taskName+' -d initialFitWorkspace.root --snapshotName initialFit --doInitialFit --robustFit 1 -m 2000 --freezeParameters "var{Fail_.*}" '+impactNuisanceString
         header.executeCmd(initialfit_cmd)
         impact_cmd = 'combineTool.py -M Impacts -n '+taskName+' -d initialFitWorkspace.root --snapshotName initialFit --doFits --robustFit 1 -m 2000 --freezeParameters "var{Fail_.*}" '+impactNuisanceString
         if options.condor:
@@ -89,33 +89,13 @@ cd %s
             job_prefix_out.write(JOB_PREFIX)
             job_prefix_out.close()
 
-            impact_cmd = impact_cmd+' --job-mode condor --prefix-file impact_prefix.txt --sub-opts "transfer_input_files = tarball.tgz" --task-name Impacts'+taskName
-
-
-            # # Need to write a custom crab config for the storage site
-            # crabConfig = open('custom_crab.py','w')
-            # crabConfig.write('def custom_crab(config):')
-            # print '>> Customising the crab config'
-            # crabConfig.write("    config.Site.storageSite = '"+options.storage+"'")
-            # crabConfig.close()
-
-            # print 'Executing dry-run of crab jobs'
-            # impact_cmd = 'combineTool.py -M Impacts -n '+taskName+' -d impactworkspace.root --robustFit 1 --doFits -m 120 --job-mode crab3 --task-name Impacts'+taskName+' --custom-crab custom_crab.py '+impactNuisanceString
-            # subprocess.call([impact_cmd+' --dry-run'],shell=True)
-            # proceed = raw_input('Please examine this command and confirm it is correct before submitting to crab. Do you wish to proceed? [Y/N]')
-            # if proceed.lower() == 'y':
-            #     commands.append('source /cvmfs/cms.cern.ch/crab3/crab.sh; cmsenv')
-            #     commands.append(impact_cmd)
-                
-            # else:
-            #     print 'Quitting...'
-            #     quit()
+            impact_cmd = impact_cmd+' --job-mode condor --dry-run --prefix-file impact_prefix.txt --sub-opts "transfer_input_files = tarball.tgz" --task-name Impacts'+taskName
 
         header.executeCmd(impact_cmd)
 
     elif options.post:
         # Grab the output
-        header.executeCmd('combineTool.py -M Impacts -n '+taskName+' -d initialFitWorkspace.root --snapshotName initialFit -m 120 '+impactNuisanceString+' -o impacts.json')
+        header.executeCmd('combineTool.py -M Impacts -n '+taskName+' -d initialFitWorkspace.root --snapshotName initialFit -m 2000 '+impactNuisanceString+' -o impacts.json')
         header.executeCmd('plotImpacts.py -i impacts.json -o impacts')
 
     # # Run commands
