@@ -93,6 +93,19 @@ if not options.skipFit:
 
 # Plot
 if not options.skipPlots:
+    with header.cd(thistag):
+        covMtrx_File = TFile.Open('fitDiagnostics.root')
+        fit_result = covMtrx_File.Get("fit_b")
+        corrMtrx = header.reducedCorrMatrixHist(fit_result)
+        corrMtrxCan = TCanvas('c','c',1400,1000)
+        corrMtrxCan.cd()
+        corrMtrxCan.SetBottomMargin(0.22)
+        corrMtrxCan.SetLeftMargin(0.17)
+        corrMtrxCan.SetTopMargin(0.06)
+
+        corrMtrx.Draw('colz')
+        corrMtrxCan.Print('correlation_matrix.png','png')
+
     for t in twoDinstances:
         try:
             t.plotFitResults('b')
