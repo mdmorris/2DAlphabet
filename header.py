@@ -8,7 +8,7 @@ import array
 import json
 import CMS_lumi, tdrstyle
 
-def setSnapshot(base_workspace):
+def setSnapshot(d=''):
     # header.executeCmd('combine -M MultiDimFit -d '+base_workspace+' --saveWorkspace --freezeParameters r --setParameters r=0,'+mask_string)
     # f = TFile.Open('higgsCombineTest.MultiDimFit.mH120.root')
     # w = f.Get('w')
@@ -23,9 +23,9 @@ def setSnapshot(base_workspace):
     # fout = TFile('initialFitWorkspace.root',"recreate")
     # fout.WriteTObject(w,'w')
     # fout.Close()
-    w_f = TFile.Open('higgsCombineTest.FitDiagnostics.mH120.root')
+    w_f = TFile.Open(d+'higgsCombineTest.FitDiagnostics.mH120.root')
     w = w_f.Get('w')
-    fr_f = TFile.Open('fitDiagnostics.root')
+    fr_f = TFile.Open(d+'fitDiagnostics.root')
     fr = fr_f.Get('fit_b')
     myargs = RooArgSet(fr.floatParsFinal())
     importPars = w.saveSnapshot('initialFit',myargs)
