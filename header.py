@@ -593,7 +593,7 @@ def dictToLatexTable(dict2convert,outfilename,roworder=[],columnorder=[]):
     latexout.close()
 
 
-def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False,datastyle='pe'):  
+def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],dataName='data',bkgNames=[],signalNames=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False,datastyle='pe',year=1):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -829,10 +829,44 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                 if logy == True:
                     mains[hist_index].SetLogy()
 
+                CMS_lumi.CMS_lumi(thisPad, year, 11)
+
     if rootfile:
         myCan.Print(tag+'/'+name+'.root','root')
     else:
         myCan.Print(tag+'/'+name+'.png','png')
+
+
+def reducedCorrMatrixHist(fit_result):
+    ROOT.gStyle.SetOptStat(0)
+    # ROOT.gStyle.SetPaintTextFormat('.3f')
+    CM = fit_result.correlationMatrix()
+    finalPars = fit_result.floatParsFinal()
+
+    nParams = CM.GetNcols()
+    finalParamsDict = {}
+    for cm_index in range(nParams):
+        if 'Fail_' not in finalPars.at(cm_index).GetName():
+            finalParamsDict[finalPars.at(cm_index).GetName()] = cm_index
+
+    nFinalParams = len(finalParamsDict.keys())
+    out = TH2D('correlation_matrix','correlation_matrix',nFinalParams,0,nFinalParams,nFinalParams,0,nFinalParams)
+    out_txt = open('correlation_matrix.txt','w')
+
+    for out_x_index, paramXName in enumerate(sorted(finalParamsDict.keys())):
+        cm_index_x = finalParamsDict[paramXName]
+        for out_y_index, paramYName in enumerate(sorted(finalParamsDict.keys())):
+            cm_index_y = finalParamsDict[paramYName]
+            if cm_index_x > cm_index_y:
+                out_txt.write('%s:%s = %s\n'%(paramXName,paramYName,CM[cm_index_x][cm_index_y]))
+            out.Fill(out_x_index+0.5,out_y_index+0.5,CM[cm_index_x][cm_index_y])
+
+        out.GetXaxis().SetBinLabel(out_x_index+1,finalPars.at(cm_index_x).GetName())
+        out.GetYaxis().SetBinLabel(out_x_index+1,finalPars.at(cm_index_x).GetName())
+    out.SetMinimum(-1)
+    out.SetMaximum(+1)
+
+    return out
 
 def FindCommonString(string_list):
     to_match = ''   # initialize the string we're looking for/building
