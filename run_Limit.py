@@ -69,8 +69,8 @@ if len(inputConfigs) > 1:
     # For each instance, check tags match and if they don't, ask the user for one
     for t in twoDinstances:
         if t.tag != twoDinstances[0].tag:
-            print 'ERROR: tags in configuration files do not match. '+t.tag+' does not match '+twoDinstances[0].tag+'. Please make sure they match and try again. Quitting...'
-            quit()
+            raise ValueErro('ERROR: tags in configuration files do not match. '+t.tag+' does not match '+twoDinstances[0].tag+'. Please make sure they match and try again. Quitting...')
+            
     thistag = twoDinstances[0].tag
 
     # Combine the cards 
