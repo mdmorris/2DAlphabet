@@ -630,7 +630,7 @@ class TwoDAlphabet:
                             elif x == 'Y': nom.SetXTitle(self.inputConfig['BINNING']['Y']['TITLE'])
 
                             nom.SetTitle(proc + ' - ' + syst + ' uncertainty')
-                            nom.SetTitleOffset(1.2,"X")
+                            # nom.SetTitleOffset(1.2,"X")
 
                             nom.Draw('hist')
                             # if proc == 'ttbar': raw_input(axis+' nom')
@@ -792,8 +792,8 @@ class TwoDAlphabet:
         Rpf = header.remapToUnity(RpfToRemap)
 
         # Plot comparisons out
-        header.makeCan('prefit_pass_fail',self.projPath,[final_pass,final_fail],xtitle=self.xVarName,ytitle=self.yVarName)
-        header.makeCan('prefit_rpf_lego',self.projPath,[RpfToRemap,Rpf],xtitle=self.xVarName,ytitle=self.yVarName)
+        header.makeCan('prefit_pass_fail',self.projPath,[final_pass,final_fail],xtitle=self.xVarName,ytitle=self.yVarName,year=self.year)
+        header.makeCan('prefit_rpf_lego',self.projPath,[RpfToRemap,Rpf],xtitle=self.xVarName,ytitle=self.yVarName,year=self.year)
 
         ###############################################
         # Determine fit function from the inputConfig #
@@ -1491,16 +1491,16 @@ class TwoDAlphabet:
             rpf_ratio = data_rpf.Clone()
             rpf_ratio.Divide(mc_rpf)
             rpf_ratio.SetMaximum(2.5)
-            mc_rpf.SetMaximum(1)
-            data_rpf.SetMaximum(1)
+            # mc_rpf.SetMaximum(1)
+            # data_rpf.SetMaximum(1)
 
-            header.makeCan('rpf_ratio',self.projPath,[data_rpf,mc_rpf,rpf_ratio],titles=["Data Ratio","MC Ratio","Ratio of ratios"])
+            header.makeCan('rpf_ratio',self.projPath,[data_rpf,mc_rpf,rpf_ratio],titles=["Data Ratio","MC Ratio","Ratio of ratios"],year=self.year)
         else: 
             data_fail = header.stitchHistsInX('data_fail',self.fullXbins,self.newYbins,[TH2_data_fail_toys['LOW'],TH2_data_fail_toys['SIG'],TH2_data_fail_toys['HIGH']],blinded=[1] if self.blindedPlots else [])
             data_pass = header.stitchHistsInX('data_fail',self.fullXbins,self.newYbins,[TH2_data_pass_toys['LOW'],TH2_data_pass_toys['SIG'],TH2_data_pass_toys['HIGH']],blinded=[1] if self.blindedPlots else [])
             data_rpf = data_pass.Clone()
             data_rpf.Divide(data_fail)
-            header.makeCan('data_ratio',self.projPath,[data_pass,data_fail,data_rpf],titles=["Data Pass","Data Fail","R_{P/F}"])
+            header.makeCan('data_ratio',self.projPath,[data_pass,data_fail,data_rpf],titles=["Data Pass","Data Fail","R_{P/F}"],year=self.year)
 
         print "Making workspace..."
         # Make workspace to save in
@@ -1830,8 +1830,9 @@ class TwoDAlphabet:
 
         post_file.Close()
 
+        # NOT CURRENTLY WORKING
         # Add together processes that we want to see as one
-        if self.plotTogether != False:
+        if False:#self.plotTogether != False:
             hist_dict = self.plotProcessesTogether(hist_dict)
             
         process_list = hist_dict.keys()
@@ -1839,19 +1840,20 @@ class TwoDAlphabet:
         # Create lists for the 2D projections (ones you want to see together)
         for process in hist_dict.keys():    # Canvas
             isSignal = (process != 'qcd' and self.inputConfig['PROCESS'][process]['CODE'] == 0)
-            twoDList = []         
+            twoDList = []
+            twoDtitles = []   
             for cat in ['fail','pass']:
                 for fit in ['prefit', 'postfit']:
                     if isSignal and fittag == 's' and fit == 'postfit':
                         hist_dict[process][cat][fit+'_2D'].Scale(signal_strength)
-                        twoDList.append(hist_dict[process][cat][fit+'_2D'])
-                    else:
-                        twoDList.append(hist_dict[process][cat][fit+'_2D'])
+
+                    twoDList.append(hist_dict[process][cat][fit+'_2D'])
+                    twoDtitles.append(process + ', '+cat+', '+fit)
 
             if isSignal and fittag != 's':
                 continue
             else:
-                header.makeCan('plots/fit_'+fittag+'/'+process+'_fit'+fittag+'_2D',self.projPath,twoDList,xtitle=self.xVarTitle,ytitle=self.yVarTitle)
+                header.makeCan('plots/fit_'+fittag+'/'+process+'_fit'+fittag+'_2D',self.projPath,twoDList,titles=twoDtitles,xtitle=self.xVarTitle,ytitle=self.yVarTitle,year=self.year)
 
         # Invert the last two items (unique to b*) - customize as needed
         process_list[-1],process_list[-2] = process_list[-2],process_list[-1]
@@ -1965,8 +1967,16 @@ class TwoDAlphabet:
                             else:
                                 prepostcolors = [kYellow]
 
-                    if 'x' in plotType: header.makeCan('plots/fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=self.xVarTitle,datastyle='histe')
-                    if 'y' in plotType: header.makeCan('plots/fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=self.yVarTitle,datastyle='histe')
+                            title_list.append('Pre vs Postfit - %s - %s - [%s,%s]'%(process,cat,low_str,high_str))
+
+                    if 'x' in plotType: header.makeCan('plots/fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,
+                        post_list,bkglist=pre_list,
+                        titles=title_list,bkgNames=['Prefit, '+process],dataName='        Postfit, '+process,
+                        colors=prepostcolors,xtitle=self.xVarTitle,datastyle='histpe',year=self.year)
+                    if 'y' in plotType: header.makeCan('plots/fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,
+                        post_list,bkglist=pre_list,
+                        titles=title_list,bkgNames=['Prefit, '+process],dataName='        Postfit, '+process,
+                        colors=prepostcolors,xtitle=self.yVarTitle,datastyle='histpe',year=self.year)
 
 
         ##############
@@ -2131,15 +2141,15 @@ class TwoDAlphabet:
         rpf_final.Write()
         rpf_file.Close()
 
-    def plotProcessesTogether(self,histDict):
-        process_list = histDict.keys()
+    def plotProcessesTogether(self,hist_dict):
+        process_list = hist_dict.keys()
 
         for summation in self.plotTogether.keys():  # For each set we're add together
             process_list.append(summation)   # add the name to a list so we can keep track
             hist_dict[summation] = {}
             first_process = self.plotTogether[summation][0]
-            self.inputConfig["PROCESS"][summation] = {"COLOR":inputConfig["PROCESS"][first_process]["COLOR"],
-                                                     "CODE":inputConfig["PROCESS"][first_process]["CODE"] }
+            self.inputConfig["PROCESS"][summation] = {"COLOR":self.inputConfig["PROCESS"][first_process]["COLOR"],
+                                                     "CODE":self.inputConfig["PROCESS"][first_process]["CODE"] }
 
             for cat in hist_dict[first_process].keys():   # for each pass/fail
                 hist_dict[summation][cat] = {}
@@ -2273,6 +2283,18 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,prerun=False):
             sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --samples 100 --print 2> PostFitShapes2D_stderr_s.txt'
             header.executeCmd(sshapes_cmd)
 
+            covMtrx_File = TFile.Open('fitDiagnostics.root')
+            fit_result = covMtrx_File.Get("fit_b")
+            corrMtrx = header.reducedCorrMatrixHist(fit_result)
+            corrMtrxCan = TCanvas('c','c',1400,1000)
+            corrMtrxCan.cd()
+            corrMtrxCan.SetBottomMargin(0.22)
+            corrMtrxCan.SetLeftMargin(0.17)
+            corrMtrxCan.SetTopMargin(0.06)
+
+            corrMtrx.Draw('colz text')
+            corrMtrxCan.Print('correlation_matrix.png','png')
+
 
 def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
     # Set verbosity - chosen from first of configs
@@ -2315,6 +2337,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
     with header.cd(projDir):
         t2w_cmd = 'text2workspace.py -b '+card_name+' -o limitworkspace.root' 
         header.executeCmd(t2w_cmd)
+        # header.setSnapshot(os.environ['CMSSW_BASE']+'/src/2DAlphabet/'+postfitWorkspaceDir+'/')
 
     # Morph workspace according to imported fit result
     prefit_file = TFile(projDir+'/limitworkspace.root','update')
@@ -2335,7 +2358,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
 
     current_dir = os.getcwd()
 
-    aL_cmd = 'combine -M AsymptoticLimits limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option# + sig_option 
+    aL_cmd = 'combine -M AsymptoticLimits limitworkspace.root --saveWorkspace' +blind_option + syst_option# + sig_option 
 
     # Run combine if not on condor
     if location == 'local':    
