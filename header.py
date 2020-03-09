@@ -857,7 +857,7 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],dataN
         myCan.Print(tag+'/'+name+'.png','png')
 
 
-def reducedCorrMatrixHist(fit_result):
+def reducedCorrMatrixHist(fit_result,varsOfInterest=[]):
     ROOT.gStyle.SetOptStat(0)
     # ROOT.gStyle.SetPaintTextFormat('.3f')
     CM = fit_result.correlationMatrix()
@@ -866,8 +866,12 @@ def reducedCorrMatrixHist(fit_result):
     nParams = CM.GetNcols()
     finalParamsDict = {}
     for cm_index in range(nParams):
-        if 'Fail_' not in finalPars.at(cm_index).GetName():
-            finalParamsDict[finalPars.at(cm_index).GetName()] = cm_index
+        if varsOfInterest == []:
+            if 'Fail_' not in finalPars.at(cm_index).GetName():
+                finalParamsDict[finalPars.at(cm_index).GetName()] = cm_index
+        else:
+            if finalPars.at(cm_index).GetName() in varsOfInterest:
+                finalParamsDict[finalPars.at(cm_index).GetName()] = cm_index
 
     nFinalParams = len(finalParamsDict.keys())
     out = TH2D('correlation_matrix','correlation_matrix',nFinalParams,0,nFinalParams,nFinalParams,0,nFinalParams)
