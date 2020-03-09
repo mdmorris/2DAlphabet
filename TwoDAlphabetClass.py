@@ -1306,7 +1306,7 @@ class TwoDAlphabet:
             TH2_qcdmc_pass = self.orgFile.Get(self.organizedDict['qcdmc']['pass_FULL']['nominal'])
             TH2_qcdmc_ratios['FULL'] = TH2_qcdmc_pass.Clone('qcdmc_rpf_full')
             TH2_qcdmc_ratios['FULL'].Divide(TH2_qcdmc_fail)
-            #TH2_qcdmc_ratios['FULL'] =  = header.smoothHist2D('qcdmc_rpf_full_smooth',TH2_qcdmc_ratios['FULL'],renormalize=False)
+            TH2_qcdmc_ratios['FULL'] = header.smoothHist2D('qcdmc_rpf_full_smooth',TH2_qcdmc_ratios['FULL'],renormalize=False,skipEdges=True)
             for c in ['LOW','SIG','HIGH']:
                 TH2_qcdmc_ratios[c] = header.copyHistWithNewXbins(TH2_qcdmc_ratios['FULL'],self.newXbins[c],'qcdmc_rpf_'+c+'_smooth')
         

@@ -146,7 +146,7 @@ def copyHistWithNewYbins(thisHist,newYbins,copyName):
 
     return hist_copy
 
-def smoothHist2D(name,histToSmooth,renormalize=True,iterate=1):
+def smoothHist2D(name,histToSmooth,renormalize=False,iterate=1,skipEdges=False):
     print "Smoothing "+name
     if renormalize: norm = histToSmooth.Integral()
     smoothed_hist = histToSmooth.Clone(name)
@@ -156,49 +156,63 @@ def smoothHist2D(name,histToSmooth,renormalize=True,iterate=1):
     for ix in range(1,histToSmooth.GetNbinsX()+1):
         for iy in range(1,histToSmooth.GetNbinsY()+1):
             bin_contents = [histToSmooth.GetBinContent(ix,iy)]
+
             if ix == 1:
                 if iy == 1: # lower left corner
-                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
-                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
-                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                    if skipEdges: pass
+                    else:
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
                 elif iy == histToSmooth.GetNbinsY(): # upper left corner
-                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
-                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
-                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+                    if skipEdges: pass
+                    else:
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
                 else: # left wall
+                    if not skipEdges:
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
                     bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
-                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
-                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
-                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
                     bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
             
             elif ix == histToSmooth.GetNbinsX():
                 if iy == 1: # lower right corner
-                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
-                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
-                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                    if skipEdges: pass
+                    else:
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
                 elif iy == histToSmooth.GetNbinsY(): # upper right corner
-                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
-                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
-                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+                    if skipEdges: pass
+                    else:
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
                 else: # right wall
+                    if not skipEdges: 
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
                     bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
-                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
-                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
-                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
                     bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+
             else:
                 if iy == 1: # bottom wall
+                    if not skipEdges:
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
                     bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
-                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
-                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
-                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
                     bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
                 elif iy == histToSmooth.GetNbinsY(): # top wall
+                    if not skipEdges:
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
                     bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
-                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
-                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
-                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
                     bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
                 else: # full square
                     bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
