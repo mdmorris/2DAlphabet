@@ -90,8 +90,8 @@ cd %s
             job_prefix_out.close()
 
             impact_cmd = impact_cmd+' --job-mode condor --dry-run --prefix-file impact_prefix.txt --sub-opts "transfer_input_files = tarball.tgz" --task-name Impacts'+taskName
-
-        header.executeCmd(impact_cmd)
+        else:
+            header.executeCmd(impact_cmd)
 
     elif options.post:
         # Grab the output

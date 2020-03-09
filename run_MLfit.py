@@ -120,8 +120,8 @@ if not options.skipPlots:
             print exc
             print 'Failed to run s plots for '+t.name
 
-for t in twoDinstances:
-    del t
+# for t in twoDinstances:
+#     del t
 #########
 # If single fit
 # else:

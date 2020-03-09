@@ -131,7 +131,8 @@ with header.cd(projDir):
     blind_string = blind_string[:-1]+' '
     blind_string = blind_string+blind_string.replace('setParametersForFit','setParametersForEval')#.replace('=1','=0')
 
-    if len(masked_regions) > 0: freeze_r_string = " --fixedSignalStrength 0"
+    if len(masked_regions) > 0: 
+    	freeze_r_string = " --fixedSignalStrength 0"
     else: freeze_r_string = ''
 
     # Make a prefit workspace from the data card
@@ -176,7 +177,7 @@ with header.cd(projDir):
         'toys_per_job':toys_per_job,
         'seed':seed
     }
-    gen_command = 'combine -M GenerateOnly'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --bypassFrequentistFit -t '+str(ntoys)+' --saveToys -s '+str(seed)+' --expectSignal '+expectSignal+' -n '+gen_name
+    gen_command = 'combine -M GenerateOnly'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --toysFrequentist --bypassFrequentistFit -t '+str(ntoys)+' --saveToys -s '+str(seed)+' --expectSignal '+expectSignal+' -n '+gen_name
 
     if not options.post and not options.plotOnly and not options.skipSnapshot: header.setSnapshot()
 
@@ -195,9 +196,9 @@ with header.cd(projDir):
             #     print 'ERROR: '+projDir+'/fitDiagnostics.root does not exist. Please check that run_MLfit.py finished correctly. Quitting...'
             #     quit()
 
-            gof_data_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated '+freeze_r_string +mask_string+ ' -n gof_data'
+            gof_data_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated '+blind_string+freeze_r_string+' -n gof_data'
             header.executeCmd(gof_data_cmd,options.dryrun)
-            gof_toy_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated --toysFrequentist --saveWorkspace --saveToys '+freeze_r_string+mask_string+' -t '+str(ntoys)+' -s '+str(seed) +' -n '+run_name
+            gof_toy_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated --saveWorkspace --saveToys '+blind_string+freeze_r_string+' -t '+str(ntoys)+' -s '+str(seed) +' -n '+run_name
 
             if options.condor == True:
                 tar_files = ['run_Stats.py',
@@ -301,7 +302,7 @@ with header.cd(projDir):
             ###########################################
             # Now fit toys (send to condor if needed) #
             ###########################################
-            fit_command = 'combine -M FitDiagnostics'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --bypassFrequentistFit --skipBOnlyFit -t '+str(ntoys)+ ' --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin '+options.rMin+' --rMax '+options.rMax+' --cminDefaultMinimizerStrategy 0 -n '+run_name
+            fit_command = 'combine -M FitDiagnostics'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --cminDefaultMinimizerStrategy 0 --skipBOnlyFit -t '+str(ntoys)+ ' --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin '+options.rMin+' --rMax '+options.rMax+' -n '+run_name
             if options.condor == True:
                 tar_files = ['run_Stats.py',
                              'TwoDAlphabetClass.py',
@@ -470,16 +471,16 @@ if options.biasStudy !='' or options.ftest:
             
         elif options.ftest == 'pvalue':
             with header.cd(projDir):
-                base_fit_cmd = 'combine -d '+workspace_name+' -M GoodnessOfFit --algo saturated --fixedSignalStrength 0 --rMax 10.0 --rMin -10.0 -n FTest'
+                base_fit_cmd = 'combine -d '+workspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_r_string
                 header.executeCmd(base_fit_cmd) 
 
             with header.cd(altDir):
-                alt_fit_cmd = 'combine -d '+altworkspace_name+' -M GoodnessOfFit --algo saturated --fixedSignalStrength 0 --rMax 10.0 --rMin -10.0 -n FTest'
+                alt_fit_cmd = 'combine -d '+altworkspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_r_string
                 header.executeCmd(alt_fit_cmd)
 
         elif options.ftest == 'fitMain':
             with header.cd(projDir):
-                base_fit_cmd = 'combine -d '+workspace_name+' -M GoodnessOfFit --algo saturated --fixedSignalStrength 0 --rMax 10.0 --rMin -10.0 -n FTest'
+                base_fit_cmd = 'combine -d '+workspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_r_string
                 header.executeCmd(base_fit_cmd) 
                 # Base fit to toys
                 base_toy_fit_cmd = 'combine -d '+workspace_name+' -M GoodnessOfFit --rMax 10.0 --rMin -10.0 --algo saturated '+blind_string+freeze_r_string+' -t '+str(ntoys)+' --toysFile higgsCombineFTest.GenerateOnly.mH120.'+ftestseed+'.root -n FTestToyFits -s '+str(ftestseed)
@@ -501,7 +502,7 @@ if options.biasStudy !='' or options.ftest:
 
         elif options.ftest == 'fitAlt':
             with header.cd(altDir):
-                alt_fit_cmd = 'combine -d '+altworkspace_name+' -M GoodnessOfFit --algo saturated --fixedSignalStrength 0 --rMax 10.0 --rMin -10.0 -n FTest'
+                alt_fit_cmd = 'combine -d '+altworkspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_r_string
                 header.executeCmd(alt_fit_cmd)
                 # Alt fit to toys
                 alt_toy_fit_cmd = 'combine -d '+altworkspace_name+' -M GoodnessOfFit --rMax 10.0 --rMin -10.0 --algo saturated '+blind_string+freeze_r_string+' -t '+str(ntoys)+' --toysFile '+altDir_depth+projDir+'/higgsCombineFTest.GenerateOnly.mH120.'+ftestseed+'.root -n '+run_name+' -s '+str(ftestseed)
@@ -559,7 +560,7 @@ if options.biasStudy !='' or options.ftest:
             ftest_p1 = min(base_nrpf_params,alt_nrpf_params)
             ftest_p2 = max(base_nrpf_params,alt_nrpf_params)
             ftest_nbins = base_nbins
-            fdist = TF1("fDist", "[0]*TMath::FDist(x, [1], [2])", 0,1.3*base_fstat[0])
+            fdist = TF1("fDist", "[0]*TMath::FDist(x, [1], [2])", 0,max(10,1.3*base_fstat[0]))
             fdist.SetParameter(0,1)
             fdist.SetParameter(1,ftest_p2-ftest_p1)
             fdist.SetParameter(2,ftest_nbins-ftest_p2)

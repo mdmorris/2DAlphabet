@@ -630,6 +630,8 @@ class TwoDAlphabet:
                             elif x == 'Y': nom.SetXTitle(self.inputConfig['BINNING']['Y']['TITLE'])
 
                             nom.SetTitle(proc + ' - ' + syst + ' uncertainty')
+                            nom.GetXaxis().SetTitleOffset(1.0)
+                            thisCan.SetRightMargin(0.16)
                             # nom.SetTitleOffset(1.2,"X")
 
                             nom.Draw('hist')
@@ -1899,7 +1901,7 @@ class TwoDAlphabet:
                                 bkg_process_names.append(process)
                             elif (process != 'qcd' and self.inputConfig['PROCESS'][process]['CODE'] == 0):
                                 if self.plotPrefitSigInFitB and fittag == 'fit_b':
-                                    signal_list.append(hist_dict[process][cat][plotType+str(regionNum)])
+                                    signal_list.append(hist_dict[process][cat][plotType.replace("postfit","prefit")+str(regionNum)])
                                 else:
                                     hist_dict[process][cat][plotType+str(regionNum)].Scale(signal_strength)
                                     signal_list.append(hist_dict[process][cat][plotType+str(regionNum)])
@@ -2324,6 +2326,8 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
     # Run blind (turns off data everywhere) but don't mask (examines signal region)
     if blindData:
         blind_option = ' --run blind'
+    else:
+        blind_option = ''
 
     # Set the project directory
     if len(twoDs) > 1:

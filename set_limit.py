@@ -26,7 +26,7 @@ parser.add_option('-P', '--plotOnly', action="store_true",
                 default   =   False,
                 dest      =   'plotOnly',
                 help      =   'Only plots if True')
-parser.add_option('-b', '--blind', action="store_true",
+parser.add_option('--unblind', action="store_false",
                 default   =   True,
                 dest      =   'blind',
                 help      =   'Only plot observed limit if false')
@@ -309,3 +309,6 @@ upLimit = Inter(g_mcminus,graphWP)[0] if len(Inter(g_mcminus,graphWP)) > 0 else 
 lowLimit = Inter(g_mcplus,graphWP)[0] if len(Inter(g_mcplus,graphWP)) > 0 else -1.0
 
 print 'Expected limit: '+str(expectedLimit/1000.) + ' +'+str(upLimit/1000.-expectedLimit/1000.) +' -'+str(expectedLimit/1000.-lowLimit/1000.) + ' TeV' # NOT GENERIC
+if not options.blind:
+    obsLimit = Inter(g_limit,graphWP)[0] if len(Inter(g_limit,graphWP)) > 0 else -1.0
+    print 'Observed limit: '+str(obsLimit/1000.) + ' TeV'
