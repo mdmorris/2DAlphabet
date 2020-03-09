@@ -573,6 +573,83 @@ if options.biasStudy !='' or options.ftest:
                 pval_file.write(str(pval))
                 pval_file.close()
 
+                # Now we plot
+                c = TCanvas('c','c',800,600)    
+                c.SetLeftMargin(0.12) 
+                c.SetBottomMargin(0.12)
+                c.SetRightMargin(0.1)
+                c.SetTopMargin(0.1)
+                ftestHist_nbins = 30
+                ftestHist = TH1F(tag+"Fhist",tag+"Fhist",ftestHist_nbins,0,max(10,1.3*base_fstat[0]))
+                # ftestHist_cut = TH1F(tag+"Fhist_cut",tag+"Fhist cut",ftestHist_nbins,0,2*base_fstat[0])
+                ftestHist.GetXaxis().SetTitle("F = #frac{-2log(#lambda_{1}/#lambda_{2})/(p_{2}-p_{1})}{-2log#lambda_{2}/(n-p_{2})}")
+                ftestHist.GetXaxis().SetTitleSize(0.025)
+                ftestHist.GetXaxis().SetTitleOffset(2)
+                # # ftestHist.GetYaxis().SetTitle("Pseudodatasets")
+                ftestHist.GetYaxis().SetTitleOffset(0.85)
+                
+                # for toyval in toys_fstat:
+                #     ftestHist.Fill(toyval)
+                #     if toyval > base_fstat[0]:
+                #         ftestHist_cut.Fill(toyval)
+
+                # ftestHist.SetMarkerStyle(20)
+                ftestHist.Draw("pez")
+                ftestobs  = TArrow(base_fstat[0],0.25,base_fstat[0],0)
+                ftestobs.SetLineColor(kBlue+1)
+                ftestobs.SetLineWidth(2)
+                # ftestHist_cut.SetLineColor(kViolet-10)
+                # ftestHist_cut.SetFillColor(kViolet-10)
+                # ftestHist_cut.Draw("histsame")
+
+                fdist.Draw('same')
+                # int_fdist = TF1("int_fDist", "[0]*TMath::FDist(x, [1], [2])", 0,max(max(toys_fstat),base_fstat[0])+1)
+                # int_fdist.SetParameter(0,1)
+                # int_fdist.SetParameter(1,ftest_p2-ftest_p1)
+                # int_fdist.SetParameter(2,ftest_nbins-ftest_p2)
+                # pval = int_fdist.Integral(0.0,base_fstat[0])
+              
+                # ftestHist.Draw("pezsame")
+                ftestobs.Draw()
+                tLeg = TLegend(0.6,0.73,0.89,0.89)
+                tLeg.SetLineColor(kWhite)
+                tLeg.SetLineWidth(0)
+                tLeg.SetFillStyle(0)
+                tLeg.SetTextFont(42)
+                tLeg.SetTextSize(0.03)
+                # tLeg.AddEntry(ftestHist,"toy data","lep")
+                tLeg.AddEntry(ftestobs,"observed = %.1f"%base_fstat[0],"l")
+                #tLeg.AddEntry('',"p-value = %.2f"%(pval),"f")
+                tLeg.AddEntry(fdist,"F-dist, ndf = (%.0f, %.0f) "%(fdist.GetParameter(1),fdist.GetParameter(2)),"l")
+                tLeg.Draw("same")
+
+                # c.cd()
+                model_info = TPaveText(0.2,0.6,0.4,0.8,"brNDC")
+                model_info.AddText('p1 = '+projDir.split('pol')[1][0:4])
+                model_info.AddText('p2 = '+altDir.split('pol')[1][0:4])
+                model_info.AddText("p-value = %.2f"%(pval))
+                model_info.Draw('same')
+                
+                latex = TLatex()
+                latex.SetTextAlign(11)
+                latex.SetTextSize(0.06)
+                latex.SetTextFont(62)
+                latex.SetNDC()
+                latex.DrawLatex(0.12,0.91,"CMS")
+                latex.SetTextSize(0.05)
+                latex.SetTextFont(52)
+                # if options.isData:
+                latex.DrawLatex(0.65,0.91,"Preliminary")
+                # else:
+                #     l.DrawLatex(0.23,0.91,"Simulation")
+                latex.SetTextFont(42)
+                # latex.DrawLatex(0.76,0.91,"%.1f fb^{-1}"%options.lumi)
+                latex.SetTextFont(52)
+                latex.SetTextSize(0.045)
+                # c.SaveAs(projDir+'/ftesst_vs_'+alttag+".root")
+                c.SaveAs(projDir+'/ftest_vs_'+alttag+"_notoys.pdf")
+                c.SaveAs(projDir+'/ftest_vs_'+alttag+"_notoys.png")
+
             elif options.ftest == 'post':
                 print 'Analyzing F-test results...'
                 toys_fstat = header.FStatCalc(projDir+"/"+toy_fit_filename_main, altDir+"/"+toy_fit_filename_alt, base_nrpf_params, alt_nrpf_params, ftest_nbins)
