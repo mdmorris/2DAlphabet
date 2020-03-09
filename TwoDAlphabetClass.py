@@ -2238,6 +2238,13 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,prerun=False):
         systematic_analyzer_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py '+card_name+' --all -f html > systematics_table.html'
         header.executeCmd(systematic_analyzer_cmd)
 
+        # Make a PDF of the nuisance_pulls.root
+        if os.path.exists('nuisance_pulls.root'):
+            nuis_file = TFile.Open('nuisance_pulls.root')
+            nuis_can = nuis_file.Get('nuisances')
+            nuis_can.Print('nuisance_pulls.pdf','pdf')
+            nuis_file.Close()
+
     # Save out Rp/f to a text file and make a re-run config
     for twoD in twoDs:
         for fittag in ['b','s']:
