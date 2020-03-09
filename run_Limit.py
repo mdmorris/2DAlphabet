@@ -20,6 +20,10 @@ parser.add_option("--unblindData", action="store_true",
                 default =   False,
                 dest    =   "unblindData",
                 help    =   "Unblind the observation and calculate the observed limit")
+parser.add_option("--recycleAll", action="store_true", 
+                default =   False,
+                dest    =   "recycleAll",
+                help    =   "Recycle everything from the previous run with this tag")
 
 
 (options, args) = parser.parse_args()
@@ -41,6 +45,7 @@ for i,c in enumerate(inputConfigsAndArgs):
 print 'tag                              = ' + str(options.quicktag)
 print 'Location of b-only fit workspace = ' + postfitWorkspaceDir 
 print 'Unblind data points                = '+ str(options.unblindData)
+print 'recycleAll\t = '+str(options.recycleAll)
 print 'Config Replacements:'
 for s in stringSwaps.keys():
     print '\t'+ s + ' -> ' + stringSwaps[s]
@@ -63,7 +68,7 @@ twoDinstances = []
 if len(inputConfigs) > 1:
     # Instantiate all class instances
     for i in inputConfigs:
-        instance = TwoDAlphabet(i,options.quicktag,stringSwaps=stringSwaps)
+        instance = TwoDAlphabet(i,options.quicktag,options.recycleAll,stringSwaps=stringSwaps)
         twoDinstances.append(instance)
 
     # For each instance, check tags match and if they don't, ask the user for one
@@ -91,6 +96,6 @@ if len(inputConfigs) > 1:
 
 # If single fit
 else:
-    instance = TwoDAlphabet(inputConfigs[0],options.quicktag,stringSwaps=stringSwaps)
+    instance = TwoDAlphabet(inputConfigs[0],options.quicktag,options.recycleAll,stringSwaps=stringSwaps)
     if 'condor' in os.getcwd(): runLimit([instance],postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='condor')
     else: runLimit([instance],postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local')
