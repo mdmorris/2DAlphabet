@@ -383,75 +383,76 @@ if options.biasStudy !='' or options.ftest:
     # Bias study #
     ##############
     if options.biasStudy:
-        if not options.plotOnly and not options.post:
-            ######################################################################
-            # Go into the alternative model directory and run the toy fits there #
-            ######################################################################
-            fit_command = 'combine -M FitDiagnostics'+mask_string.replace('=1','=0')+' -d '+workspace_name+' -t '+str(ntoys)+ ' --toysFile '+projDir+'higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin '+options.rMin+' --rMax '+options.rMax+' --skipBOnlyFit --cminDefaultMinimizerStrategy 0 -n '+run_name
-            if options.condor == True:
-                this_gen_command = gen_command.replace('-d '+workspace_name,'-d '+projDir+'/'+workspace_name)
-                this_fit_command = fit_command.replace('-d '+workspace_name,'-d '+altDir+'/'+workspace_name)
-                tar_files = ['run_Stats.py',
-                             'TwoDAlphabetClass.py',
-                             'header.py',
-                             'RpfHandler.py',
-                             projDir+'/'+workspace_name,
-                             altDir+'/'+altworkspace_name]
+        print 'Not working currently'
+        # if not options.plotOnly and not options.post:
+        #     ######################################################################
+        #     # Go into the alternative model directory and run the toy fits there #
+        #     ######################################################################
+        #     fit_command = 'combine -M FitDiagnostics -d '+workspace_name+' -t '+str(ntoys)+ ' --toysFile '+projDir+'higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin '+options.rMin+' --rMax '+options.rMax+' -n '+run_name
+        #     if options.condor == True:
+        #         this_gen_command = gen_command.replace('-d '+workspace_name,'-d '+projDir+'/'+workspace_name)
+        #         this_fit_command = fit_command.replace('-d '+workspace_name,'-d '+altDir+'/'+workspace_name)
+        #         tar_files = ['run_Stats.py',
+        #                      'TwoDAlphabetClass.py',
+        #                      'header.py',
+        #                      'RpfHandler.py',
+        #                      projDir+'/'+workspace_name,
+        #                      altDir+'/'+altworkspace_name]
 
-                # Need to cd into base dir to build the condor workspace
-                with header.cd(projDir): header.StatsForCondor(run_name,toyjobs,tar_files,[this_gen_command,this_fit_command])
+        #         # Need to cd into base dir to build the condor workspace
+        #         with header.cd(projDir): header.StatsForCondor(run_name,toyjobs,tar_files,[this_gen_command,this_fit_command])
 
-            else:
-                with header.cd(projDir):
-                    header.executeCmd(gen_command,options.dryrun)
-                with header.cd(altDir):
-                    this_fit_command = fit_command.replace(projDir+'higgsCombine',altDir_depth+'/'+projDir+'higgsCombine')
-                    header.executeCmd(this_fit_command,options.dryrun)
+        #     else:
+        #         with header.cd(projDir):
+        #             header.executeCmd(gen_command,options.dryrun)
+        #         with header.cd(altDir):
+        #             this_fit_command = fit_command.replace(projDir+'higgsCombine',altDir_depth+'/'+projDir+'higgsCombine')
+        #             header.executeCmd(this_fit_command,options.dryrun)
 
-        ############
-        # Plotting #
-        ############
-        if not options.condor:
-            with header.cd(projDir):
-                # If need to post-process a condor task
-                if options.post:
-                    with header.cd(projDir+'/condor_'+run_name):
-                        if toyjobs > 1:
-                            header.executeCmd('cat '+run_name+'*.tgz | tar zxvf - -i')
-                            tree_fit_sb = TChain('tree_fit_sb')
-                            tree_fit_sb.Add('fitDiagnostics'+run_name+'_*.root')
-                        else:
-                            header.executeCmd('tar xzvf *.tgz')
-                            post_file = TFile.Open('fitDiagnostics'+run_name+'.root')
-                            tree_fit_sb = post_file.Get('tree_fit_sb')
-                else:
-                    post_file = TFile.Open('fitDiagnostics'+run_name+'.root')
-                    tree_fit_sb = post_file.Get('tree_fit_sb')
+        # ############
+        # # Plotting #
+        # ############
+        # if not options.condor:
+        #     with header.cd(projDir):
+        #         # If need to post-process a condor task
+        #         if options.post:
+        #             with header.cd(projDir+'/condor_'+run_name):
+        #                 if toyjobs > 1:
+        #                     header.executeCmd('cat '+run_name+'*.tgz | tar zxvf - -i')
+        #                     tree_fit_sb = TChain('tree_fit_sb')
+        #                     tree_fit_sb.Add('fitDiagnostics'+run_name+'_*.root')
+        #                 else:
+        #                     header.executeCmd('tar xzvf *.tgz')
+        #                     post_file = TFile.Open('fitDiagnostics'+run_name+'.root')
+        #                     tree_fit_sb = post_file.Get('tree_fit_sb')
+        #         else:
+        #             post_file = TFile.Open('fitDiagnostics'+run_name+'.root')
+        #             tree_fit_sb = post_file.Get('tree_fit_sb')
 
-            ################################
-            # Plot and save out the result #
-            ################################
-            tree_fit_sb.Draw("(r-"+expectSignal+")/(rHiErr*(r<"+expectSignal+")+rLoErr*(r>"+expectSignal+"))>>sigpull(20,-5,5)","fit_status>=0")
-            tree_fit_sb.Draw("(r-"+expectSignal+")>>sigstrength(20,-1,1)","fit_status>=0")
+        #     ################################
+        #     # Plot and save out the result #
+        #     ################################
+        #     tree_fit_sb.Draw("(r-"+expectSignal+")/(rHiErr*(r<"+expectSignal+")+rLoErr*(r>"+expectSignal+"))>>sigpull(20,-5,5)","fit_status>=0")
+        #     tree_fit_sb.Draw("(r-"+expectSignal+")>>sigstrength(20,-2,2)","fit_status>=0")
 
-            hsigpull = gDirectory.Get('sigpull')
-            hsignstrength = gDirectory.Get('sigstrength')
+        #     hsigpull = gDirectory.Get('sigpull')
+        #     hsignstrength = gDirectory.Get('sigstrength')
 
-            hsigpull.Fit("gaus","L")
-            hsigpull.SetTitle(run_name)
-            hsigpull.GetXaxis().SetTitle('(r-'+expectSignal+')/rErr')
-            result_can.cd()
-            hsigpull.Draw('pe')
-            result_can.Print(run_name+'_sigpull.png','png')
+        #     hsigpull.Fit("gaus","L")
+        #     hsigpull.SetTitle(run_name)
+        #     hsigpull.GetXaxis().SetTitle('(r-'+expectSignal+')/rErr')
+        #     result_can.cd()
+        #     hsigpull.Draw('pe')
+        #     result_can.Print(run_name+'_sigpull.png','png')
 
-            hsignstrength.Fit("gaus","L")
-            hsignstrength.SetTitle(run_name)
-            hsignstrength.GetXaxis().SetTitle('r-'+expectSignal)
-            result_can.cd()
-            hsignstrength.Draw('pe')
-            result_can.Print(run_name+'_sigstrength.png','png')
+        #     hsignstrength.Fit("gaus","L")
+        #     hsignstrength.SetTitle(run_name)
+        #     hsignstrength.GetXaxis().SetTitle('r-'+expectSignal)
+        #     result_can.cd()
+        #     hsignstrength.Draw('pe')
+        #     result_can.Print(run_name+'_sigstrength.png','png')
 
-            header.executeCmd('rm condor_'+run_name+'/fitDiagnostics*.root condor_'+run_name+'/higgsCombine*.root')
+        #     header.executeCmd('rm condor_'+run_name+'/fitDiagnostics*.root condor_'+run_name+'/higgsCombine*.root')
 
     ##########
     # F test #
