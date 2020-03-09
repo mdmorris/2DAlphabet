@@ -52,8 +52,11 @@ signal_names = [n.strip() for n in signal_names]
 signal_mass = signal_file.readline().split(',')
 signal_mass = [int(m.strip()) for m in signal_mass]
 # Read in xsecs as a list of strings, strip whitespace, and convert to floats
-signal_xsecs = signal_file.readline().split(',')
-signal_xsecs = [float(x.strip()) for x in signal_xsecs]
+theory_xsecs = signal_file.readline().split(',')
+theory_xsecs = [float(x.strip()) for x in theory_xsecs]
+# 
+signal_xsecs = theory_xsecs#signal_file.readline().split(',')
+#signal_xsecs = [float(x.strip()) for x in signal_xsecs]
 
 # Initialize arrays to eventually store the points on the TGraph
 x_mass = array('d')
@@ -193,7 +196,7 @@ graphWP.SetMinimum(1.0e-3) #0.005
 graphWP.SetMaximum(700.)
 q = 0
 for index,mass in enumerate(signal_mass):
-    xsec = signal_xsecs[index]
+    xsec = theory_xsecs[index]
     graphWP.SetPoint(q,    mass ,   xsec    )
     q+=1
 
