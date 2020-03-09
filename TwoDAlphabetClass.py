@@ -1391,7 +1391,7 @@ class TwoDAlphabet:
                             bin_err_down   = bin_err_down    - this_TH2.GetBinErrorLow(xbin,ybin) #- this_TH2.GetBinContent(xbin,ybin)
 
                     # If bin content is <= 0, treat this bin as a RooConstVar at value close to 0
-                    if (bin_content <= 0) or (this_pass_bin_zero == True):
+                    if (bin_content <= 0):# or (this_pass_bin_zero == True):
                         binRRV = RooConstVar(fail_bin_name, fail_bin_name, max(1e-9,bin_content))
                         bin_list_fail.add(binRRV)
                         self.allVars.append(binRRV)
