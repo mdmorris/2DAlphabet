@@ -607,7 +607,7 @@ def dictToLatexTable(dict2convert,outfilename,roworder=[],columnorder=[]):
     latexout.close()
 
 
-def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],dataName='data',bkgNames=[],signalNames=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False,datastyle='pe',year=1):  
+def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],titles=[],dataName='data',bkgNames=[],signalNames=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False,datastyle='pe',year=1):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -656,12 +656,21 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],dataN
     if len(colors) == 0:   
         colors = default_colors
     stacks = []
+    tot_hists_err = []
     tot_hists = []
     legends = []
     mains = []
     subs = []
     pulls = []
     logString = ''
+
+    bstar_name_match = {
+        'ttbar':'t#bar{t} hadronic',
+        'ttbar-semilep':'t#bar{t} semi-leptonic',
+        'singletop_tW':'single top tW',
+        'singletop_tWB':'single top #bar{t}W',
+        'qcd':'Multijet'
+    }
 
     # For each hist/data distribution
     for hist_index, hist in enumerate(histlist):
@@ -682,11 +691,16 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],dataN
             hist.GetYaxis().SetTitleOffset(2.3)
             hist.GetZaxis().SetTitleOffset(1.8)
             if len(titles) > 0:
-                hist.SetTitle(titles[hist_index])
+                # Bstar specific
+                hist.SetTitle('')
+                # hist.SetTitle(titles[hist_index])
 
-            hist.Draw('lego')
+            if datastyle != 'pe': hist.Draw(datastyle)
+            else: hist.Draw('colz')
             if len(bkglist) > 0:
                 print 'ERROR: It seems you are trying to plot backgrounds with data on a 2D plot. This is not supported since there is no good way to view this type of distribution.'
+
+            CMS_lumi.CMS_lumi(thisPad, year, 11)
         
         # Otherwise it's a TH1 hopefully
         else:
@@ -706,9 +720,12 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],dataN
                 hist.GetXaxis().SetTitle(xtitle)
                 hist.GetYaxis().SetTitle(ytitle)
                 if len(titles) > 0:
-                    hist.SetTitle(titles[hist_index])
+                    # Bstar specific
+                    hist.SetTitle('')
+                    # hist.SetTitle(titles[hist_index])
                     hist.SetTitleOffset(1.1)
                 hist.Draw(datastyle)
+                CMS_lumi.CMS_lumi(thisPad, year, 11)
             
             # Otherwise...
             else:
@@ -724,11 +741,16 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],dataN
                 if not logy: legends.append(TLegend(0.65,0.81-0.02*(len(bkglist[0])+len(signals)),0.90,0.90))
                 else: legends.append(TLegend(0.2,0.11,0.45,0.2+0.02*(len(bkglist[0])+len(signals))))
                 stacks.append(THStack(hist.GetName()+'_stack',hist.GetName()+'_stack'))
-                tot_hist = hist.Clone(hist.GetName()+'_tot')
-                tot_hist.Reset()
+                if totalBkg == None:
+                    tot_hist = hist.Clone(hist.GetName()+'_tot')
+                    tot_hist.Reset()
+                else:
+                    tot_hist = totalBkg[hist_index]
+
                 tot_hist.SetTitle(hist.GetName()+'_tot')
                 tot_hist.SetMarkerStyle(0)
                 tot_hists.append(tot_hist)
+                tot_hists_err.append(tot_hist.Clone())
 
 
                 # Set margins and make these two pads primitives of the division, thisPad
@@ -747,30 +769,34 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],dataN
                 # Build the stack
                 for bkg_index,bkg in enumerate(bkglist[hist_index]):     # Won't loop if bkglist is empty
                     # bkg.Sumw2()
-                    tot_hists[hist_index].Add(bkg)
-                    bkg.SetLineColor(kBlack)
+                    if totalBkg == None: tot_hists[hist_index].Add(bkg)
+                    
                     if logy:
                         bkg.SetMinimum(1e-3)
 
                     if bkg.GetName().find('qcd') != -1:
                         bkg.SetFillColor(kYellow)
-
+                        bkg.SetLineColor(kYellow)
                     else:
                         if colors[bkg_index] != None:
                             bkg.SetFillColor(colors[bkg_index])
+                            bkg.SetLineColor(colors[bkg_index])
                         else:
                             bkg.SetFillColor(default_colors[bkg_index])
+                            bkg.SetLineColor(default_colors[bkg_index])
 
                     stacks[hist_index].Add(bkg)
                     if bkgNames == []: this_bkg_name = bkg.GetName().split('_')[0]
                     elif type(bkgNames[0]) != list: this_bkg_name = bkgNames[bkg_index]
                     else: this_bkg_name = bkgNames[hist_index][bkg_index]
-                    legends[hist_index].AddEntry(bkg,this_bkg_name,'f')
+                    
+                    if this_bkg_name in bstar_name_match.keys(): legends[hist_index].AddEntry(bkg,bstar_name_match[this_bkg_name],'f')
+                    else: legends[hist_index].AddEntry(bkg,this_bkg_name,'f')
                     
                 # Go to main pad, set logy if needed
                 mains[hist_index].cd()
 
-                # Set y max of all hists to be the same to accomodate the tallest
+                # Set y max of all hists to be the same to accommodate the tallest
                 histList = [stacks[hist_index],tot_hists[hist_index],hist]
 
                 yMax = histList[0].GetMaximum()
@@ -798,6 +824,7 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],dataN
                     hist.SetMinimum(1e-3)
                 hist.Draw(datastyle)
 
+                if logy == True:stacks[hist_index].SetMinimum(1e-3) 
                 stacks[hist_index].Draw('same hist')
 
                 # Do the signals
@@ -807,13 +834,22 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],dataN
                     if logy == True:
                         signals[hist_index].SetMinimum(1e-3)
                     if signalNames == []: this_sig_name = signals[hist_index].GetName().split('_')[0]
+                    elif type(signalNames) == str: this_sig_name = signalNames
+                    else: this_sig_name = signalNames[hist_index]
+
                     legends[hist_index].AddEntry(signals[hist_index],this_sig_name,'L')
                     signals[hist_index].Draw('hist same')
 
-                tot_hists[hist_index].SetFillColor(kBlack)
-                tot_hists[hist_index].SetFillStyle(3354)
+                if logy: 
+                    tot_hists[hist_index].SetMinimum(1e-3)
+                    tot_hists_err[hist_index].SetMinimum(1e-3)
+                tot_hists[hist_index].Draw('hist same')
 
-                tot_hists[hist_index].Draw('e2 same')
+                tot_hists_err[hist_index].SetFillColor(kBlack)
+                tot_hists_err[hist_index].SetFillStyle(3354)
+                tot_hists_err[hist_index].Draw('e2 same')
+
+                legends[hist_index].SetBorderSize(0)
                 legends[hist_index].Draw()
 
                 if not dataOff:
@@ -851,9 +887,12 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],dataN
 
                 CMS_lumi.CMS_lumi(thisPad, year, 11)
 
+    # CMS_lumi.CMS_lumi(myCan, year, 11)
+
     if rootfile:
         myCan.Print(tag+'/'+name+'.root','root')
     else:
+        myCan.Print(tag+'/'+name+'.pdf','pdf')
         myCan.Print(tag+'/'+name+'.png','png')
 
 

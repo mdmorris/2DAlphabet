@@ -1731,7 +1731,8 @@ class TwoDAlphabet:
 
         # Define low, middle, high projection regions for y (x regions defined already via signal region bounds)
         y_turnon_endBin = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').ProjectionY().GetMaximumBin()
-        y_tail_beginningBin = int((y_nbins - y_turnon_endBin)/2.0 + y_turnon_endBin)
+        y_turnon_endVal = int(post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetYaxis().GetBinUpEdge(y_turnon_endBin))
+        y_tail_beginningBin = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetYaxis().FindBin((y_high - y_turnon_endVal)/3.0 + y_turnon_endVal)
         print 'Finding start and end bin indexes of signal range. Looking for '+str(self.sigStart)+', '+str(self.sigEnd)
         for ix,xwall in enumerate(self.fullXbins):
             if xwall == self.sigStart:
@@ -1744,7 +1745,7 @@ class TwoDAlphabet:
         if y_turnon_endBin > y_nbins/2.0:  # in case this isn't a distribution with a turn-on
             y_turnon_endBin = int(round(y_nbins/3.0))
             y_tail_beginningBin = 2*y_turnon_endBin
-        y_turnon_endVal = str(int(post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetYaxis().GetBinUpEdge(y_turnon_endBin)))
+        y_turnon_endVal = str(y_turnon_endVal)
         y_tail_beginningVal = str(int(post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetYaxis().GetBinLowEdge(y_tail_beginningBin)))
      
 
@@ -1765,7 +1766,7 @@ class TwoDAlphabet:
         hist_dict = {}
 
         # Organize and make any projections or 2D distributions
-        for process in [process for process in self.inputConfig['PROCESS'] if process != 'HELP']+['qcd']:
+        for process in [process for process in self.inputConfig['PROCESS'] if process != 'HELP']+['qcd','TotalBkg']:
             hist_dict[process] = {}
             for cat in ['fail','pass']:
                 hist_dict[process][cat] = {'LOW':{},'SIG':{},'HIGH':{}}
@@ -1841,7 +1842,7 @@ class TwoDAlphabet:
 
         # Create lists for the 2D projections (ones you want to see together)
         for process in hist_dict.keys():    # Canvas
-            isSignal = (process != 'qcd' and self.inputConfig['PROCESS'][process]['CODE'] == 0)
+            isSignal = (process != 'qcd' and process != 'TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] == 0)
             twoDList = []
             twoDtitles = []   
             for cat in ['fail','pass']:
@@ -1851,6 +1852,9 @@ class TwoDAlphabet:
 
                     twoDList.append(hist_dict[process][cat][fit+'_2D'])
                     twoDtitles.append(process + ', '+cat+', '+fit)
+
+            if isSignal: # BSTAR SPECIFIC
+                mass = process.split('signal')[1][2:]
 
             if isSignal and fittag != 's':
                 continue
@@ -1866,7 +1870,7 @@ class TwoDAlphabet:
             if process != 'data_obs':
                 if process not in self.inputConfig['PROCESS'].keys():
                     continue
-                if (process != 'qcd' and self.inputConfig['PROCESS'][process]['CODE'] != 0):
+                if (process != 'qcd' and process !='TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] != 0):
                     if (process in self.inputConfig['PROCESS'].keys()) and ('COLOR' in self.inputConfig['PROCESS'][process].keys()):
                         colors.append(self.inputConfig['PROCESS'][process]["COLOR"])
                     else:
@@ -1882,10 +1886,13 @@ class TwoDAlphabet:
             dataList = []
             signal_list = []
             title_list = []
+            totalBkgs = []
             for cat in ['fail','pass']: # Row 
                 for regionNum in range(1,4):    # Column
                     bkg_process_list = []
                     bkg_process_names = []
+                    this_totalbkg = hist_dict['TotalBkg'][cat][plotType+str(regionNum)]
+                    totalBkgs.append(this_totalbkg)
                     if 'y' in plotType:
                         if regionNum == 1: low_str,high_str = str(x_low),str(self.sigStart)
                         elif regionNum == 2: low_str,high_str = str(self.sigStart),str(self.sigEnd)
@@ -1896,10 +1903,10 @@ class TwoDAlphabet:
                         elif regionNum == 3: low_str,high_str = str(y_tail_beginningVal),str(y_high)
                     for process in process_list:
                         if process != 'data_obs':
-                            if (process != 'qcd' and self.inputConfig['PROCESS'][process]['CODE'] != 0):
+                            if (process != 'qcd' and process != 'TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] != 0):
                                 bkg_process_list.append(hist_dict[process][cat][plotType+str(regionNum)])
                                 bkg_process_names.append(process)
-                            elif (process != 'qcd' and self.inputConfig['PROCESS'][process]['CODE'] == 0):
+                            elif (process != 'qcd' and process != 'TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] == 0):
                                 if self.plotPrefitSigInFitB and fittag == 'fit_b':
                                     signal_list.append(hist_dict[process][cat][plotType.replace("postfit","prefit")+str(regionNum)])
                                 else:
@@ -1920,31 +1927,33 @@ class TwoDAlphabet:
                     # Make the "money plot" of just the y projection of the signal region
                     if ('y' in plotType) and (cat == 'pass') and (regionNum == 2): 
                         money_title = 'Data vs Background - '+self.yVarTitle
-                        header.makeCan('plots/fit_'+fittag+'/postfit_signal_region_only',self.projPath,[this_data],[bkg_process_list],signals=signal_list,titles=[money_title],colors=colors,xtitle=self.yVarTitle,year=self.year)
+                        header.makeCan('plots/fit_'+fittag+'/postfit_signal_region_only',self.projPath,[this_data],[bkg_process_list],totalBkg=[this_totalbkg],signals=signal_list,titles=[money_title],bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,colors=colors,xtitle=self.yVarTitle,year=self.year)
+
+
 
             if 'x' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
-                    dataList,bkglist=bkgList,signals=signal_list,
-                    bkgNames=bkgNameList,titles=title_list,
+                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
+                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
                     colors=colors,xtitle=self.xVarTitle,year=self.year)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
-                    dataList,bkglist=bkgList,signals=signal_list,
-                    bkgNames=bkgNameList,titles=title_list,
+                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
+                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
                     colors=colors,xtitle=self.xVarTitle,logy=True,year=self.year)
             elif 'y' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
-                    dataList,bkglist=bkgList,signals=signal_list,
-                    bkgNames=bkgNameList,titles=title_list,
+                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
+                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
                     colors=colors,xtitle=self.yVarTitle,year=self.year)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
-                    dataList,bkglist=bkgList,signals=signal_list,
-                    bkgNames=bkgNameList,titles=title_list,
+                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
+                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
                     colors=colors,xtitle=self.yVarTitle,logy=True,year=self.year)
 
         # Make comparisons for each background process of pre and post fit projections
         for plotType in ['projx','projy']:
             for process in process_list:
-                if process != 'data_obs':
+                if process != 'data_obs' and process != 'TotalBkg':
                     pre_list = []
                     post_list = []
                     title_list = []
@@ -1961,7 +1970,7 @@ class TwoDAlphabet:
 
                             pre_list.append([hist_dict[process][cat]['prefit_'+plotType+str(regionNum)]])  # in terms of makeCan these are "bkg hists"
                             post_list.append(hist_dict[process][cat]['postfit_'+plotType+str(regionNum)])   # and these are "data hists"
-                            if process != 'qcd':
+                            if process != 'qcd' and process != 'TotalBkg':
                                 if 'COLOR' in self.inputConfig['PROCESS'][process].keys():
                                     prepostcolors = [self.inputConfig['PROCESS'][process]['COLOR']]
                                 else:
@@ -1972,18 +1981,18 @@ class TwoDAlphabet:
                             title_list.append('Pre vs Postfit - %s - %s - [%s,%s]'%(process,cat,low_str,high_str))
 
                     if 'x' in plotType: header.makeCan('plots/fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,
-                        post_list,bkglist=pre_list,
+                        post_list,bkglist=pre_list,totalBkg=[b[0] for b in pre_list],
                         titles=title_list,bkgNames=['Prefit, '+process],dataName='        Postfit, '+process,
                         colors=prepostcolors,xtitle=self.xVarTitle,datastyle='histpe',year=self.year)
                     if 'y' in plotType: header.makeCan('plots/fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,
-                        post_list,bkglist=pre_list,
+                        post_list,bkglist=pre_list,totalBkg=[b[0] for b in pre_list],
                         titles=title_list,bkgNames=['Prefit, '+process],dataName='        Postfit, '+process,
                         colors=prepostcolors,xtitle=self.yVarTitle,datastyle='histpe',year=self.year)
 
 
         ##############
         #    Rp/f    #
-        ##############
+        ##############           
         # Need to sample the space to get the Rp/f with proper errors (1000 samples)
         rpf_xnbins = len(self.fullXbins)-1
         rpf_ynbins = len(self.newYbins)-1
@@ -2294,15 +2303,18 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,prerun=False):
 
             covMtrx_File = TFile.Open('fitDiagnostics.root')
             fit_result = covMtrx_File.Get("fit_b")
-            corrMtrx = header.reducedCorrMatrixHist(fit_result)
-            corrMtrxCan = TCanvas('c','c',1400,1000)
-            corrMtrxCan.cd()
-            corrMtrxCan.SetBottomMargin(0.22)
-            corrMtrxCan.SetLeftMargin(0.17)
-            corrMtrxCan.SetTopMargin(0.06)
+            if hasattr(fit_result,'correlationMatrix'):
+                corrMtrx = header.reducedCorrMatrixHist(fit_result)
+                corrMtrxCan = TCanvas('c','c',1400,1000)
+                corrMtrxCan.cd()
+                corrMtrxCan.SetBottomMargin(0.22)
+                corrMtrxCan.SetLeftMargin(0.17)
+                corrMtrxCan.SetTopMargin(0.06)
 
-            corrMtrx.Draw('colz text')
-            corrMtrxCan.Print('correlation_matrix.png','png')
+                corrMtrx.Draw('colz text')
+                corrMtrxCan.Print('correlation_matrix.png','png')
+            else:
+                print 'WARNING: Not able to produce correlation matrix.'
 
 
 def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
