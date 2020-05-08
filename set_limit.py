@@ -55,8 +55,8 @@ signal_mass = [int(m.strip()) for m in signal_mass]
 theory_xsecs = signal_file.readline().split(',')
 theory_xsecs = [float(x.strip()) for x in theory_xsecs]
 # 
-signal_xsecs = theory_xsecs#signal_file.readline().split(',')
-#signal_xsecs = [float(x.strip()) for x in signal_xsecs]
+signal_xsecs = signal_file.readline().split(',')
+signal_xsecs = [float(x.strip()) for x in signal_xsecs]
 
 # Initialize arrays to eventually store the points on the TGraph
 x_mass = array('d')
@@ -78,7 +78,7 @@ for this_index, this_name in enumerate(signal_names):
     
     # Set the mass (x axis)
     x_mass.append(float(this_mass))
-
+    print this_mass
     # Grab the cross section limits (y axis)
     for ievent in range(int(this_tree.GetEntries())):
         this_tree.GetEntry(ievent)
@@ -152,16 +152,16 @@ if not options.blind:
     g_limit.SetMarkerSize(0.5) #0.5
     g_limit.GetYaxis().SetRangeUser(0., 80.)
     g_limit.GetXaxis().SetRangeUser(1, 3.2)
-    g_limit.SetMinimum(1.0e-3) #0.005
-    g_limit.SetMaximum(700.)
+    g_limit.SetMinimum(0.3e-3) #0.005
+    g_limit.SetMaximum(100.)
 else:
     print 'Blinded'
     g_mclimit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
-    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
+    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) (pb)") # NOT GENERIC
     g_mclimit.GetYaxis().SetRangeUser(0., 80.)
     g_mclimit.GetXaxis().SetRangeUser(1, 3.2)
-    g_mclimit.SetMinimum(1.0e-3) #0.005
-    g_mclimit.SetMaximum(700.)
+    g_mclimit.SetMinimum(0.3e-3) #0.005
+    g_mclimit.SetMaximum(100.)
 # Expected
 # g_mclimit = TGraph(len(x_mass), x_mass, y_mclimit)
 # g_mclimit.SetTitle("")
@@ -192,8 +192,8 @@ graphWP.SetMarkerColor(4)
 graphWP.SetMarkerSize(0.5)
 graphWP.GetYaxis().SetRangeUser(0., 80.)
 graphWP.GetXaxis().SetRangeUser(1, 3.2)
-graphWP.SetMinimum(1.0e-3) #0.005
-graphWP.SetMaximum(700.)
+graphWP.SetMinimum(0.3e-3) #0.005
+graphWP.SetMaximum(100.)
 q = 0
 for index,mass in enumerate(signal_mass):
     xsec = theory_xsecs[index]
@@ -246,17 +246,19 @@ graphWP.SetLineColor(4)
 
 # 2 sigma expected
 g_error95 = make_smooth_graph(g_mc2minus, g_mc2plus)
-g_error95.SetFillColor(kYellow)
+g_error95.SetFillColor(kOrange)
 g_error95.SetLineColor(0)
 
 # 1 sigma expected
 g_error = make_smooth_graph(g_mcminus, g_mcplus)
-g_error.SetFillColor( kGreen)
+g_error.SetFillColor( kGreen+1)
 g_error.SetLineColor(0)
 
 if not options.blind:
     g_limit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
-    g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
+    g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) (pb)") # NOT GENERIC
+    g_limit.GetXaxis().SetTitleSize(0.04)
+    g_limit.GetYaxis().SetTitleSize(0.04)
     g_limit.Draw('al')
     g_error95.Draw("lf")
     g_error.Draw("lf")
@@ -267,7 +269,9 @@ if not options.blind:
 
 else:
     g_mclimit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
-    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
+    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) (pb)") # NOT GENERIC
+    g_limit.GetXaxis().SetTitleSize(0.04)
+    g_limit.GetYaxis().SetTitleSize(0.04)
     g_mclimit.Draw("al")
     g_error95.Draw("lf")
     g_error.Draw("lf")
