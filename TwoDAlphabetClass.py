@@ -328,7 +328,7 @@ class TwoDAlphabet:
         # Standard bins over one category - one NBINS,MIN,MAX
         # Standard bins over three categories - three NBINS,MIN,MAX (organized by dict)
         # Custom bins over one category - list of bin walls
-        # Custom bins over three cateogories - three lists of bin walls (organized by dict)
+        # Custom bins over three categories - three lists of bin walls (organized by dict)
 
         # Finally, we need to get the bin normalizations correct. So we look at one of the
         # input histograms to get the bin widths and use that as the base to normalize the 
@@ -427,11 +427,11 @@ class TwoDAlphabet:
             option_return = self.inputConfig['OPTIONS'][optionName]
         # Default to true
         elif optionName in ['blindedPlots','blindedFit']:
-            print 'WARNING: '+optionName+' boolean not set explicitely. Default to True.'
+            print 'WARNING: '+optionName+' boolean not set explicitly. Default to True.'
             option_return = True
         # Default to false
         elif optionName in ['freezeFail','fitGuesses','plotUncerts','prerun','rpfRatio','plotPrefitSigInFitB']:
-            print 'WARNING: '+optionName+' boolean not set explicitely. Default to False.'
+            print 'WARNING: '+optionName+' boolean not set explicitly. Default to False.'
             option_return = False
         elif optionName == 'verbosity':
             option_return = 0
@@ -439,10 +439,10 @@ class TwoDAlphabet:
             option_return = 1
         else:
             if optionName == 'recycle':
-                print 'WARNING: '+optionName+' boolean not set explicitely. Default to [].'
+                print 'WARNING: '+optionName+' boolean not set explicitly. Default to [].'
                 option_return = []
             else:
-                print 'WARNING: '+optionName+' boolean not set explicitely. Default to False.'
+                print 'WARNING: '+optionName+' boolean not set explicitly. Default to False.'
                 option_return = False
             
 
@@ -629,8 +629,9 @@ class TwoDAlphabet:
                             if x == 'X': nom.SetXTitle(self.inputConfig['BINNING']['X']['TITLE'])
                             elif x == 'Y': nom.SetXTitle(self.inputConfig['BINNING']['Y']['TITLE'])
 
-                            nom.SetTitle(proc + ' - ' + syst + ' uncertainty')
+                            nom.SetTitle('')#proc + ' - ' + syst + ' uncertainty')
                             nom.GetXaxis().SetTitleOffset(1.0)
+                            nom.GetXaxis().SetTitleSize(0.05)
                             thisCan.SetRightMargin(0.16)
                             # nom.SetTitleOffset(1.2,"X")
 
@@ -1074,8 +1075,13 @@ class TwoDAlphabet:
             else: smooth_this = False
 
             if smooth_this:
-                hist_pass = header.smoothHist2D('smooth_'+process+'_pass',hist_pass,renormalize=False,iterate = 1 if process != 'qcdmc' else 3)
-                hist_fail = header.smoothHist2D('smooth_'+process+'_fail',hist_fail,renormalize=False,iterate = 1 if process != 'qcdmc' else 3)
+                if process != 'qcdmc':
+                    hist_pass.Smooth(1,"k5a") #= header.smoothHist2D('smooth_'+process+'_pass',hist_pass,renormalize=False,iterate = 1 if process != 'qcdmc' else 1)
+                    hist_fail.Smooth(1,"k5a") #= header.smoothHist2D('smooth_'+process+'_fail',hist_fail,renormalize=False,iterate = 1 if process != 'qcdmc' else 1)
+                else:
+                    for i in range(3):
+                        hist_pass.Smooth(1,"k5a")
+                        hist_fail.Smooth(1,"k5a")
 
             dict_hists[process]['file'] = file_nominal
             dict_hists[process]['pass']['nominal'] = hist_pass
@@ -1119,7 +1125,7 @@ class TwoDAlphabet:
                         # User will most likely have different file for each process but maybe not so check
                         if 'FILE_UP' in this_syst_dict:
                             file_up = TFile.Open(this_syst_dict['FILE_UP'])
-                        # DOCUMENT
+                        # Wild card to replace * with the process name
                         elif 'FILE_UP_*' in this_syst_dict:
                             file_up = TFile.Open(this_syst_dict['FILE_UP_*'].replace('*',process))
                         else:
@@ -1173,10 +1179,10 @@ class TwoDAlphabet:
 
                     if this_syst_dict['CODE'] > 1:
                         if smooth_this:
-                            dict_hists[process]['pass'][pass_syst+'Up'] = header.smoothHist2D('smooth_'+process+'_pass_'+syst+'Up',dict_hists[process]['pass'][pass_syst+'Up'],renormalize=False)
-                            dict_hists[process]['pass'][pass_syst+'Down'] = header.smoothHist2D('smooth_'+process+'_pass_'+syst+'Down',dict_hists[process]['pass'][pass_syst+'Down'],renormalize=False)
-                            dict_hists[process]['fail'][fail_syst+'Up']   = header.smoothHist2D('smooth_'+process+'_fail_'+syst+'Up',dict_hists[process]['fail'][fail_syst+'Up'],renormalize=False)
-                            dict_hists[process]['fail'][fail_syst+'Down'] = header.smoothHist2D('smooth_'+process+'_fail_'+syst+'Down',dict_hists[process]['fail'][fail_syst+'Down'],renormalize=False)
+                            dict_hists[process]['pass'][pass_syst+'Up'].Smooth(1,"k5a") #= header.smoothHist2D('smooth_'+process+'_pass_'+syst+'Up',dict_hists[process]['pass'][pass_syst+'Up'],renormalize=False)
+                            dict_hists[process]['pass'][pass_syst+'Down'].Smooth(1,"k5a") #= header.smoothHist2D('smooth_'+process+'_pass_'+syst+'Down',dict_hists[process]['pass'][pass_syst+'Down'],renormalize=False)
+                            dict_hists[process]['fail'][fail_syst+'Up'].Smooth(1,"k5a")   #= header.smoothHist2D('smooth_'+process+'_fail_'+syst+'Up',dict_hists[process]['fail'][fail_syst+'Up'],renormalize=False)
+                            dict_hists[process]['fail'][fail_syst+'Down'].Smooth(1,"k5a") #= header.smoothHist2D('smooth_'+process+'_fail_'+syst+'Down',dict_hists[process]['fail'][fail_syst+'Down'],renormalize=False)
 
                         if "SCALE" in this_process_dict.keys():
                             dict_hists[process]['pass'][pass_syst+'Up'].Scale(this_proc_scale)
@@ -1193,7 +1199,7 @@ class TwoDAlphabet:
         # With dictionary made, we can split around the signal region and   #
         # start renaming to match the format required by Combine. The       #
         # dictionary key names are conveniently named so we can do this     #
-        # with minimumal pain.                                              #
+        # with minimal pain.                                                #
         #####################################################################
         temp_TH2 = dict_hists['data_obs']['pass']['nominal']
         old_x_min = temp_TH2.GetXaxis().GetXmin()
@@ -1252,7 +1258,6 @@ class TwoDAlphabet:
                         finalhist.Write()
                         self.organizedDict[process][cat+'_'+c][dist] = finalhist.GetName()#header.copyHistWithNewXbins(temp_hist,self.newXbins[c],histname)
 
-
     def _buildFitWorkspace(self):
         self.floatingBins = [] # This holds the names of all of the variables that we want to float.
                            # These are typically bins in the RPH2D 
@@ -1296,7 +1301,6 @@ class TwoDAlphabet:
         ######################################
         # Build the RooParametricHist2D bins #
         ######################################
-
         Roo_dict['qcd'] = {}
         for r in ['pass','fail']:
             for c in ['LOW','SIG','HIGH']:
@@ -1306,9 +1310,12 @@ class TwoDAlphabet:
         if self.rpfRatio != False:
             TH2_qcdmc_fail = self.orgFile.Get(self.organizedDict['qcdmc']['fail_FULL']['nominal'])
             TH2_qcdmc_pass = self.orgFile.Get(self.organizedDict['qcdmc']['pass_FULL']['nominal'])
+            # for ismooth in range(3):
+            #     TH2_qcdmc_fail.Smooth(1,"k5a")
+            #     TH2_qcdmc_pass.Smooth(1,"k5a")
             TH2_qcdmc_ratios['FULL'] = TH2_qcdmc_pass.Clone('qcdmc_rpf_full')
             TH2_qcdmc_ratios['FULL'].Divide(TH2_qcdmc_fail)
-            TH2_qcdmc_ratios['FULL'] = header.smoothHist2D('qcdmc_rpf_full_smooth',TH2_qcdmc_ratios['FULL'],renormalize=False,skipEdges=True)
+            TH2_qcdmc_ratios['FULL'].Smooth(1,"k5a") #= header.smoothHist2D('qcdmc_rpf_full_smooth',TH2_qcdmc_ratios['FULL'],renormalize=False,skipEdges=True)
             for c in ['LOW','SIG','HIGH']:
                 TH2_qcdmc_ratios[c] = header.copyHistWithNewXbins(TH2_qcdmc_ratios['FULL'],self.newXbins[c],'qcdmc_rpf_'+c+'_smooth')
         
@@ -1372,14 +1379,14 @@ class TwoDAlphabet:
                     fail_bin_name = 'Fail_'+c+'_bin_'+str(xbin)+'-'+str(ybin)+'_'+self.name
                     pass_bin_name = 'Pass_'+c+'_bin_'+str(xbin)+'-'+str(ybin)+'_'+self.name
 
-                    # Initialize contents by subtracting minor non-QCD components (code 2)
+                    # Initialize contents
                     bin_content    = TH2_data_fail.GetBinContent(xbin,ybin)
-                    bin_range_up   = bin_content*3 #+ TH2_data_fail.GetBinErrorUp(xbin,ybin)*5
-                    bin_range_down = 1e-9#bin_content #- TH2_data_fail.GetBinErrorLow(xbin,ybin)*5
-                    bin_err_up     = TH2_data_fail.GetBinErrorUp(xbin,ybin)#bin_content + TH2_data_fail.GetBinErrorUp(xbin,ybin)
-                    bin_err_down   = TH2_data_fail.GetBinErrorLow(xbin,ybin)#bin_content - TH2_data_fail.GetBinErrorLow(xbin,ybin)
+                    bin_range_up   = bin_content*3 
+                    bin_range_down = 1e-9
+                    bin_err_up     = TH2_data_fail.GetBinErrorUp(xbin,ybin)
+                    bin_err_down   = TH2_data_fail.GetBinErrorLow(xbin,ybin)
 
-                    # Now subtract away the parts that we don't want
+                    # Now subtract away the MC
                     for process in self.organizedDict.keys():
                         this_TH2 = self.orgFile.Get(self.organizedDict[process]['fail_'+c]['nominal'])
 
@@ -1392,7 +1399,7 @@ class TwoDAlphabet:
                             bin_err_up     = bin_err_up      + this_TH2.GetBinErrorUp(xbin,ybin) #- this_TH2.GetBinContent(xbin,ybin)             # Just propagate errors normally
                             bin_err_down   = bin_err_down    - this_TH2.GetBinErrorLow(xbin,ybin) #- this_TH2.GetBinContent(xbin,ybin)
 
-                    # If bin content is <= 0, treat this bin as a RooConstVar at value close to 0
+                    # If fail bin content is <= 0, treat this bin as a RooConstVar at value close to 0
                     if (bin_content <= 0):# or (this_pass_bin_zero == True):
                         binRRV = RooConstVar(fail_bin_name, fail_bin_name, max(1e-9,bin_content))
                         bin_list_fail.add(binRRV)
@@ -1413,7 +1420,7 @@ class TwoDAlphabet:
                         # Now get the Rpf function value for this bin 
                         self.allVars.append(x_const)
                         self.allVars.append(y_const)
-                        this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
+                        self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin) # store rpf for this bin but dont need return
 
                         this_bin_pass = RooConstVar(pass_bin_name, pass_bin_name, 1e-9)
                         bin_list_pass.add(this_bin_pass)
@@ -1436,7 +1443,7 @@ class TwoDAlphabet:
                                 binRRV = RooRealVar(fail_bin_name, fail_bin_name, bin_content, max(1e-9,bin_range_down), bin_range_up)
 
                             if bin_content - bin_err_down < 0.0001:
-                                bin_err_down = bin_content - 0.0001#binRRV.getMin()     # For the rare case when bin error is larger than the content
+                                bin_err_down = bin_content - 0.0001 # For the edge case when bin error is larger than the content
                             
                             binRRV.setAsymError(bin_err_down,bin_err_up)
                             self.floatingBins.append(fail_bin_name)
@@ -1445,7 +1452,7 @@ class TwoDAlphabet:
                         bin_list_fail.add(binRRV)
                         self.allVars.append(binRRV)
 
-                        # Then get bin center and assign it to a RooConstVar
+                        # Then get bin center
                         x_center = TH2_data_fail.GetXaxis().GetBinCenter(xbin)
                         y_center = TH2_data_fail.GetYaxis().GetBinCenter(ybin)
 
@@ -1453,13 +1460,14 @@ class TwoDAlphabet:
                         x_center_mapped = (x_center - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
                         y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
 
-                        # And now get the Rpf function value for this bin 
+                        # Create RooConstVars to store the bin centers
                         x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center if self.rpf.fitType == 'cheb' else x_center_mapped)
                         y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center if self.rpf.fitType == 'cheb' else y_center_mapped)
 
                         self.allVars.append(x_const)
                         self.allVars.append(y_const)
 
+                        # And now get the Rpf function value for this bin 
                         this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
 
                         if self.rpfRatio == False:
@@ -1493,8 +1501,7 @@ class TwoDAlphabet:
             rpf_ratio = data_rpf.Clone()
             rpf_ratio.Divide(mc_rpf)
             rpf_ratio.SetMaximum(2.5)
-            # mc_rpf.SetMaximum(1)
-            # data_rpf.SetMaximum(1)
+            rpf_ratio.GetZaxis().SetLabelSize(0.08)
 
             header.makeCan('rpf_ratio',self.projPath,[data_rpf,mc_rpf,rpf_ratio],titles=["Data Ratio","MC Ratio","Ratio of ratios"],year=self.year)
         else: 
@@ -1503,6 +1510,7 @@ class TwoDAlphabet:
             data_rpf = data_pass.Clone()
             data_rpf.Divide(data_fail)
             header.makeCan('data_ratio',self.projPath,[data_pass,data_fail,data_rpf],titles=["Data Pass","Data Fail","R_{P/F}"],year=self.year)
+            header.makeCan('data_ratio_lego',self.projPath,[data_pass,data_fail,data_rpf],titles=["Data Pass","Data Fail","R_{P/F}"],year=self.year,datastyle='lego')
 
         print "Making workspace..."
         # Make workspace to save in
@@ -1511,10 +1519,6 @@ class TwoDAlphabet:
             for cat in [k for k in Roo_dict[process].keys() if 'file' not in k and 'FULL' not in k]:
                 if process == 'qcd':
                     rooObj = Roo_dict[process][cat]
-                    # if type(rooObj) != dict:
-                    #     print "Importing " + rooObj.GetName() + ' from ' + process + ', ' + cat + ', ' +c
-                    #     getattr(self.workspace,'import')(rooObj,RooFit.RecycleConflictNodes(),RooFit.Silence())
-                    # else:
                     for itemkey in rooObj.keys():
                         print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat + ', ' + itemkey
                         getattr(self.workspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes(),RooFit.Silence())
@@ -1522,10 +1526,6 @@ class TwoDAlphabet:
                 else:
                     for dist in Roo_dict[process][cat].keys():
                         rooObj = Roo_dict[process][cat][dist]
-                        # if type(rooObj) != dict: 
-                        #     print "Importing " + rooObj.GetName() + ' from ' + process + ', ' + cat + ', ' +dist+', '+ c
-                        #     getattr(self.workspace,'import')(rooObj,RooFit.RecycleConflictNodes(),RooFit.Silence())
-                        # else:
                         for itemkey in rooObj.keys():
                             print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat  +', ' +dist+ ', ' + itemkey
                             getattr(self.workspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes(),RooFit.Silence())
@@ -1626,10 +1626,6 @@ class TwoDAlphabet:
                 bin_line += (chan+' ')
                 processName_line += (proc+' ')
 
-                # If we have processes with integral of 0 in certain regions, we need to tell combine this here
-                # if proc in [p[0] for p in self.integralZero]:
-
-
                 # If signal
                 if proc in signal_procs:
                     processCode_line += (str(0-signal_procs.index(proc))+' ')
@@ -1679,8 +1675,6 @@ class TwoDAlphabet:
 
                     syst_lines[syst_line_key] += (thisVal+' ')
 
-
-
         card_new.write(header.colliMate(bin_line+'\n',column_width))
         card_new.write(header.colliMate(processName_line+'\n',column_width))
         card_new.write(header.colliMate(processCode_line+'\n',column_width))
@@ -1704,7 +1698,7 @@ class TwoDAlphabet:
         for b in self.floatingBins:
             card_new.write(header.colliMate(b+' flatParam\n',22))
            
-        card_new.close() # need to add masking if blinded
+        card_new.close() 
 
     def plotFitResults(self,fittag):#,simfit=False): # fittag means 'b' or 's'
         allVars = []
@@ -1904,7 +1898,7 @@ class TwoDAlphabet:
                                 bkg_process_list.append(hist_dict[process][cat][plotType+str(regionNum)])
                                 bkg_process_names.append(process)
                             elif (process != 'qcd' and process != 'TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] == 0):
-                                if self.plotPrefitSigInFitB and fittag == 'fit_b':
+                                if self.plotPrefitSigInFitB and fittag == 'b':
                                     signal_list.append(hist_dict[process][cat][plotType.replace("postfit","prefit")+str(regionNum)])
                                 else:
                                     hist_dict[process][cat][plotType+str(regionNum)].Scale(signal_strength)
@@ -2181,19 +2175,8 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,prerun=False):
     if twoDs[0].verbosity != False:
         verbose = ' -v '+twoDs[0].verbosity
     
-    # Set systematics
-    #syst_option = ' -S 0' # Default 0 systematics
-    #for twoD in twoDs:
-    #    for proc in twoD.inputConfig['PROCESS'].keys():
-    #        if type(twoD.inputConfig['PROCESS'][proc]) == dict:
-    #            if twoD.inputConfig['PROCESS'][proc]['CODE'] == 0:
-    #                if len(twoD.inputConfig['PROCESS'][proc]['SYSTEMATICS']) != 0: # If at any point there's a process
-    #                    syst_option = ''                                           # with non-zero systematics, turn them on
-
     # Set signal strength range - chosen from first of configs
     sig_option = ' --rMin '+rMin+' --rMax '+rMax
-    # if twoDs[0].signalOff:
-    #     sig_option = ' --rMin 0 --rMax 0'
 
     # Set blinding (mask pass for each twoD that requires it)
     # For channel masking, need to send text2workspace arg to text2workspace.py via `--text2workspace "--channel-masks"`
@@ -2220,9 +2203,7 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,prerun=False):
         else: blind_option = '--setParameters '+systsToSet
 
     # Run Combine
-    print 'cd '+projDir
-    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace --cminDefaultMinimizerStrategy 0 ' + sig_option +verbose #+syst_option -> now out of date
-    # print 'Executing '+FitDiagnostics_command
+    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace --cminDefaultMinimizerStrategy 0 ' + sig_option +verbose 
 
     with header.cd(projDir):
         command_saveout = open('FitDiagnostics_command.txt','w')
@@ -2272,12 +2253,8 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,prerun=False):
                             if k in coeff_final.GetName():
                                 rerun_config['FIT'][k]['ERROR'] = coeff_final.getError()
                                 rerun_config['FIT'][k]['NOMINAL'] = coeff_final.getValV()
-                                # if coeff_final.getValV() >= 0:
                                 rerun_config['FIT'][k]['MIN'] = coeff_final.getValV()-3*coeff_final.getError()
                                 rerun_config['FIT'][k]['MAX'] = coeff_final.getValV()+3*coeff_final.getError()
-                                # else:
-                                #     rerun_config['FIT'][k]['MAX'] = coeff_final.getValV()*0.5
-                                #     rerun_config['FIT'][k]['MIN'] = coeff_final.getValV()*1.5
 
                     # Next
                     coeff_final = coeffIter_final.Next()
