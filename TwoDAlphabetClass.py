@@ -328,7 +328,7 @@ class TwoDAlphabet:
         # Standard bins over one category - one NBINS,MIN,MAX
         # Standard bins over three categories - three NBINS,MIN,MAX (organized by dict)
         # Custom bins over one category - list of bin walls
-        # Custom bins over three cateogories - three lists of bin walls (organized by dict)
+        # Custom bins over three categories - three lists of bin walls (organized by dict)
 
         # Finally, we need to get the bin normalizations correct. So we look at one of the
         # input histograms to get the bin widths and use that as the base to normalize the 
@@ -427,11 +427,11 @@ class TwoDAlphabet:
             option_return = self.inputConfig['OPTIONS'][optionName]
         # Default to true
         elif optionName in ['blindedPlots','blindedFit']:
-            print 'WARNING: '+optionName+' boolean not set explicitely. Default to True.'
+            print 'WARNING: '+optionName+' boolean not set explicitly. Default to True.'
             option_return = True
         # Default to false
         elif optionName in ['freezeFail','fitGuesses','plotUncerts','prerun','rpfRatio','plotPrefitSigInFitB']:
-            print 'WARNING: '+optionName+' boolean not set explicitely. Default to False.'
+            print 'WARNING: '+optionName+' boolean not set explicitly. Default to False.'
             option_return = False
         elif optionName == 'verbosity':
             option_return = 0
@@ -439,10 +439,10 @@ class TwoDAlphabet:
             option_return = 1
         else:
             if optionName == 'recycle':
-                print 'WARNING: '+optionName+' boolean not set explicitely. Default to [].'
+                print 'WARNING: '+optionName+' boolean not set explicitly. Default to [].'
                 option_return = []
             else:
-                print 'WARNING: '+optionName+' boolean not set explicitely. Default to False.'
+                print 'WARNING: '+optionName+' boolean not set explicitly. Default to False.'
                 option_return = False
             
 
