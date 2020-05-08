@@ -664,14 +664,6 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
     pulls = []
     logString = ''
 
-    bstar_name_match = {
-        'ttbar':'t#bar{t} hadronic',
-        'ttbar-semilep':'t#bar{t} semi-leptonic',
-        'singletop_tW':'single top tW',
-        'singletop_tWB':'single top #bar{t}W',
-        'qcd':'Multijet'
-    }
-
     # For each hist/data distribution
     for hist_index, hist in enumerate(histlist):
         # Grab the pad we want to draw in
@@ -691,9 +683,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
             hist.GetYaxis().SetTitleOffset(2.3)
             hist.GetZaxis().SetTitleOffset(1.8)
             if len(titles) > 0:
-                # Bstar specific
-                hist.SetTitle('')
-                # hist.SetTitle(titles[hist_index])
+                hist.SetTitle(titles[hist_index])
 
             if datastyle != 'pe': hist.Draw(datastyle)
             else: hist.Draw('colz')
@@ -720,9 +710,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 hist.GetXaxis().SetTitle(xtitle)
                 hist.GetYaxis().SetTitle(ytitle)
                 if len(titles) > 0:
-                    # Bstar specific
-                    hist.SetTitle('')
-                    # hist.SetTitle(titles[hist_index])
+                    hist.SetTitle(titles[hist_index])
                     hist.SetTitleOffset(1.1)
                 hist.Draw(datastyle)
                 CMS_lumi.CMS_lumi(thisPad, year, 11)
@@ -790,8 +778,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     elif type(bkgNames[0]) != list: this_bkg_name = bkgNames[bkg_index]
                     else: this_bkg_name = bkgNames[hist_index][bkg_index]
                     
-                    if this_bkg_name in bstar_name_match.keys(): legends[hist_index].AddEntry(bkg,bstar_name_match[this_bkg_name],'f')
-                    else: legends[hist_index].AddEntry(bkg,this_bkg_name,'f')
+                    legends[hist_index].AddEntry(bkg,this_bkg_name,'f')
                     
                 # Go to main pad, set logy if needed
                 mains[hist_index].cd()

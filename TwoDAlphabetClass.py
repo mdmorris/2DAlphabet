@@ -1847,9 +1847,6 @@ class TwoDAlphabet:
                     twoDList.append(hist_dict[process][cat][fit+'_2D'])
                     twoDtitles.append(process + ', '+cat+', '+fit)
 
-            if isSignal: # BSTAR SPECIFIC
-                mass = process.split('signal')[1][2:]
-
             if isSignal and fittag != 's':
                 continue
             else:
@@ -1921,27 +1918,27 @@ class TwoDAlphabet:
                     # Make the "money plot" of just the y projection of the signal region
                     if ('y' in plotType) and (cat == 'pass') and (regionNum == 2): 
                         money_title = 'Data vs Background - '+self.yVarTitle
-                        header.makeCan('plots/fit_'+fittag+'/postfit_signal_region_only',self.projPath,[this_data],[bkg_process_list],totalBkg=[this_totalbkg],signals=signal_list,titles=[money_title],bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,colors=colors,xtitle=self.yVarTitle,year=self.year)
+                        header.makeCan('plots/fit_'+fittag+'/postfit_signal_region_only',self.projPath,[this_data],[bkg_process_list],totalBkg=[this_totalbkg],signals=signal_list,titles=[money_title],bkgNames=bkgNameList,colors=colors,xtitle=self.yVarTitle,year=self.year)
 
 
 
             if 'x' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
                     dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
+                    bkgNames=bkgNameList,titles=title_list,
                     colors=colors,xtitle=self.xVarTitle,year=self.year)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
                     dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
+                    bkgNames=bkgNameList,titles=title_list,
                     colors=colors,xtitle=self.xVarTitle,logy=True,year=self.year)
             elif 'y' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
                     dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
+                    bkgNames=bkgNameList,titles=title_list,
                     colors=colors,xtitle=self.yVarTitle,year=self.year)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
                     dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
+                    bkgNames=bkgNameList,titles=title_list,
                     colors=colors,xtitle=self.yVarTitle,logy=True,year=self.year)
 
         # Make comparisons for each background process of pre and post fit projections

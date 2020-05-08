@@ -26,10 +26,6 @@ parser.add_option('-t', '--tarball', metavar='FILE', type='string', action='stor
 
 commands = []
 
-print options.args
-
-#if 'bstar' in options.runscript: commands.append('source condor/prep.csh')
-
 # Tar stuff
 if options.inputs != '':
     commands.append('rm '+options.tarball)
