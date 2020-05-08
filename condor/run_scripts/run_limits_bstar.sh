@@ -6,6 +6,7 @@ scramv1 project CMSSW CMSSW_10_2_13
 tar -xzf 10XwithNano.tgz
 rm 10XwithNano.tgz
 
+echo TEMPTAR
 mkdir tardir; cp TEMPTAR tardir/; cd tardir
 tar -xzvf TEMPTAR
 cp -r * ../CMSSW_10_2_13/src/2DAlphabet/
