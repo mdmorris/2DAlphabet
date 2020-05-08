@@ -26,18 +26,18 @@ parser.add_option('-P', '--plotOnly', action="store_true",
                 default   =   False,
                 dest      =   'plotOnly',
                 help      =   'Only plots if True')
-parser.add_option('-b', '--blind', action="store_true",
+parser.add_option('--unblind', action="store_false",
                 default   =   True,
                 dest      =   'blind',
                 help      =   'Only plot observed limit if false')
 parser.add_option('-l', '--lumi', metavar='F', type='string', action='store',
-                default       =       '137052',
+                default       =       '137.44',
                 dest          =       'lumi',
                 help          =       'Luminosity option')
 parser.add_option('-m', '--mod', metavar='F', type='string', action='store',
                 default       =       '',
                 dest          =       'mod',
-                help          =       'Modification to limit. For example, different handedness of the signal')
+                help          =       'Modification to limit title on y-axis. For example, different handedness of the signal')
 
 (options, args) = parser.parse_args()
 
@@ -52,8 +52,11 @@ signal_names = [n.strip() for n in signal_names]
 signal_mass = signal_file.readline().split(',')
 signal_mass = [int(m.strip()) for m in signal_mass]
 # Read in xsecs as a list of strings, strip whitespace, and convert to floats
-signal_xsecs = signal_file.readline().split(',')
-signal_xsecs = [float(x.strip()) for x in signal_xsecs]
+theory_xsecs = signal_file.readline().split(',')
+theory_xsecs = [float(x.strip()) for x in theory_xsecs]
+# 
+signal_xsecs = theory_xsecs#signal_file.readline().split(',')
+#signal_xsecs = [float(x.strip()) for x in signal_xsecs]
 
 # Initialize arrays to eventually store the points on the TGraph
 x_mass = array('d')
@@ -69,7 +72,8 @@ for this_index, this_name in enumerate(signal_names):
     # Setup call for one of the signal
     this_xsec = signal_xsecs[this_index]
     this_mass = signal_mass[this_index]
-    this_output = TFile.Open(this_name+'/higgsCombineTest.Asymptotic.mH120.root')
+    this_output = TFile.Open(this_name+'/higgsCombineTest.AsymptoticLimits.mH120.root')
+    if not this_output: continue
     this_tree = this_output.Get('limit')
     
     # Set the mass (x axis)
@@ -138,6 +142,7 @@ g_mclimit.SetMarkerSize(0.)
 
 # Observed
 if not options.blind:
+    print 'Not blinded'
     g_limit = TGraph(len(x_mass), x_mass, y_limit)
     g_limit.SetTitle("")
     g_limit.SetMarkerStyle(0)
@@ -145,19 +150,18 @@ if not options.blind:
     g_limit.SetLineColor(1)
     g_limit.SetLineWidth(3)
     g_limit.SetMarkerSize(0.5) #0.5
-    g_limit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
-    g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
     g_limit.GetYaxis().SetRangeUser(0., 80.)
     g_limit.GetXaxis().SetRangeUser(1, 3.2)
-    g_limit.SetMinimum(3.0e-3) #0.005
-    g_limit.SetMaximum(7000.)
+    g_limit.SetMinimum(1.0e-3) #0.005
+    g_limit.SetMaximum(700.)
 else:
+    print 'Blinded'
     g_mclimit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
     g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
     g_mclimit.GetYaxis().SetRangeUser(0., 80.)
     g_mclimit.GetXaxis().SetRangeUser(1, 3.2)
-    g_mclimit.SetMinimum(3.0e-3) #0.005
-    g_mclimit.SetMaximum(7000.)
+    g_mclimit.SetMinimum(1.0e-3) #0.005
+    g_mclimit.SetMaximum(700.)
 # Expected
 # g_mclimit = TGraph(len(x_mass), x_mass, y_mclimit)
 # g_mclimit.SetTitle("")
@@ -188,11 +192,11 @@ graphWP.SetMarkerColor(4)
 graphWP.SetMarkerSize(0.5)
 graphWP.GetYaxis().SetRangeUser(0., 80.)
 graphWP.GetXaxis().SetRangeUser(1, 3.2)
-graphWP.SetMinimum(3.0e-3) #0.005
-graphWP.SetMaximum(7000.)
+graphWP.SetMinimum(1.0e-3) #0.005
+graphWP.SetMaximum(700.)
 q = 0
 for index,mass in enumerate(signal_mass):
-    xsec = signal_xsecs[index]
+    xsec = theory_xsecs[index]
     graphWP.SetPoint(q,    mass ,   xsec    )
     q+=1
 
@@ -251,6 +255,8 @@ g_error.SetFillColor( kGreen)
 g_error.SetLineColor(0)
 
 if not options.blind:
+    g_limit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
+    g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
     g_limit.Draw('al')
     g_error95.Draw("lf")
     g_error.Draw("lf")
@@ -260,12 +266,14 @@ if not options.blind:
     g_limit.GetYaxis().SetTitleOffset(1.4)
 
 else:
-    g_mclimit.GetYaxis().SetTitleOffset(1.4)
+    g_mclimit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
+    g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) [pb]") # NOT GENERIC
     g_mclimit.Draw("al")
     g_error95.Draw("lf")
     g_error.Draw("lf")
     g_mclimit.Draw("l")
     graphWP.Draw("l")
+    g_mclimit.GetYaxis().SetTitleOffset(1.4)
     
 # graphWP.Draw("l")
 
@@ -274,7 +282,7 @@ else:
 # graphWPdown.Draw("l")
 
 
-legend = TLegend(0.5, 0.45, 0.86, 0.84, '')
+legend = TLegend(0.55, 0.50, 0.87, 0.80, '')
 if not options.blind:
     legend.AddEntry(g_limit, "Observed", "l")
 legend.AddEntry(g_mclimit, "Expected (95% CL)","l")
@@ -292,15 +300,18 @@ legend.Draw("same")
 text1 = ROOT.TLatex()
 text1.SetNDC()
 text1.SetTextFont(42)
-text1.DrawLatex(0.2,0.84, "#scale[1.0]{CMS, L = "+options.lumi+" pb^{-1} at  #sqrt{s} = 13 TeV}") # NOT GENERIC
+text1.DrawLatex(0.2,0.84, "#scale[1.0]{CMS, L = "+options.lumi+" fb^{-1} at  #sqrt{s} = 13 TeV}") # NOT GENERIC
 
 TPT.Draw()      
 climits.RedrawAxis()
-climits.SaveAs("limits_combine_"+options.lumi+"pb_"+options.signals[options.signals.find('/')+1:options.signals.find('.')]+".pdf")
+climits.SaveAs("limits_combine_"+options.lumi.replace('.','p')+"fb_"+options.signals[options.signals.find('/')+1:options.signals.find('.')]+'_'+cstr+".pdf")
 
 # Finally calculate the intercept
-expectedLimit = Inter(g_mclimit,graphWP)[0]
-upLimit = Inter(g_mcminus,graphWP)[0]
-lowLimit = Inter(g_mcplus,graphWP)[0]
+expectedLimit = Inter(g_mclimit,graphWP)[0] if len(Inter(g_mclimit,graphWP)) > 0 else -1.0
+upLimit = Inter(g_mcminus,graphWP)[0] if len(Inter(g_mcminus,graphWP)) > 0 else -1.0
+lowLimit = Inter(g_mcplus,graphWP)[0] if len(Inter(g_mcplus,graphWP)) > 0 else -1.0
 
 print 'Expected limit: '+str(expectedLimit/1000.) + ' +'+str(upLimit/1000.-expectedLimit/1000.) +' -'+str(expectedLimit/1000.-lowLimit/1000.) + ' TeV' # NOT GENERIC
+if not options.blind:
+    obsLimit = Inter(g_limit,graphWP)[0] if len(Inter(g_limit,graphWP)) > 0 else -1.0
+    print 'Observed limit: '+str(obsLimit/1000.) + ' TeV'

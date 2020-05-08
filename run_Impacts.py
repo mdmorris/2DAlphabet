@@ -1,21 +1,32 @@
 import sys, os
 import subprocess
 import header
+import CombineHarvester.CombineTools.ch as ch
+
+def SystematicParser(cardname):
+    systs = []
+    f = open(cardname,'r')
+    for l in f.readlines():
+        if 'lnN' in l or 'shape' in l:
+            syst_name = l.split(' ')[0]
+            if syst_name != 'shapes': systs.append(syst_name.rstrip())
+
+    return systs
 
 from optparse import OptionParser
 
 parser = OptionParser()
 parser.add_option("-d", "--projDir", dest="projDir",
                   help="Home of the project - has the cards, fit results, etc")
-parser.add_option("-c", "--crab",
-                  action="store_true", dest="crab", default=False,
-                  help="Turn crab grid submission on")
+parser.add_option("--condor",
+                  action="store_true", dest="condor", default=False,
+                  help="Turn condor grid submission on")
 parser.add_option("-p", "--post",
                   action="store_true", dest="post", default=False,
                   help="Run the post processing to get impact plot")
-parser.add_option("-s", "--storage",
-                  dest="storage", default='T3_US_FNALLPC',
-                  help="Crab3 storage site (config.Site.storageSite)")
+# parser.add_option("-s", "--storage",
+#                   dest="storage", default='T3_US_FNALLPC',
+#                   help="Crab3 storage site (config.Site.storageSite)")
 
 (options, args) = parser.parse_args()
 
@@ -25,73 +36,69 @@ if projDir.split('/')[-1] != '': card_tag = projDir.split('/')[-1]
 else: card_tag = projDir.split('/')[-2]
 
 if taskName == '':
-    print 'ERROR in project directory name (where your workspace and data card lives). Did you accidentally provide a leading slash? (ie /projDir/) Quitting...'
-    quit()
-if options.crab:
-    print 'Crab task name = '+taskName
+    raise NameError('ERROR in project directory name (where your workspace and data card lives). Did you accidentally provide a leading slash? (ie /projDir/) Quitting...')
+if options.condor:
+    print 'Condor task name = '+taskName
 
 if not os.path.isdir(projDir): 
-    print projDir +' is not a directory. Quitting...'
-    quit()
+    raise TypeError(projDir +' is not a directory. Quitting...')
 
 # By default, this calculates the impacts for every RooRealVar in your workspace.
 # That would mean EVERY FAIL BIN would need to be scanned (100s or even 1000s of parameters).
 # So instead, we'll be a list of only the nuisance parameters and ask to just fit those
 
+if options.condor: 
+    header.executeCmd('tar --exclude="*.tgz" --exclude="*.std*" --exclude="run_combine*.sh" --exclude="*GoodnessOfFit*" --exclude="*.png" --exclude="*.pdf" --exclude="*.log" -czvf tarball.tgz '+projDir)
+    header.executeCmd('mv tarball.tgz '+projDir)
 print 'cd '+projDir
 with header.cd(projDir):
-    twoDAlphaConfig = header.openJSON('rerunConfig.json')
+    systs = SystematicParser('card_'+card_tag+'.txt')
     impactNuisanceString = '--named '
-    for s in twoDAlphaConfig['SYSTEMATIC'].keys():
-        if s !='HELP':
-            impactNuisanceString+=s+','
-    # Cut off the trailing comma
-    impactNuisanceString = impactNuisanceString[:-1]
-
-    commands = []
+    for s in systs:
+        impactNuisanceString+=s+','
+    impactNuisanceString = impactNuisanceString[:-1]# Cut off the trailing comma
 
     if not options.post:
         # Remove old runs if they exist
-        # print 'rm *_paramFit_*.root *_initialFit_*.root'
-        # subprocess.call(['rm *_paramFit_*.root *_initialFit_*.root'],shell=True)
-        header.executeCmd('text2workspace.py -b card_'+card_tag+'.txt -o impactworkspace.root')
-        initialfit_cmd = 'combineTool.py -M Impacts -n '+taskName+' -d impactworkspace.root --doInitialFit --robustFit 1 -m 120 '+impactNuisanceString
+        header.executeCmd('rm *_paramFit_*.root *_initialFit_*.root')
+        # Build a post-fit workspace
+        #header.executeCmd('text2workspace.py -b card_'+card_tag+'.txt -o impactworkspace.root')
+        header.setSnapshot()
+        initialfit_cmd = 'combineTool.py -M Impacts -n '+taskName+' -d initialFitWorkspace.root --snapshotName initialFit --doInitialFit --robustFit 1 -m 2000 --freezeParameters "var{Fail_.*}" '+impactNuisanceString
         header.executeCmd(initialfit_cmd)
+        impact_cmd = 'combineTool.py -M Impacts -n '+taskName+' -d initialFitWorkspace.root --snapshotName initialFit --doFits --robustFit 1 -m 2000 --freezeParameters "var{Fail_.*}" '+impactNuisanceString
+        if options.condor:
+            JOB_PREFIX = """#!/bin/bash
+source /cvmfs/cms.cern.ch/cmsset_default.sh
+xrdcp root://cmseos.fnal.gov//store/user/lcorcodi/10XwithNano.tgz ./
+export SCRAM_ARCH=slc6_amd64_gcc700
+scramv1 project CMSSW CMSSW_10_2_13
+tar -xzf 10XwithNano.tgz
+rm 10XwithNano.tgz
 
-        if options.crab:
-            # Need to write a custom crab config for the storage site
-            crabConfig = open('custom_crab.py','w')
-            crabConfig.write('def custom_crab(config):')
-            print '>> Customising the crab config'
-            crabConfig.write("    config.Site.storageSite = '"+options.storage+"'")
-            crabConfig.close()
+mkdir tardir; cp tarball.tgz tardir/; cd tardir
+tar -xzf tarball.tgz
+cp -r * ../CMSSW_10_2_13/src/2DAlphabet/
+cd ../CMSSW_10_2_13/src/2DAlphabet/
+eval `scramv1 runtime -sh`
+scramv1 b clean; scramv1 b
 
-            print 'Executing dry-run of crab jobs'
-            impact_cmd = 'combineTool.py -M Impacts -n '+taskName+' -d impactworkspace.root --robustFit 1 --doFits -m 120 --job-mode crab3 --task-name Impacts'+taskName+' --custom-crab custom_crab.py '+impactNuisanceString
-            subprocess.call([impact_cmd+' --dry-run'],shell=True)
-            proceed = raw_input('Please examine this command and confirm it is correct before submitting to crab. Do you wish to proceed? [Y/N]')
-            if proceed.lower() == 'y':
-                commands.append('source /cvmfs/cms.cern.ch/crab3/crab.sh; cmsenv')
-                commands.append(impact_cmd)
-                
-            else:
-                print 'Quitting...'
-                quit()
+cd %s
+                """ % (projDir)
+            job_prefix_out = open('impact_prefix.txt','w')
+            job_prefix_out.write(JOB_PREFIX)
+            job_prefix_out.close()
 
-        else:     
-            commands.append('combineTool.py -M Impacts -n '+taskName+' -d impactworkspace.root --robustFit 1 --doFits -m 120 '+impactNuisanceString)
+            impact_cmd = impact_cmd+' --job-mode condor --dry-run --prefix-file impact_prefix.txt --sub-opts "transfer_input_files = tarball.tgz" --task-name Impacts'+taskName
+        else:
+            header.executeCmd(impact_cmd)
 
     elif options.post:
-        # Grab the crab output, untar it, and put it in the main directory (now it looks like it was run locally)
-        if options.crab:
-            commands.append('crab getoutput -d crab_Impacts'+taskName)
-            for filename in os.listdir('crab_Impacts'+taskName+'/results/'):
-                commands.append('tar -xvf crab_ImpactsunitTest/results/'+filename)
+        # Grab the output
+        header.executeCmd('combineTool.py -M Impacts -n '+taskName+' -d initialFitWorkspace.root --snapshotName initialFit -m 2000 '+impactNuisanceString+' -o impacts.json')
+        header.executeCmd('plotImpacts.py -i impacts.json -o impacts')
 
-        commands.append('combineTool.py -M Impacts -n '+taskName+' -d impactworkspace.root -m 120 '+impactNuisanceString+' -o impacts.json')
-        commands.append('plotImpacts.py -i impacts.json -o impacts')
-
-    # Run commands
-    for c in commands:
-        print 'Executing: '+c
-        subprocess.call([c],shell=True)
+    # # Run commands
+    # for c in commands:
+    #     print 'Executing: '+c
+    #     subprocess.call([c],shell=True)

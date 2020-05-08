@@ -1,11 +1,37 @@
 import ROOT
 from ROOT import *
 from contextlib import contextmanager
-import os, pickle, subprocess
+import os, pickle, subprocess, time,random
 import math
 from math import sqrt
 import array
 import json
+import CMS_lumi, tdrstyle
+
+def setSnapshot(d=''):
+    # header.executeCmd('combine -M MultiDimFit -d '+base_workspace+' --saveWorkspace --freezeParameters r --setParameters r=0,'+mask_string)
+    # f = TFile.Open('higgsCombineTest.MultiDimFit.mH120.root')
+    # w = f.Get('w')
+    # w.loadSnapshot("MultiDimFit")
+    # w.var("r").setConstant(0)
+    # w.var("r").setVal(0)
+    # w.var("r").setMin(-20)
+    # w.var("r").setMax(20)
+    # myargs = RooArgSet(w.allVars())
+    # myargs.add(w.allCats())
+    # w.saveSnapshot("initialFit",myargs)
+    # fout = TFile('initialFitWorkspace.root',"recreate")
+    # fout.WriteTObject(w,'w')
+    # fout.Close()
+    w_f = TFile.Open(d+'higgsCombineTest.FitDiagnostics.mH120.root')
+    w = w_f.Get('w')
+    fr_f = TFile.Open(d+'fitDiagnostics.root')
+    fr = fr_f.Get('fit_b')
+    myargs = RooArgSet(fr.floatParsFinal())
+    importPars = w.saveSnapshot('initialFit',myargs)
+    fout = TFile('initialFitWorkspace.root',"recreate")
+    fout.WriteTObject(w,'w')
+    fout.Close()
 
 # Function stolen from https://stackoverflow.com/questions/9590382/forcing-python-json-module-to-work-with-ascii
 def openJSON(f):
@@ -22,87 +48,7 @@ def ascii_encode_dict(data):
     ascii_encode = lambda x: x.encode('ascii') if isinstance(x, unicode) else x 
     return dict(map(ascii_encode, pair) for pair in data.items())
 
-# def copyHistWithNewXbounds(thisHist,copyName,newBinWidthX,xNewBinsLow,xNewBinsHigh):
-#     # Make a copy with the same Y bins but new X bins
-#     nBinsY = thisHist.GetNbinsY()
-#     yBinsLow = thisHist.GetYaxis().GetXmin()
-#     yBinsHigh = thisHist.GetYaxis().GetXmax()
-#     nNewBinsX = int((xNewBinsHigh-xNewBinsLow)/float(newBinWidthX))
-#     # Use copyName with _temp to avoid overwriting if thisHist has the same name
-#     # We can do this at the end but not before we're finished with thisHist
-#     histCopy = TH2F(copyName+'_temp',copyName+'_temp',nNewBinsX,xNewBinsLow,xNewBinsHigh,nBinsY,yBinsLow,yBinsHigh)
-#     histCopy.Sumw2()
-    
-#     histCopy.GetXaxis().SetName(thisHist.GetXaxis().GetName())
-#     histCopy.GetYaxis().SetName(thisHist.GetYaxis().GetName())
-
-
-#     # Loop through the old bins
-#     for binY in range(1,nBinsY+1):
-#         # print 'Bin y: ' + str(binY)
-#         for newBinX in range(1,nNewBinsX+1):
-#             newBinContent = 0
-#             newBinErrorSq = 0
-#             newBinXlow = histCopy.GetXaxis().GetBinLowEdge(newBinX)
-#             newBinXhigh = histCopy.GetXaxis().GetBinUpEdge(newBinX)
-
-#             # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
-#             for oldBinX in range(1,thisHist.GetNbinsX()+1):
-#                 if thisHist.GetXaxis().GetBinLowEdge(oldBinX) >= newBinXlow and thisHist.GetXaxis().GetBinUpEdge(oldBinX) <= newBinXhigh:
-#                     # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
-#                     # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
-#                     newBinContent += thisHist.GetBinContent(oldBinX,binY)
-#                     newBinErrorSq += thisHist.GetBinError(oldBinX,binY)**2
-
-#             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
-#             if newBinContent > 0:
-#                 histCopy.SetBinContent(newBinX,binY,newBinContent)
-#                 histCopy.SetBinError(newBinX,binY,sqrt(newBinErrorSq))
-
-#     # Will now set the copyName which will overwrite thisHist if it has the same name
-#     histCopy.SetName(copyName)
-#     histCopy.SetTitle(copyName)
-
-#     return histCopy
-
-# def copyHistWithNewYbounds(thisHist,copyName,newBinWidthY,yNewBinsLow,yNewBinsHigh):
-#     # Make a copy with the same Y bins but new X bins
-#     nBinsX = thisHist.GetNbinsX()
-#     xBinsLow = thisHist.GetXaxis().GetXmin()
-#     xBinsHigh = thisHist.GetXaxis().GetXmax()
-#     nNewBinsY = int((yNewBinsHigh-yNewBinsLow)/float(newBinWidthY))
-#     histCopy = TH2F(copyName,copyName,nBinsX,xBinsLow,xBinsHigh,nNewBinsY,yNewBinsLow,yNewBinsHigh)
-#     histCopy.Sumw2()
-    
-#     histCopy.GetXaxis().SetName(thisHist.GetXaxis().GetName())
-#     histCopy.GetYaxis().SetName(thisHist.GetYaxis().GetName())
-
-
-#     # Loop through the old bins
-#     for binX in range(1,nBinsX+1):
-#         # print 'Bin y: ' + str(binY)
-#         for newBinY in range(1,nNewBinsY+1):
-#             newBinContent = 0
-#             newBinErrorSq = 0
-#             newBinYlow = histCopy.GetYaxis().GetBinLowEdge(newBinY)
-#             newBinYhigh = histCopy.GetYaxis().GetBinUpEdge(newBinY)
-
-#             # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
-#             for oldBinY in range(1,thisHist.GetNbinsY()+1):
-#                 if thisHist.GetYaxis().GetBinLowEdge(oldBinY) >= newBinYlow and thisHist.GetYaxis().GetBinUpEdge(oldBinY) <= newBinYhigh:
-#                     # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
-#                     # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
-#                     newBinContent += thisHist.GetBinContent(binX,oldBinY)
-#                     newBinErrorSq += thisHist.GetBinError(binX,oldBinY)**2
-
-#             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
-#             if newBinContent > 0:
-#                 histCopy.SetBinContent(binX,newBinY,newBinContent)
-#                 histCopy.SetBinError(binX,newBinY,sqrt(newBinErrorSq))
-
-#     return histCopy
-
-def copyHistWithNewXbins(thisHist,newXbins,copyName,oldBinWidth):
+def copyHistWithNewXbins(thisHist,newXbins,copyName):
     # Make a copy with the same Y bins but new X bins
     ybins = []
     for iy in range(1,thisHist.GetNbinsY()+1):
@@ -133,22 +79,15 @@ def copyHistWithNewXbins(thisHist,newXbins,copyName,oldBinWidth):
             new_bin_max = hist_copy.GetXaxis().GetBinUpEdge(xbin)
 
             # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
-            bins_added = 0
             for old_xbin in range(1,thisHist.GetNbinsX()+1):
                 if thisHist.GetXaxis().GetBinLowEdge(old_xbin) >= new_bin_min and thisHist.GetXaxis().GetBinUpEdge(old_xbin) <= new_bin_max:
                     # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
                     # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
-                    bins_added +=1
                     new_bin_content += thisHist.GetBinContent(old_xbin,ybin)
                     new_bin_errorsq += thisHist.GetBinError(old_xbin,ybin)**2
 
-            new_bin_content /= bins_added
-            new_bin_errorsq /= bins_added
-
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             if new_bin_content > 0:
-                # new_bin_content = new_bin_content/(hist_copy.GetXaxis().GetBinWidth(xbin)/oldBinWidth)
-                # new_bin_errorsq = new_bin_errorsq/(hist_copy.GetXaxis().GetBinWidth(xbin)/oldBinWidth)
                 hist_copy.SetBinContent(xbin,ybin,new_bin_content)
                 hist_copy.SetBinError(xbin,ybin,sqrt(new_bin_errorsq))
 
@@ -158,7 +97,7 @@ def copyHistWithNewXbins(thisHist,newXbins,copyName,oldBinWidth):
 
     return hist_copy
 
-def copyHistWithNewYbins(thisHist,newYbins,copyName,oldBinWidth):
+def copyHistWithNewYbins(thisHist,newYbins,copyName):
     # Make a copy with the same X bins but new Y bins
     xbins = []
     for ix in range(1,thisHist.GetNbinsX()+1):
@@ -189,22 +128,15 @@ def copyHistWithNewYbins(thisHist,newYbins,copyName,oldBinWidth):
             new_bin_max = hist_copy.GetYaxis().GetBinUpEdge(ybin)
 
             # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
-            bins_added = 0
             for old_ybin in range(1,thisHist.GetNbinsY()+1):
                 if thisHist.GetYaxis().GetBinLowEdge(old_ybin) >= new_bin_min and thisHist.GetYaxis().GetBinUpEdge(old_ybin) <= new_bin_max:
                     # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
                     # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
-                    bins_added += 1
                     new_bin_content += thisHist.GetBinContent(xbin,old_ybin)
                     new_bin_errorsq += thisHist.GetBinError(xbin,old_ybin)**2
 
-            new_bin_content /= bins_added
-            new_bin_errorsq /= bins_added
-
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             if new_bin_content > 0:
-                # new_bin_content = new_bin_content/(hist_copy.GetXaxis().GetBinWidth(xbin)/oldBinWidth)
-                # new_bin_errorsq = new_bin_errorsq/(hist_copy.GetXaxis().GetBinWidth(xbin)/oldBinWidth)
                 hist_copy.SetBinContent(xbin,ybin,new_bin_content)
                 hist_copy.SetBinError(xbin,ybin,sqrt(new_bin_errorsq))
 
@@ -213,6 +145,109 @@ def copyHistWithNewYbins(thisHist,newYbins,copyName,oldBinWidth):
     hist_copy.SetTitle(copyName)
 
     return hist_copy
+
+def smoothHist2D(name,histToSmooth,renormalize=False,iterate=1,skipEdges=False):
+    print "Smoothing "+name
+    if renormalize: norm = histToSmooth.Integral()
+    smoothed_hist = histToSmooth.Clone(name)
+    smoothed_hist.Reset()
+    smoothed_hist.Sumw2()
+
+    for ix in range(1,histToSmooth.GetNbinsX()+1):
+        for iy in range(1,histToSmooth.GetNbinsY()+1):
+            bin_contents = [histToSmooth.GetBinContent(ix,iy)]
+
+            if ix == 1:
+                if iy == 1: # lower left corner
+                    if skipEdges: pass
+                    else:
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                elif iy == histToSmooth.GetNbinsY(): # upper left corner
+                    if skipEdges: pass
+                    else:
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+                else: # left wall
+                    if not skipEdges:
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+            
+            elif ix == histToSmooth.GetNbinsX():
+                if iy == 1: # lower right corner
+                    if skipEdges: pass
+                    else:
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                elif iy == histToSmooth.GetNbinsY(): # upper right corner
+                    if skipEdges: pass
+                    else:
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+                else: # right wall
+                    if not skipEdges: 
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+
+            else:
+                if iy == 1: # bottom wall
+                    if not skipEdges:
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                elif iy == histToSmooth.GetNbinsY(): # top wall
+                    if not skipEdges:
+                        bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+                        bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                else: # full square
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy+1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy  ))
+                    # bin_contents.append(histToSmooth.GetBinContent(ix  ,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy  ))
+                    bin_contents.append(histToSmooth.GetBinContent(ix+1,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix  ,iy-1))
+                    bin_contents.append(histToSmooth.GetBinContent(ix-1,iy-1))
+
+            avg = 0
+            for b in bin_contents: avg += b
+            avg = avg/len(bin_contents)
+
+            smoothed_hist.SetBinContent(ix,iy,avg)
+
+    if renormalize:
+        smoothed_norm = smoothed_hist.Integral()
+        smoothed_hist.Scale(norm/smoothed_norm)
+    if iterate > 1: smoothed_hist = smoothHist2D(name+str(iterate),smoothed_hist,iterate=iterate-1)
+    return smoothed_hist
+
+def zeroNegativeBins(name,inhist):
+    outhist = inhist.Clone(name)
+    outhist.Reset()
+    for ix in range(1,inhist.GetNbinsX()):
+        for iy in range(1,inhist.GetNbinsY()):
+            content = max(0,inhist.GetBinContent(ix,iy))
+            outhist.SetBinContent(ix,iy,content)
+            if content == 0: outhist.SetBinError(ix,iy,0)
+            else: outhist.SetBinError(ix,iy,inhist.GetBinError(ix,iy))
+
+    return outhist
 
 def stitchHistsInX(name,xbins,ybins,thisHistList,blinded=[]):
     # Required that thisHistList be in order of desired stitching
@@ -398,12 +433,12 @@ def ftestInfoLookup(projInfoDict):
 
 def FStatCalc(filename1,filename2,p1,p2,n):
     print 'Calculating F statistic'
-    print 'Files: ',filename1,filename2
-    print 'Parameters: p1 %f, p2 %f, n %f'%(p1,p2,n)
     # Flip flop to make sure p2 is always greater than p1 (more parameters should always fit better)
     if p1 > p2:
         p1, p2 = p2, p1
         filename1, filename2 = filename2, filename1
+    print 'Files: ',filename1,filename2
+    print 'Parameters: p1 %f, p2 %f, n %f'%(p1,p2,n)
 
     # Get limit trees from each file
     file1 = TFile.Open(filename1)
@@ -411,21 +446,21 @@ def FStatCalc(filename1,filename2,p1,p2,n):
     file2 = TFile.Open(filename2)
     tree2 = file2.Get("limit")
     diffs=[]
-    print 'Entries ',tree1.GetEntries(),tree2.GetEntries()
+    # print 'Entries ',tree1.GetEntries(),tree2.GetEntries()
 
     # Loop over entries and calculate the F statistics
     for i in range(0,tree1.GetEntries()):
         tree1.GetEntry(i)
         tree2.GetEntry(i)
-        print 'Limits ',tree1.limit,tree2.limit
+        # print 'Limits ',tree1.limit,tree2.limit
         if tree1.limit-tree2.limit>0:
-            F = (tree1.limit-tree2.limit)/(p2-p1)/(lTree2.limit/(n-p2))
-            print 'Entry ',i, ":", tree2.limit, "-", tree1.limit, "=", tree2.limit-tree1.limit, "F =", F
-            diffs.append(F)
+            F = (tree1.limit-tree2.limit)/(p2-p1)/(tree2.limit/(n-p2))
+            # print 'Entry ',i, ":", tree2.limit, "-", tree1.limit, "=", tree2.limit-tree1.limit, "F =", F
+            if F < 50: diffs.append(F)
         else:
-            print 'WARNING in calculationg of F statistic for entry %i. limit1-limit2 <=0 (%f - %f)' %(i,tree1.limit,tree2.limit)
+            print 'WARNING in calculation of F statistic for entry %i. limit1-limit2 <=0 (%f - %f)' %(i,tree1.limit,tree2.limit)
 
-    print 'Diffs F stat: ',diffs
+    # print 'Diffs F stat: ',diffs
     return diffs
 
 def makeToyCard(channelNames):
@@ -497,10 +532,10 @@ def makeToyCard(channelNames):
 
     toy_gen_card.close()
 
-def projInfoLookup(projDir,cardtag):
+def projInfoLookup(projDir,card_tag):
     # Check if there was more than one 2DAlphabet object run over
     more_than_one = False
-    run_card = open('card_'+card_tag+'.txt','r')
+    run_card = open(projDir+'/card_'+card_tag+'.txt','r')
     firstline = run_card.readline()
     if 'Combination of ' in firstline:
         more_than_one = True
@@ -510,7 +545,7 @@ def projInfoLookup(projDir,cardtag):
         # Look up all categories run in the most recent fit
         twoD_names = getTwoDAlphaNames(firstline)
         for n in twoD_names:
-            proj_info[n] = pickle.load(open(projDir+twoD_obj_name+'/saveOut.p','r'))
+            proj_info[n] = pickle.load(open(projDir+'/'+n+'/saveOut.p','r'))
 
     elif not more_than_one:
         proj_info[card_tag] = pickle.load(open(projDir+'/saveOut.p','r'))
@@ -519,7 +554,7 @@ def projInfoLookup(projDir,cardtag):
 
 def getTwoDAlphaNames(line):
     card_locs = [loc for loc in line.split(' ') if (loc != ' ' and loc != '' and 'txt' in loc)]
-    proj_names = [n.split('/') for n in card_locs]
+    proj_names = [n.split('/')[0] for n in card_locs]
     return proj_names
 
 def executeCmd(cmd,dryrun=False):
@@ -572,7 +607,7 @@ def dictToLatexTable(dict2convert,outfilename,roworder=[],columnorder=[]):
     latexout.close()
 
 
-def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False,datastyle='pe'):  
+def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],titles=[],dataName='data',bkgNames=[],signalNames=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False,datastyle='pe',year=1):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -608,7 +643,10 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
         pady = 2
     else:
         print 'histlist of size ' + str(len(histlist)) + ' not currently supported'
+        print histlist
         return 0
+
+    tdrstyle.setTDRStyle()
 
     myCan = TCanvas(name,name,width,height)
     myCan.Divide(padx,pady)
@@ -618,6 +656,7 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
     if len(colors) == 0:   
         colors = default_colors
     stacks = []
+    tot_hists_err = []
     tot_hists = []
     legends = []
     mains = []
@@ -625,15 +664,21 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
     pulls = []
     logString = ''
 
+    bstar_name_match = {
+        'ttbar':'t#bar{t} hadronic',
+        'ttbar-semilep':'t#bar{t} semi-leptonic',
+        'singletop_tW':'single top tW',
+        'singletop_tWB':'single top #bar{t}W',
+        'qcd':'Multijet'
+    }
+
     # For each hist/data distribution
     for hist_index, hist in enumerate(histlist):
         # Grab the pad we want to draw in
         myCan.cd(hist_index+1)
-        if len(histlist) > 1:
-            thisPad = myCan.GetPrimitive(name+'_'+str(hist_index+1))
-            thisPad.cd()
-        
-        
+        # if len(histlist) > 1:
+        thisPad = myCan.GetPrimitive(name+'_'+str(hist_index+1))
+        thisPad.cd()        
 
         # If this is a TH2, just draw the lego
         if hist.ClassName().find('TH2') != -1:
@@ -646,11 +691,16 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
             hist.GetYaxis().SetTitleOffset(2.3)
             hist.GetZaxis().SetTitleOffset(1.8)
             if len(titles) > 0:
-                hist.SetTitle(titles[hist_index])
+                # Bstar specific
+                hist.SetTitle('')
+                # hist.SetTitle(titles[hist_index])
 
-            hist.Draw('lego')
+            if datastyle != 'pe': hist.Draw(datastyle)
+            else: hist.Draw('colz')
             if len(bkglist) > 0:
                 print 'ERROR: It seems you are trying to plot backgrounds with data on a 2D plot. This is not supported since there is no good way to view this type of distribution.'
+
+            CMS_lumi.CMS_lumi(thisPad, year, 11)
         
         # Otherwise it's a TH1 hopefully
         else:
@@ -666,11 +716,16 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
             
             # If there are no backgrounds, only plot the data (semilog if desired)
             if len(bkglist) == 0:
+                hist.SetMaximum(1.13*hist.GetMaximum())
                 hist.GetXaxis().SetTitle(xtitle)
                 hist.GetYaxis().SetTitle(ytitle)
                 if len(titles) > 0:
-                    hist.SetTitle(titles[hist_index])
+                    # Bstar specific
+                    hist.SetTitle('')
+                    # hist.SetTitle(titles[hist_index])
+                    hist.SetTitleOffset(1.1)
                 hist.Draw(datastyle)
+                CMS_lumi.CMS_lumi(thisPad, year, 11)
             
             # Otherwise...
             else:
@@ -683,20 +738,26 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                     mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.1, 1, 1))
                     subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 0, 0))
 
-                legends.append(TLegend(0.65,0.6,0.95,0.93))
+                if not logy: legends.append(TLegend(0.65,0.81-0.02*(len(bkglist[0])+len(signals)),0.90,0.90))
+                else: legends.append(TLegend(0.2,0.11,0.45,0.2+0.02*(len(bkglist[0])+len(signals))))
                 stacks.append(THStack(hist.GetName()+'_stack',hist.GetName()+'_stack'))
-                tot_hist = hist.Clone(hist.GetName()+'_tot')
-                tot_hist.Reset()
+                if totalBkg == None:
+                    tot_hist = hist.Clone(hist.GetName()+'_tot')
+                    tot_hist.Reset()
+                else:
+                    tot_hist = totalBkg[hist_index]
+
                 tot_hist.SetTitle(hist.GetName()+'_tot')
                 tot_hist.SetMarkerStyle(0)
                 tot_hists.append(tot_hist)
+                tot_hists_err.append(tot_hist.Clone())
 
 
                 # Set margins and make these two pads primitives of the division, thisPad
                 mains[hist_index].SetBottomMargin(0.0)
                 mains[hist_index].SetLeftMargin(0.16)
                 mains[hist_index].SetRightMargin(0.05)
-                mains[hist_index].SetTopMargin(0.1)
+                mains[hist_index].SetTopMargin(0.08)
 
                 subs[hist_index].SetLeftMargin(0.16)
                 subs[hist_index].SetRightMargin(0.05)
@@ -708,28 +769,34 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                 # Build the stack
                 for bkg_index,bkg in enumerate(bkglist[hist_index]):     # Won't loop if bkglist is empty
                     # bkg.Sumw2()
-                    tot_hists[hist_index].Add(bkg)
-                    bkg.SetLineColor(kBlack)
+                    if totalBkg == None: tot_hists[hist_index].Add(bkg)
+                    
                     if logy:
                         bkg.SetMinimum(1e-3)
 
                     if bkg.GetName().find('qcd') != -1:
                         bkg.SetFillColor(kYellow)
-
+                        bkg.SetLineColor(kYellow)
                     else:
                         if colors[bkg_index] != None:
                             bkg.SetFillColor(colors[bkg_index])
+                            bkg.SetLineColor(colors[bkg_index])
                         else:
                             bkg.SetFillColor(default_colors[bkg_index])
+                            bkg.SetLineColor(default_colors[bkg_index])
 
                     stacks[hist_index].Add(bkg)
-
-                    legends[hist_index].AddEntry(bkg,bkg.GetName().split('_')[0],'f')
+                    if bkgNames == []: this_bkg_name = bkg.GetName().split('_')[0]
+                    elif type(bkgNames[0]) != list: this_bkg_name = bkgNames[bkg_index]
+                    else: this_bkg_name = bkgNames[hist_index][bkg_index]
+                    
+                    if this_bkg_name in bstar_name_match.keys(): legends[hist_index].AddEntry(bkg,bstar_name_match[this_bkg_name],'f')
+                    else: legends[hist_index].AddEntry(bkg,this_bkg_name,'f')
                     
                 # Go to main pad, set logy if needed
                 mains[hist_index].cd()
 
-                # Set y max of all hists to be the same to accomodate the tallest
+                # Set y max of all hists to be the same to accommodate the tallest
                 histList = [stacks[hist_index],tot_hists[hist_index],hist]
 
                 yMax = histList[0].GetMaximum()
@@ -739,7 +806,7 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                         yMax = histList[h].GetMaximum()
                         maxHist = histList[h]
                 for h in histList:
-                    h.SetMaximum(yMax*1.1)
+                    h.SetMaximum(yMax*1.25)
                     if logy == True:
                         h.SetMaximum(yMax*10)
 
@@ -749,7 +816,7 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                 data_leg_title = hist.GetTitle()
                 if len(titles) > 0:
                     hist.SetTitle(titles[hist_index])
-                hist.SetTitleOffset(1.5,"xy")
+                hist.SetTitleOffset(1.1,"xy")
                 hist.GetYaxis().SetTitle('Events')
                 hist.GetYaxis().SetLabelSize(mLS)
                 hist.GetYaxis().SetTitleSize(mLS)
@@ -757,6 +824,7 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                     hist.SetMinimum(1e-3)
                 hist.Draw(datastyle)
 
+                if logy == True:stacks[hist_index].SetMinimum(1e-3) 
                 stacks[hist_index].Draw('same hist')
 
                 # Do the signals
@@ -765,17 +833,27 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                     signals[hist_index].SetLineWidth(2)
                     if logy == True:
                         signals[hist_index].SetMinimum(1e-3)
-                    legends[hist_index].AddEntry(signals[hist_index],signals[hist_index].GetName().split('_')[0],'L')
+                    if signalNames == []: this_sig_name = signals[hist_index].GetName().split('_')[0]
+                    elif type(signalNames) == str: this_sig_name = signalNames
+                    else: this_sig_name = signalNames[hist_index]
+
+                    legends[hist_index].AddEntry(signals[hist_index],this_sig_name,'L')
                     signals[hist_index].Draw('hist same')
 
-                tot_hists[hist_index].SetFillColor(kBlack)
-                tot_hists[hist_index].SetFillStyle(3354)
+                if logy: 
+                    tot_hists[hist_index].SetMinimum(1e-3)
+                    tot_hists_err[hist_index].SetMinimum(1e-3)
+                tot_hists[hist_index].Draw('hist same')
 
-                tot_hists[hist_index].Draw('e2 same')
-                # legends[hist_index].Draw()
+                tot_hists_err[hist_index].SetFillColor(kBlack)
+                tot_hists_err[hist_index].SetFillStyle(3354)
+                tot_hists_err[hist_index].Draw('e2 same')
+
+                legends[hist_index].SetBorderSize(0)
+                legends[hist_index].Draw()
 
                 if not dataOff:
-                    legends[hist_index].AddEntry(hist,'data',datastyle)
+                    legends[hist_index].AddEntry(hist,dataName,datastyle)
                     hist.Draw(datastyle+' same')
 
                 gPad.RedrawAxis()
@@ -792,7 +870,7 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
 
                 pulls[hist_index].GetYaxis().SetRangeUser(-2.9,2.9)
                 pulls[hist_index].GetYaxis().SetTitleOffset(0.4)
-                pulls[hist_index].GetXaxis().SetTitleOffset(0.9)
+                # pulls[hist_index].GetXaxis().SetTitleOffset(0.9)
                              
                 pulls[hist_index].GetYaxis().SetLabelSize(LS)
                 pulls[hist_index].GetYaxis().SetTitleSize(LS)
@@ -807,10 +885,51 @@ def makeCan(name, tag, histlist, bkglist=[],signals=[],colors=[],titles=[],logy=
                 if logy == True:
                     mains[hist_index].SetLogy()
 
+                CMS_lumi.CMS_lumi(thisPad, year, 11)
+
+    # CMS_lumi.CMS_lumi(myCan, year, 11)
+
     if rootfile:
-        myCan.Print(tag+'plots/'+name+'.root','root')
+        myCan.Print(tag+'/'+name+'.root','root')
     else:
-        myCan.Print(tag+'plots/'+name+'.png','png')
+        myCan.Print(tag+'/'+name+'.pdf','pdf')
+        myCan.Print(tag+'/'+name+'.png','png')
+
+
+def reducedCorrMatrixHist(fit_result,varsOfInterest=[]):
+    ROOT.gStyle.SetOptStat(0)
+    # ROOT.gStyle.SetPaintTextFormat('.3f')
+    CM = fit_result.correlationMatrix()
+    finalPars = fit_result.floatParsFinal()
+
+    nParams = CM.GetNcols()
+    finalParamsDict = {}
+    for cm_index in range(nParams):
+        if varsOfInterest == []:
+            if 'Fail_' not in finalPars.at(cm_index).GetName():
+                finalParamsDict[finalPars.at(cm_index).GetName()] = cm_index
+        else:
+            if finalPars.at(cm_index).GetName() in varsOfInterest:
+                finalParamsDict[finalPars.at(cm_index).GetName()] = cm_index
+
+    nFinalParams = len(finalParamsDict.keys())
+    out = TH2D('correlation_matrix','correlation_matrix',nFinalParams,0,nFinalParams,nFinalParams,0,nFinalParams)
+    out_txt = open('correlation_matrix.txt','w')
+
+    for out_x_index, paramXName in enumerate(sorted(finalParamsDict.keys())):
+        cm_index_x = finalParamsDict[paramXName]
+        for out_y_index, paramYName in enumerate(sorted(finalParamsDict.keys())):
+            cm_index_y = finalParamsDict[paramYName]
+            if cm_index_x > cm_index_y:
+                out_txt.write('%s:%s = %s\n'%(paramXName,paramYName,CM[cm_index_x][cm_index_y]))
+            out.Fill(out_x_index+0.5,out_y_index+0.5,CM[cm_index_x][cm_index_y])
+
+        out.GetXaxis().SetBinLabel(out_x_index+1,finalPars.at(cm_index_x).GetName())
+        out.GetYaxis().SetBinLabel(out_x_index+1,finalPars.at(cm_index_x).GetName())
+    out.SetMinimum(-1)
+    out.SetMaximum(+1)
+
+    return out
 
 def FindCommonString(string_list):
     to_match = ''   # initialize the string we're looking for/building
@@ -925,6 +1044,96 @@ def make_smooth_graph(h2,h3):
             h2.GetPoint(npoints-b+1, x1, y1)
         h3.SetPoint(npoints+b, x1, y1)
     return h3
+
+def Condor(runscript):
+    dir_base = os.environ['CMSSW_BASE']+'/src/2DAlphabet/'
+
+    commands = []
+
+    # tar_cmd = "tar czvf tarball.tgz --directory="+dir_base+" "
+    # for t in tarFilesList: tar_cmd+=t+' '
+    # commands.append(tar_cmd)
+
+    # Make JDL from template
+    timestr = time.strftime("%Y%m%d-%H%M%S")
+    out_jdl = 'temp_'+timestr+'_jdl'
+    commands.append("sed 's$TEMPSCRIPT$"+runscript+"$g' "+dir_base+"condor/templates/jdl_template_noargs > "+out_jdl)
+    commands.append('mkdir notneeded')
+    commands.append("condor_submit "+out_jdl)
+    commands.append("mv "+out_jdl+" "+dir_base+"condor/jdls/")
+
+    # commands.append("condor_q lcorcodi")
+
+    for s in commands:
+        print s
+        subprocess.call([s],shell=True)
+
+def StatsForCondor(run_name,toyDict,tarFilesList,commands,files_to_grab=[]):
+    if len(files_to_grab) == 0:
+        files_to_grab = ['higgsCombine'+run_name+'*.*.mH120.*.root','fitDiagnostics'+run_name+'*.root']
+    ntoys = toyDict['ntoys']
+    toys_per_job = toyDict['toys_per_job']
+    jobs = toyDict['toyjobs']
+    seed = toyDict['seed']
+
+    executeCmd('mkdir condor_'+run_name)
+    executeCmd('rm condor_'+run_name+'/*')
+
+    with cd('condor_'+run_name):
+        # Ship along a post-processing script to grab the output from condor
+        tar_cmd = "tar czvf tarball.tgz --directory="+os.environ['CMSSW_BASE']+'/src/2DAlphabet/'+" "
+        for t in tarFilesList: tar_cmd+=t+' '
+        executeCmd(tar_cmd)
+
+        out_tar_cmd = 'tar -czvf '+run_name+'.tgz '
+        for f in files_to_grab: out_tar_cmd+=f+' '
+
+        if jobs > 1:
+            for i in range(jobs):
+                executeCmd('cp '+os.environ['CMSSW_BASE']+'/src/2DAlphabet/condor/templates/run_combine.sh run_combine_%s.sh'%(i))
+                this_run_file = open('run_combine_%s.sh'%(i),'a+')
+
+                this_seed = random.randint(100000,999999)
+                this_run_name = run_name+'_%s'%(this_seed)
+
+                these_commands = []
+                for cmd in commands:
+                    this_command = cmd.replace('-t '+str(ntoys),'-t '+str(toys_per_job))
+                    this_command = this_command.replace('-n '+run_name,'-n '+this_run_name)
+                    this_command = this_command.replace('-s '+str(seed),'-s '+str(this_seed))
+                    # this_command = this_command.replace('-d '+workspace_name,'-d '+projDir+'/'+workspace_name)
+                    this_command = this_command.replace('.'+str(seed)+'.','.'+str(this_seed)+'.')
+                    this_command = this_command.replace('higgsCombine'+run_name,'higgsCombine'+this_run_name)
+                    these_commands.append(this_command)
+
+                this_run_file.write('\n')
+                for c in these_commands:
+                    this_run_file.write(c+'\n')
+                this_run_file.write(out_tar_cmd.replace(run_name+'.tgz',run_name+'_'+str(this_seed)+'.tgz')+'\n')
+                this_run_file.write('cp '+this_run_name+'.tgz $CMSSW_BASE/../')
+                this_run_file.close()
+                Condor('run_combine_%s.sh'%(i))
+                
+        else:
+            executeCmd('cp '+os.environ['CMSSW_BASE']+'/src/2DAlphabet/condor/templates/run_combine.sh run_combine.sh')
+            this_run_file = open('run_combine.sh','a+')
+            this_run_file.write('\n')
+            for c in commands:
+                this_run_file.write(c+'\n')
+            this_run_file.write(out_tar_cmd+'\n')
+            this_run_file.write('cp '+run_name+'.tgz $CMSSW_BASE/../')
+            this_run_file.close()
+            Condor('run_combine.sh')
+
+def makeShellFinisher(identifier,files_to_grab):
+    tar_cmd = 'tar -czvf '+identifier+'.tgz '
+    for f in files_to_grab: tar_cmd+=f+' '
+    shell_finisher = open('shell_finisher.sh','w')
+    shell_finisher.write('#!/bin/sh\n')
+    shell_finisher.write('echo "'+tar_cmd+'" \n')
+    shell_finisher.write(tar_cmd+'\n')
+    shell_finisher.write('cp '+identifier+'.tgz $CMSSW_BASE/../')
+    shell_finisher.close()
 
 # Built to wait for condor jobs to finish and then check that they didn't fail
 # The script that calls this function will quit if there are any job failures

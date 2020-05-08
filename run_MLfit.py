@@ -12,6 +12,10 @@ parser.add_option('-q', '--tag', metavar='F', type='string', action='store',
                 default =   '',
                 dest    =   'quicktag',
                 help    =   'Assigns a tag for this run')
+parser.add_option('-s', '--setParameter', metavar='F', type='string', action='store',
+                default =   '',
+                dest    =   'setParameter',
+                help    =   'String of parameters to set pre-fit. Uses same comma separated format as Combine (V1=1.0,V2=1.0...)')
 parser.add_option('--rMin', metavar='F', type='string', action='store',
                 default =   '0',
                 dest    =   'rMin',
@@ -32,14 +36,19 @@ parser.add_option("--skipPlots", action="store_true",
                 default =   False,
                 dest    =   "skipPlots",
                 help    =   "Skip plotting")
-parser.add_option("--plotOn", metavar='F', type='string', action='store',
-                default =   '',
-                dest    =   "plotOn",
-                help    =   "Plot the fit result of this fit onto the workspace from project in directory provided")
 
 (options, args) = parser.parse_args()
+inputConfigsAndArgs = args
 
-inputConfigs = args
+# Assign and summarize input
+stringSwaps = {}
+inputConfigs = []
+for i,c in enumerate(inputConfigsAndArgs):
+    if ':' in c: # specify string swap
+        stringSwaps[c.split(':')[0]] = c.split(':')[1]
+        print c.split(':')[0] +' = '+c.split(':')[1]
+    elif '.json' in c:
+        inputConfigs.append(c)
 
 print 'Setting on-fly parameters:'
 print '\ttag\t\t = '+options.quicktag
@@ -52,76 +61,90 @@ for i in inputConfigs:
 twoDinstances = []
 
 # If simultaneous fit
-if len(inputConfigs) > 1:
-    # Instantiate all class instances
-    for i in inputConfigs:
-        instance = TwoDAlphabet(i,options.quicktag,options.recycleAll)
-        twoDinstances.append(instance)
+# if len(inputConfigs) > 1:
+##############
+# Instantiate all class instances
+for i in inputConfigs:
+    instance = TwoDAlphabet(i,options.quicktag,options.recycleAll,stringSwaps=stringSwaps)
+    twoDinstances.append(instance)
 
-    # For each instance, check tags match and if they don't, ask the user for one
-    for t in twoDinstances:
-        if t.tag != twoDinstances[0].tag:
-            print 'ERROR: tags in configuration files do not match. '+t.tag+' does not match '+twoDinstances[0].tag+'. Please make sure they match and try again. Quitting...'
-            quit()
-    thistag = twoDinstances[0].tag
+# For each instance, check tags match and if they don't, ask the user for one
+for t in twoDinstances:
+    if t.tag != twoDinstances[0].tag:
+        print 'ERROR: tags in configuration files do not match. '+t.tag+' does not match '+twoDinstances[0].tag+'. Please make sure they match and try again. Quitting...'
+        quit()
+thistag = twoDinstances[0].tag
 
-    # Combine the cards
-    print 'cd ' + thistag
+# Combine the cards
+print 'cd ' + thistag
+with header.cd(thistag):
+    card_combination_command = 'combineCards.py'
+    for i in twoDinstances:
+        card_combination_command += ' '+i.name+'/card_'+i.name+'.txt'
+    card_combination_command += ' > card_'+thistag+'.txt'
+
+    print 'Executing ' + card_combination_command
+    subprocess.call([card_combination_command],shell=True)
+    for num in range(1,len(twoDinstances)+1):
+        subprocess.call(["sed -i 's/ch"+str(num)+"_//g' card_"+thistag+".txt"],shell=True)
+
+if not options.skipFit:
+    runMLFit(twoDinstances,options.rMin,options.rMax,systsToSet=options.setParameter,skipPlots=options.skipPlots)
+
+# Plot
+if not options.skipPlots:
     with header.cd(thistag):
-        card_combination_command = 'combineCards.py'
-        for i in twoDinstances:
-            card_combination_command += ' '+i.name+'/card_'+i.name+'.txt'
-        card_combination_command += ' > card_'+thistag+'.txt'
+        covMtrx_File = TFile.Open('fitDiagnostics.root')
+        fit_result = covMtrx_File.Get("fit_b")
+        corrMtrx = header.reducedCorrMatrixHist(fit_result)
+        corrMtrxCan = TCanvas('c','c',1400,1000)
+        corrMtrxCan.cd()
+        corrMtrxCan.SetBottomMargin(0.22)
+        corrMtrxCan.SetLeftMargin(0.17)
+        corrMtrxCan.SetTopMargin(0.06)
 
-        print 'Executing ' + card_combination_command
-        subprocess.call([card_combination_command],shell=True)
-        for num in range(1,len(twoDinstances)+1):
-            subprocess.call(["sed -i 's/ch"+str(num)+"_//g' card_"+thistag+".txt"],shell=True)
-
-    if not options.skipFit:
-        runMLFit(twoDinstances,options.rMin,options.rMax,skipPlots=options.skipPlots)
-
-    # Plot
-    if not options.skipPlots:
-        for t in twoDinstances:
-            try:
-                t.plotFitResults('b',simfit=True)
-            except Exception as exc:
-                print traceback.format_exc()
-                print exc
-                print 'Failed to run b plots for '+t.name
-            try:
-                t.plotFitResults('s',simfit=True)
-            except Exception as exc:
-                print traceback.format_exc()
-                print exc
-                print 'Failed to run s plots for '+t.name
+        corrMtrx.Draw('colz')
+        corrMtrxCan.Print('correlation_matrix.png','png')
 
     for t in twoDinstances:
-        del t
+        try:
+            t.plotFitResults('b')
+        except Exception as exc:
+            print traceback.format_exc()
+            print exc
+            print 'Failed to run b plots for '+t.name
+        try:
+            t.plotFitResults('s')
+        except Exception as exc:
+            print traceback.format_exc()
+            print exc
+            print 'Failed to run s plots for '+t.name
 
+# for t in twoDinstances:
+#     del t
+#########
 # If single fit
-else:
-    instance = TwoDAlphabet(inputConfigs[0],options.quicktag,options.recycleAll)
+# else:
+#     instance = TwoDAlphabet(inputConfigs[0],options.quicktag,options.recycleAll,stringSwaps=stringSwaps)
     
-    if not options.skipFit:
-        runMLFit([instance],options.rMin,options.rMax,skipPlots=options.skipPlots)
-    thistag = instance.projPath
+#     if not options.skipFit:
+#         runMLFit([instance],options.rMin,options.rMax,systsToSet=options.setParameter,skipPlots=options.skipPlots)
+#     thistag = instance.projPath
 
-    # Plot
-    if not options.skipPlots:
-        try:
-            instance.plotFitResults('b')
-        except Exception as exc:
-            print traceback.format_exc()
-            print exc
-            print 'Failed to run b plots for '+instance.name
-        try:
-            instance.plotFitResults('s')
-        except Exception as exc:
-            print traceback.format_exc()
-            print exc
-            print 'Failed to run s plots for '+instance.name
+#     # Plot
+#     if not options.skipPlots:
+#         try:
+#             instance.plotFitResults('b')
+#         except Exception as exc:
+#             print traceback.format_exc()
+#             print exc
+#             print 'Failed to run b plots for '+instance.name
+#         try:
+#             instance.plotFitResults('s')
+#         except Exception as exc:
+#             print traceback.format_exc()
+#             print exc
+#             print 'Failed to run s plots for '+instance.name
 
-    del instance
+#     del instance
     

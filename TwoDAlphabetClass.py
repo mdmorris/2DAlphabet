@@ -76,12 +76,16 @@ class TwoDAlphabet:
         self.overwrite = self._getOption('overwrite')
         self.recycle = self._getOption('recycle')
         self.plotTogether = self._getOption('plotTogether')
+        self.rpfRatio = self._getOption('rpfRatio')
+        self.year = self._getOption('year')
+        self.plotPrefitSigInFitB = self._getOption('plotPrefitSigInFitB')
+        self.recycleAll = recycleAll
 
         # Setup a directory to save
         self.projPath = self._projPath()
 
         # Pickle reading if recycling
-        if self.recycle != [] or recycleAll:
+        if self.recycle != [] or self.recycleAll:
             self.pickleFile = pickle.load(open(self.projPath+'saveOut.p','rb'))
         
         # Dict to pickle at the end
@@ -94,7 +98,7 @@ class TwoDAlphabet:
         # Replace signal with command specified
 
         # Global var replacement
-        if not recycleAll or 'runConfig' not in self.recycle:
+        if not self.recycleAll or 'runConfig' not in self.recycle:
             self._configGlobalVarReplacement()
         else:
             self.inputConfig = self._readIn('runConfig')
@@ -113,22 +117,18 @@ class TwoDAlphabet:
 
         print self.fullXbins
 
-        # Make systematic uncertainty plots
-        if self.plotUncerts and not recycleAll:
-            self._makeSystematicPlots()
-
         # Run pseudo2D for fit guesses and make the config to actually run on
-        if ("runConfig" not in self.recycle and not recycleAll):
-            self._makeFitGuesses()
+        if ("runConfig" not in self.recycle and not self.recycleAll):
+            if self.fitGuesses: self._makeFitGuesses()
 
         # Initialize rpf class
-        if 'organizedDict' not in self.recycle and not recycleAll:
+        if 'organizedDict' not in self.recycle and not self.recycleAll:
         #     self.rpf = self._readIn('rpf')
         # else:
-            self.rpf = RpfHandler.RpfHandler(self.inputConfig['FIT'],self.name)
+            self.rpf = RpfHandler.RpfHandler(self.inputConfig['FIT'],self.name,self._dummyTH2(),self.tag)
 
         # Organize everything for workspace building
-        if 'organizedDict' in self.recycle or recycleAll:
+        if 'organizedDict' in self.recycle or self.recycleAll:
             self.organizedDict = self._readIn('organizedDict')
             self.orgFile = TFile.Open(self.projPath+'organized_hists.root') # have to save out the histograms to keep them persistent past this function
         else:
@@ -136,22 +136,26 @@ class TwoDAlphabet:
             self.organizedDict = {}
             self._inputOrganizer()
 
+        # Make systematic uncertainty plots
+        if self.plotUncerts and not self.recycleAll:
+            self._makeSystematicPlots()
+
         # Build the workspace
-        if 'workspace' in self.recycle or recycleAll:
+        if 'workspace' in self.recycle or self.recycleAll:
             self.workspace = self._readIn('workspace')
             self.floatingBins = self._readIn('floatingBins')
         else:
             self._buildFitWorkspace()
 
         # Make the card
-        if 'card' not in self.recycle and not recycleAll:
+        if 'card' not in self.recycle and not self.recycleAll:
             self._makeCard()
 
         # Do a prerun where we fit just this pass-fail pair and set the rpf to result
-        if self.prerun:
+        if self.prerun and not self.recycleAll:
             print 'Pre-running '+self.tag+' '+self.name+' to get a better estimate of the transfer function'
             self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
-            runMLFit([self],'0','5',skipPlots=True)    
+            runMLFit([self],'0','5','',skipPlots=True,prerun=True)    
             prerun_file = TFile.Open(self.projPath+'/fitDiagnostics.root')
             if prerun_file:
                 if prerun_file.GetListOfKeys().Contains('fit_b'):
@@ -175,7 +179,7 @@ class TwoDAlphabet:
                 raw_input('WARNING: Pre-run for '+self.tag+' '+self.name+'failed. Using original Rp/f parameters. Press any key to continue.')
 
         # Save out at the end
-        if not recycleAll:
+        if not self.recycleAll:
             self._saveOut()
             pickle.dump(self.pickleDict, open(self.projPath+'saveOut.p','wb'))
 
@@ -216,7 +220,7 @@ class TwoDAlphabet:
             
             if old_string != "HELP":                                            # For each key in GLOBAL that is not HELP
                 for mainkey in self.inputConfig.keys():                         # For each main (top level) key in config that isn't GLOBAL
-                    if mainkey != 'GLOBAL' and mainkey != 'OPTIONS':            # Mainkeys are all unchangeable (uppercase) so no check performed
+                    if mainkey != 'GLOBAL':            # Mainkeys are all unchangeable (uppercase) so no check performed
                         for subkey in self.inputConfig[mainkey].keys():         # For each subkey of main key dictionary
                             if old_string in subkey:                            # Check subkey for old_string
                                 self.inputConfig[mainkey][subkey.replace(old_string,new_string)] = self.inputConfig[mainkey].pop(subkey)  # replace it
@@ -224,7 +228,7 @@ class TwoDAlphabet:
 
                             # If the subkey value is not a dict, then check one more time
                             if type(self.inputConfig[mainkey][subkey]) != dict:
-                                if old_string in self.inputConfig[mainkey][subkey]:
+                                if type(self.inputConfig[mainkey][subkey]) == str and old_string in self.inputConfig[mainkey][subkey]:
                                     self.inputConfig[mainkey][subkey] = self.inputConfig[mainkey][subkey].replace(old_string,new_string)
                             # If it is a dict, go deeper
                             else:
@@ -237,6 +241,9 @@ class TwoDAlphabet:
                                         if old_string in self.inputConfig[mainkey][subkey][subsubkey]:                               # check subsubkey val
                                             self.inputConfig[mainkey][subkey][subsubkey] = self.inputConfig[mainkey][subkey][subsubkey].replace(old_string,new_string) # replace it
 
+    def _dummyTH2(self): # stores binning of space
+        dummyTH2 = TH2F('dummyTH2','dummyTH2',len(self.fullXbins)-1,array.array('d',self.fullXbins),len(self.newYbins)-1,array.array('d',self.newYbins))
+        return dummyTH2
 
     def _getRRVs(self):
         xRRVs = {}
@@ -423,16 +430,20 @@ class TwoDAlphabet:
             print 'WARNING: '+optionName+' boolean not set explicitely. Default to True.'
             option_return = True
         # Default to false
-        elif optionName in ['freezeFail','fitGuesses','plotUncerts','prerun']:
+        elif optionName in ['freezeFail','fitGuesses','plotUncerts','prerun','rpfRatio','plotPrefitSigInFitB']:
             print 'WARNING: '+optionName+' boolean not set explicitely. Default to False.'
             option_return = False
         elif optionName == 'verbosity':
             option_return = 0
+        elif optionName == 'year':
+            option_return = 1
         else:
-            print 'WARNING: '+optionName+' boolean not set explicitely. Default to False.'
-            option_return = False
             if optionName == 'recycle':
+                print 'WARNING: '+optionName+' boolean not set explicitely. Default to [].'
                 option_return = []
+            else:
+                print 'WARNING: '+optionName+' boolean not set explicitely. Default to False.'
+                option_return = False
             
 
         return option_return
@@ -506,72 +517,131 @@ class TwoDAlphabet:
 
                     print proc + '_'+syst
 
-                    # If code 2 or 3 (shape based), grab the up and down shapes for passing and project onto the Y axis
-                    if self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 2:
-                        thisFile = TFile.Open(self.inputConfig['PROCESS'][proc]['FILE'])
-                        passUp2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS_UP'])
-                        passDown2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS_DOWN'])
-                        passUp = passUp2D.ProjectionY(proc + '_'+syst,21,28)
-                        passDown = passDown2D.ProjectionY(proc + '_'+syst+'_down',21,28)
+                    if self.inputConfig['SYSTEMATIC'][syst]['CODE'] < 2: continue
 
-                    elif self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 3:
-                        if 'FILE_UP_'+proc in self.inputConfig['SYSTEMATIC'][syst]:
-                            thisFileUp = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_UP_'+proc])
-                            thisFileDown = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_DOWN_'+proc])
+                    tracking_dict = {
+                        "pass": {
+                            "X": {"nom": None, "up": None, "down": None},
+                            "Y": {"nom": None, "up": None, "down": None}
+                        },
+                        "fail": {
+                            "X": {"nom": None, "up": None, "down": None},
+                            "Y": {"nom": None, "up": None, "down": None}
+                        }
+                    }
 
-                        elif 'FILE_UP_*' in self.inputConfig['SYSTEMATIC'][syst]:
-                            thisFileUp = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_UP_*'].replace('*',proc))
-                            thisFileDown = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_DOWN_*'].replace('*',proc))
+                    for r in ['pass','fail']:
+                        for v in ['nom','up','down']:
+                            for x in ['X','Y']:
+                                if x == 'Y': 
+                                    reg = 'SIG'
+                                    if v == 'nom': tracking_dict[r][x][v] = self.orgFile.Get(self.organizedDict[proc][r+'_'+reg]['nominal']).ProjectionY(proc +'_'+r+ '_'+syst+'_'+x+'_'+v)
+                                    else: tracking_dict[r][x][v] = self.orgFile.Get(self.organizedDict[proc][r+'_'+reg][syst+v.capitalize()]).ProjectionY(proc +'_'+r+ '_'+syst+'_'+x+'_'+v)
 
-                        else:
-                            print 'Could not identify file for ' + proc +', '+syst
+                                elif x == 'X': 
+                                    reg = 'FULL'
+                                    if v == 'nom': tracking_dict[r][x][v] = self.orgFile.Get(self.organizedDict[proc][r+'_'+reg]['nominal']).ProjectionX(proc +'_'+r+ '_'+syst+'_'+x+'_'+v)
+                                    else: tracking_dict[r][x][v] = self.orgFile.Get(self.organizedDict[proc][r+'_'+reg][syst+v.capitalize()]).ProjectionX(proc +'_'+r+ '_'+syst+'_'+x+'_'+v)
 
-                        passUp = thisFileUp.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionY(proc + '_'+syst,21,28)
-                        passDown = thisFileDown.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionY(proc + '_'+syst+'_down',21,28)
+                    # self.orgFile.Get(self.organizedDict['data_obs']['fail_'+c]['nominal'])
 
-                    else:
-                        continue
+                    # # If code 2 or 3 (shape based), grab the up and down shapes for passing and project onto the Y axis
+                    # if self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 2:
+                    #     thisFile = TFile.Open(self.inputConfig['PROCESS'][proc]['FILE'])
+                    #     passUp2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS_UP'])
+                    #     passDown2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS_DOWN'])
+                    #     passUpY = passUp2D.ProjectionY(proc + '_pass_'+syst+'_y_up',x_sigstart_bin,x_sigend_bin)
+                    #     passDownY = passDown2D.ProjectionY(proc + '_pass_'+syst+'_y_down',x_sigstart_bin,x_sigend_bin)
+                    #     passUpX = passUp2D.ProjectionX(proc + '_pass_'+syst+'_x_up')
+                    #     passDownX = passDown2D.ProjectionX(proc + '_pass_'+syst+'_x_down')
 
-                    # Setup the nominal shape (consistent across all of the pltos)
-                    fileNom = TFile.Open(self.inputConfig['PROCESS'][proc]['FILE'])
-                    passNom = fileNom.Get(self.inputConfig['PROCESS'][proc]['HISTPASS']).ProjectionY(proc + '_'+syst+'_nom',21,28)
+                    #     failUp2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTFAIL_UP'])
+                    #     failDown2D = thisFile.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTFAIL_DOWN'])
+                    #     failUpY = failUp2D.ProjectionY(proc + '_fail_'+syst+'_y_up',x_sigstart_bin,x_sigend_bin)
+                    #     failDownY = failDown2D.ProjectionY(proc + '_fail_'+syst+'_y_down',x_sigstart_bin,x_sigend_bin)
+                    #     failUpX = failUp2D.ProjectionX(proc + '_fail_'+syst+'_x_up')
+                    #     failDownX = failDown2D.ProjectionX(proc + '_fail_'+syst+'_x_down')
 
-                    thisCan = TCanvas('canvas_'+proc+'_'+syst,'canvas_'+proc+'_'+syst,700,600)
-                    thisCan.cd()
-                    passNom.SetLineColor(kBlack)
-                    passNom.SetFillColor(kYellow-9)
-                    passUp.SetLineColor(kRed)
-                    passDown.SetLineColor(kBlue)
+                    # elif self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 3:
+                    #     if 'FILE_UP_'+proc in self.inputConfig['SYSTEMATIC'][syst]:
+                    #         thisFileUp = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_UP_'+proc])
+                    #         thisFileDown = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_DOWN_'+proc])
 
-                    passUp.SetLineStyle(9)
-                    passDown.SetLineStyle(9)
-                    passUp.SetLineWidth(2)
-                    passDown.SetLineWidth(2)
+                    #     elif 'FILE_UP_*' in self.inputConfig['SYSTEMATIC'][syst]:
+                    #         thisFileUp = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_UP_*'].replace('*',proc))
+                    #         thisFileDown = TFile.Open(self.inputConfig['SYSTEMATIC'][syst]['FILE_DOWN_*'].replace('*',proc))
 
-                    histList = [passNom,passUp,passDown]
+                    #     else:
+                    #         print 'Could not identify file for ' + proc +', '+syst
 
-                    # Set the max of the range so we can see all three histograms on the same plot
-                    yMax = histList[0].GetMaximum()
-                    maxHist = histList[0]
-                    for h in range(1,len(histList)):
-                        if histList[h].GetMaximum() > yMax:
-                            yMax = histList[h].GetMaximum()
-                            maxHist = histList[h]
-                    for h in histList:
-                        h.SetMaximum(yMax*1.1)
+                    #     passUpY = thisFileUp.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionY(proc + '_pass_'+syst+'_y_up',x_sigstart_bin,x_sigend_bin)
+                    #     passDownY = thisFileDown.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionY(proc + '_pass_'+syst+'_y_down',x_sigstart_bin,x_sigend_bin)
+                    #     passUpX = thisFileUp.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionX(proc + '_pass_'+syst+'_x_up')
+                    #     passDownX = thisFileDown.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTPASS']).ProjectionX(proc + '_pass_'+syst+'_x_down')
 
-                    passNom.SetXTitle(self.inputConfig['BINNING']['Y']['TITLE'])
-                    # passUp.SetXTitle(inputConfig['BINNING']['Y']['TITLE'])
-                    # passDown.SetXTitle(inputConfig['BINNING']['Y']['TITLE'])
-                    passNom.SetTitle(proc + ' - ' + syst + ' uncertainty')
-                    passNom.SetTitleOffset(1.2,"X")
+                    #     failUpY = thisFileUp.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTFAIL']).ProjectionY(proc + '_fail_'+syst+'_y_up',x_sigstart_bin,x_sigend_bin)
+                    #     failDownY = thisFileDown.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTFAIL']).ProjectionY(proc + '_fail_'+syst+'_y_down',x_sigstart_bin,x_sigend_bin)
+                    #     failUpX = thisFileUp.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTFAIL']).ProjectionX(proc + '_fail_'+syst+'_x_up')
+                    #     failDownX = thisFileDown.Get(self.inputConfig['SYSTEMATIC'][syst]['HISTFAIL']).ProjectionX(proc + '_fail_'+syst+'_x_down')
 
-                    passNom.Draw('hist')
-                    passUp.Draw('same hist')
-                    passDown.Draw('same hist')
-                    
+                    # else:
+                    #     continue
 
-                    thisCan.Print(self.projPath+'/UncertPlots/Uncertainty_'+proc+'_'+syst+'.pdf','pdf')
+                    # # Setup the nominal shape (consistent across all of the pltos)
+                    # fileNom = TFile.Open(self.inputConfig['PROCESS'][proc]['FILE'])
+                    # passNomY = fileNom.Get(self.inputConfig['PROCESS'][proc]['HISTPASS']).ProjectionY(proc + '_pass_'+syst+'_y_nom',x_sigstart_bin,x_sigend_bin)
+                    # passNomX = fileNom.Get(self.inputConfig['PROCESS'][proc]['HISTPASS']).ProjectionX(proc + '_pass_'+syst+'_x_nom')
+                    # failNomY = fileNom.Get(self.inputConfig['PROCESS'][proc]['HISTFAIL']).ProjectionY(proc + '_fail_'+syst+'_y_nom',x_sigstart_bin,x_sigend_bin)
+                    # failNomX = fileNom.Get(self.inputConfig['PROCESS'][proc]['HISTFAIL']).ProjectionX(proc + '_fail_'+syst+'_x_nom')
+
+                    for i,r in enumerate(['fail','pass']):
+                        for j,x in enumerate(['X','Y']):
+                            thisCan = TCanvas('canvas_'+proc+'_'+syst,'canvas_'+proc+'_'+syst,800,700)
+                            ipad = i+j+1
+
+                            thisPad = tracking_dict[r][x]
+                            nom = thisPad['nom']
+                            up = thisPad['up']
+                            down = thisPad['down']
+
+                            nom.SetLineColor(kBlack)
+                            nom.SetFillColor(kYellow-9)
+                            up.SetLineColor(kRed)
+                            down.SetLineColor(kBlue)
+
+                            up.SetLineStyle(9)
+                            down.SetLineStyle(9)
+                            up.SetLineWidth(2)
+                            down.SetLineWidth(2)
+
+                            histList = [nom,up,down]
+
+                            # Set the max of the range so we can see all three histograms on the same plot
+                            yMax = histList[0].GetMaximum()
+                            maxHist = histList[0]
+                            for h in range(1,len(histList)):
+                                if histList[h].GetMaximum() > yMax:
+                                    yMax = histList[h].GetMaximum()
+                                    maxHist = histList[h]
+                            for h in histList:
+                                h.SetMaximum(yMax*1.1)
+
+                            if x == 'X': nom.SetXTitle(self.inputConfig['BINNING']['X']['TITLE'])
+                            elif x == 'Y': nom.SetXTitle(self.inputConfig['BINNING']['Y']['TITLE'])
+
+                            nom.SetTitle(proc + ' - ' + syst + ' uncertainty')
+                            nom.GetXaxis().SetTitleOffset(1.0)
+                            thisCan.SetRightMargin(0.16)
+                            # nom.SetTitleOffset(1.2,"X")
+
+                            nom.Draw('hist')
+                            # if proc == 'ttbar': raw_input(axis+' nom')
+                            up.Draw('same hist')
+                            # if proc == 'ttbar': raw_input(axis+' up')
+                            down.Draw('same hist')
+                            # if proc == 'ttbar': raw_input(axis+' down')
+                            
+                            thisCan.Print(self.projPath+'/UncertPlots/Uncertainty_'+proc+'_'+syst+r+x+'.png','png')
 
     def _makeFitGuesses(self,nslices=6,sigma=5):
         # Grab everything
@@ -691,11 +761,11 @@ class TwoDAlphabet:
         print ybins_pseudo
 
         # Rebin x and y
-        rebinned_x_pass = header.copyHistWithNewXbins(data_pass,xbins_pseudo,'rebinned_x_pass',self.oldXwidth)
-        rebinned_x_fail = header.copyHistWithNewXbins(data_fail,xbins_pseudo,'rebinned_x_fail',self.oldXwidth)
+        rebinned_x_pass = header.copyHistWithNewXbins(data_pass,xbins_pseudo,'rebinned_x_pass')#,self.oldXwidth)
+        rebinned_x_fail = header.copyHistWithNewXbins(data_fail,xbins_pseudo,'rebinned_x_fail')#,self.oldXwidth)
 
-        rebinned_pass = header.copyHistWithNewYbins(rebinned_x_pass,ybins_pseudo,'rebinned_pass',self.oldYwidth)
-        rebinned_fail = header.copyHistWithNewYbins(rebinned_x_fail,ybins_pseudo,'rebinned_fail',self.oldYwidth)
+        rebinned_pass = header.copyHistWithNewYbins(rebinned_x_pass,ybins_pseudo,'rebinned_pass')#,self.oldYwidth)
+        rebinned_fail = header.copyHistWithNewYbins(rebinned_x_fail,ybins_pseudo,'rebinned_fail')#,self.oldYwidth)
 
         ######################################################
         #   Rebin the distributions according to new y bins  #
@@ -724,8 +794,8 @@ class TwoDAlphabet:
         Rpf = header.remapToUnity(RpfToRemap)
 
         # Plot comparisons out
-        header.makeCan('prefit_pass_fail',self.projPath,[final_pass,final_fail],xtitle=self.xVarName,ytitle=self.yVarName)
-        header.makeCan('prefit_rpf_lego',self.projPath,[RpfToRemap,Rpf],xtitle=self.xVarName,ytitle=self.yVarName)
+        header.makeCan('prefit_pass_fail',self.projPath,[final_pass,final_fail],xtitle=self.xVarName,ytitle=self.yVarName,year=self.year)
+        header.makeCan('prefit_rpf_lego',self.projPath,[RpfToRemap,Rpf],xtitle=self.xVarName,ytitle=self.yVarName,year=self.year)
 
         ###############################################
         # Determine fit function from the inputConfig #
@@ -871,8 +941,6 @@ class TwoDAlphabet:
                     for i,chunk in enumerate(chunkedProjX):
                         header.makeCan('fitSlices_'+str(i*6)+'-'+str(6*(i+1)),self.projPath,chunk,xtitle=self.xVarName)
 
-                pseudo2D_results.Close()
-
                 ########################################################
                 # And now fit these parameters as a function of y axis #
                 ########################################################
@@ -953,6 +1021,7 @@ class TwoDAlphabet:
                     quit()
 
             # Finally draw the surface
+            pseudo2D_results.Close()
             header.makeCan('pseudo2D_Rpf',self.projPath,[pseudo2D_Rpf],xtitle=self.xVarName,ytitle=self.yVarName)
 
     def _inputOrganizer(self):
@@ -966,8 +1035,11 @@ class TwoDAlphabet:
 
         # Grab all process names and loop through
         processes = [process for process in self.inputConfig['PROCESS'].keys() if process != "HELP"]
+        if self.rpfRatio != False: processes.append('qcdmc')
+
         for process in processes:
-            this_process_dict = self.inputConfig['PROCESS'][process]
+            if process == 'qcdmc': this_process_dict = self.inputConfig['OPTIONS']['rpfRatio']
+            else: this_process_dict = self.inputConfig['PROCESS'][process]
             
             dict_hists[process] = {  
                 'file': 0,
@@ -997,13 +1069,20 @@ class TwoDAlphabet:
                 hist_pass.Multiply(this_proc_scale_pass)
                 hist_fail.Multiply(this_proc_scale_fail)
 
+            # Smooth
+            if 'SMOOTH' in this_process_dict.keys() and this_process_dict['SMOOTH']: smooth_this = True# and self.inputConfig['OPTIONS']['rpfRatio'] != False and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']: smooth_this = True
+            else: smooth_this = False
+
+            if smooth_this:
+                hist_pass = header.smoothHist2D('smooth_'+process+'_pass',hist_pass,renormalize=False,iterate = 1 if process != 'qcdmc' else 3)
+                hist_fail = header.smoothHist2D('smooth_'+process+'_fail',hist_fail,renormalize=False,iterate = 1 if process != 'qcdmc' else 3)
+
             dict_hists[process]['file'] = file_nominal
             dict_hists[process]['pass']['nominal'] = hist_pass
             dict_hists[process]['fail']['nominal'] = hist_fail
 
-
             # If there are systematics
-            if len(this_process_dict['SYSTEMATICS']) == 0:
+            if process == 'qcdmc' or len(this_process_dict['SYSTEMATICS']) == 0:
                 print 'No systematics for process ' + process
             else:
                 # Loop through them and grab info from inputConfig['SYSTEMATIC']
@@ -1020,13 +1099,21 @@ class TwoDAlphabet:
                             print 'Quiting'
                             quit()
 
+                    # Handle case where pass and fail are uncorrelated
+                    if 'UNCORRELATED' in this_syst_dict and this_syst_dict['UNCORRELATED']:
+                        pass_syst = syst+'_pass'
+                        fail_syst = syst+'_fail'
+                    else:
+                        pass_syst = syst
+                        fail_syst = syst
 
-                    # Only care about syst (right now) if it's a shape (CODE == 2 or 3)
+                    # Only care about syst if it's a shape (CODE == 2 or 3)
                     if this_syst_dict['CODE'] == 2:   # same file as norm, different hist names
-                        dict_hists[process]['pass'][syst+'Up']   = file_nominal.Get(this_syst_dict['HISTPASS_UP'])
-                        dict_hists[process]['pass'][syst+'Down'] = file_nominal.Get(this_syst_dict['HISTPASS_DOWN'])
-                        dict_hists[process]['fail'][syst+'Up']   = file_nominal.Get(this_syst_dict['HISTFAIL_UP'])
-                        dict_hists[process]['fail'][syst+'Down'] = file_nominal.Get(this_syst_dict['HISTFAIL_DOWN'])
+
+                        dict_hists[process]['pass'][pass_syst+'Up']   = file_nominal.Get(this_syst_dict['HISTPASS_UP'])
+                        dict_hists[process]['pass'][pass_syst+'Down'] = file_nominal.Get(this_syst_dict['HISTPASS_DOWN'])
+                        dict_hists[process]['fail'][fail_syst+'Up']   = file_nominal.Get(this_syst_dict['HISTFAIL_UP'])
+                        dict_hists[process]['fail'][fail_syst+'Down'] = file_nominal.Get(this_syst_dict['HISTFAIL_DOWN'])
 
                     if this_syst_dict['CODE'] == 3:   # different file as norm and different files for each process if specified, same hist name if not specified in inputConfig
                         # User will most likely have different file for each process but maybe not so check
@@ -1049,42 +1136,58 @@ class TwoDAlphabet:
                         dict_hists[process]['file_'+syst+'Down'] = file_down
 
                         if 'HISTPASS_UP' in this_syst_dict:
-                            dict_hists[process]['pass'][syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP'])            # try to grab hist name from SYSTEMATIC dictionary
+                            dict_hists[process]['pass'][pass_syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP'])            # try to grab hist name from SYSTEMATIC dictionary
                         elif 'HISTPASS' in this_syst_dict:
-                            dict_hists[process]['pass'][syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS'])               # else use the same one as nominal distribution
+                            dict_hists[process]['pass'][pass_syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS'])               # else use the same one as nominal distribution
                         elif 'HISTPASS_UP_*' in this_syst_dict:
-                            dict_hists[process]['pass'][syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP_*'].replace('*',process))
+                            dict_hists[process]['pass'][pass_syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP_*'].replace('*',process))
                         else: 
-                            dict_hists[process]['pass'][syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP_'+process])   # or use process specific name
+                            dict_hists[process]['pass'][pass_syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP_'+process])   # or use process specific name
 
                         if 'HISTPASS_DOWN' in this_syst_dict:
-                            dict_hists[process]['pass'][syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS_DOWN'])
+                            dict_hists[process]['pass'][pass_syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS_DOWN'])
                         elif 'HISTPASS' in this_syst_dict:
-                            dict_hists[process]['pass'][syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS'])
+                            dict_hists[process]['pass'][pass_syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS'])
                         elif 'HISTPASS_DOWN_*' in this_syst_dict:
-                            dict_hists[process]['pass'][syst+'Down'] = file_up.Get(this_syst_dict['HISTPASS_DOWN_*'].replace('*',process))
+                            dict_hists[process]['pass'][pass_syst+'Down'] = file_up.Get(this_syst_dict['HISTPASS_DOWN_*'].replace('*',process))
                         else:
-                            dict_hists[process]['pass'][syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS_DOWN_' + process])
+                            dict_hists[process]['pass'][pass_syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS_DOWN_' + process])
 
                         if 'HISTFAIL_UP' in this_syst_dict:
-                            dict_hists[process]['fail'][syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP'])
+                            dict_hists[process]['fail'][fail_syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP'])
                         elif 'HISTFAIL' in this_syst_dict:
-                            dict_hists[process]['fail'][syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL'])
+                            dict_hists[process]['fail'][fail_syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL'])
                         elif 'HISTFAIL_UP_*' in this_syst_dict:
-                            dict_hists[process]['fail'][syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP_*'].replace('*',process))    
+                            dict_hists[process]['fail'][fail_syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP_*'].replace('*',process))    
                         else:
-                            dict_hists[process]['fail'][syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP_' + process])
+                            dict_hists[process]['fail'][fail_syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP_' + process])
 
                         if 'HISTFAIL_DOWN' in this_syst_dict:
-                            dict_hists[process]['fail'][syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL_DOWN'])
+                            dict_hists[process]['fail'][fail_syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL_DOWN'])
                         elif 'HISTFAIL' in this_syst_dict:
-                            dict_hists[process]['fail'][syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL'])
+                            dict_hists[process]['fail'][fail_syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL'])
                         elif 'HISTFAIL_DOWN_*' in this_syst_dict:
-                            dict_hists[process]['fail'][syst+'Down'] = file_up.Get(this_syst_dict['HISTFAIL_DOWN_*'].replace('*',process))
+                            dict_hists[process]['fail'][fail_syst+'Down'] = file_up.Get(this_syst_dict['HISTFAIL_DOWN_*'].replace('*',process))
                         else:
-                            dict_hists[process]['fail'][syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL_DOWN_' + process])
+                            dict_hists[process]['fail'][fail_syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL_DOWN_' + process])
 
-        
+                    if this_syst_dict['CODE'] > 1:
+                        if smooth_this:
+                            dict_hists[process]['pass'][pass_syst+'Up'] = header.smoothHist2D('smooth_'+process+'_pass_'+syst+'Up',dict_hists[process]['pass'][pass_syst+'Up'],renormalize=False)
+                            dict_hists[process]['pass'][pass_syst+'Down'] = header.smoothHist2D('smooth_'+process+'_pass_'+syst+'Down',dict_hists[process]['pass'][pass_syst+'Down'],renormalize=False)
+                            dict_hists[process]['fail'][fail_syst+'Up']   = header.smoothHist2D('smooth_'+process+'_fail_'+syst+'Up',dict_hists[process]['fail'][fail_syst+'Up'],renormalize=False)
+                            dict_hists[process]['fail'][fail_syst+'Down'] = header.smoothHist2D('smooth_'+process+'_fail_'+syst+'Down',dict_hists[process]['fail'][fail_syst+'Down'],renormalize=False)
+
+                        if "SCALE" in this_process_dict.keys():
+                            dict_hists[process]['pass'][pass_syst+'Up'].Scale(this_proc_scale)
+                            dict_hists[process]['pass'][pass_syst+'Down'].Scale(this_proc_scale)
+                            dict_hists[process]['fail'][fail_syst+'Up'].Scale(this_proc_scale)
+                            dict_hists[process]['fail'][fail_syst+'Down'].Scale(this_proc_scale)
+                        elif "SCALEPASS" in this_process_dict.keys() and "SCALEFAIL" in this_process_dict.keys():
+                            dict_hists[process]['pass'][pass_syst+'Up'].Multiply(this_proc_scale_pass)
+                            dict_hists[process]['pass'][pass_syst+'Down'].Multiply(this_proc_scale_pass)
+                            dict_hists[process]['fail'][fail_syst+'Up'].Multiply(this_proc_scale_fail)
+                            dict_hists[process]['fail'][fail_syst+'Down'].Multiply(this_proc_scale_fail)
 
         #####################################################################
         # With dictionary made, we can split around the signal region and   #
@@ -1112,7 +1215,7 @@ class TwoDAlphabet:
 
         # For each process, category, and dist (nominal, systUp, etc)
         for process in dict_hists.keys():
-            self.organizedDict[process] = {'pass_LOW':{}, 'pass_SIG':{}, 'pass_HIGH':{}, 'fail_LOW':{}, 'fail_SIG':{}, 'fail_HIGH':{}}
+            self.organizedDict[process] = {'pass_FULL':{}, 'pass_LOW':{}, 'pass_SIG':{}, 'pass_HIGH':{}, 'fail_FULL':{}, 'fail_LOW':{}, 'fail_SIG':{}, 'fail_HIGH':{}}
             for cat in ['pass','fail']:
                 for dist in dict_hists[process][cat].keys():
                     print 'Making ' + process +', ' + cat + ', ' + dist
@@ -1124,18 +1227,19 @@ class TwoDAlphabet:
 
                     # If there are user specified y bins...
                     if self.newYbins != False:
-                        temp_hist = header.copyHistWithNewYbins(dict_hists[process][cat][dist],self.newYbins,temp_histname,self.oldYwidth)
+                        temp_hist = header.copyHistWithNewYbins(dict_hists[process][cat][dist],self.newYbins,temp_histname)#,self.oldYwidth)
                     else:
                         temp_hist = dict_hists[process][cat][dist]
 
                     # If there are user specified x bins...
-                    for c in ['LOW','SIG','HIGH']: 
+                    for c in ['FULL','LOW','SIG','HIGH']: 
                         # Get new names
                         histname = process + '_' + cat+'_'+c+'_'+self.name
                         if dist != 'nominal':                           # if not nominal dist
                             histname = histname + '_' + dist
                         print 'Making '+histname
-                        finalhist = header.copyHistWithNewXbins(temp_hist,self.newXbins[c],histname,self.oldYwidth)
+                        if c != 'FULL': finalhist = header.copyHistWithNewXbins(temp_hist,self.newXbins[c],histname)#,self.oldYwidth)
+                        else: finalhist = header.copyHistWithNewXbins(temp_hist,self.fullXbins,histname)
 
                         # Test if histogram is non-zero
                         if finalhist.Integral() <= 0:
@@ -1197,6 +1301,20 @@ class TwoDAlphabet:
         for r in ['pass','fail']:
             for c in ['LOW','SIG','HIGH']:
                 Roo_dict['qcd'][r+'_'+c] = {}
+
+        TH2_qcdmc_ratios = {}
+        if self.rpfRatio != False:
+            TH2_qcdmc_fail = self.orgFile.Get(self.organizedDict['qcdmc']['fail_FULL']['nominal'])
+            TH2_qcdmc_pass = self.orgFile.Get(self.organizedDict['qcdmc']['pass_FULL']['nominal'])
+            TH2_qcdmc_ratios['FULL'] = TH2_qcdmc_pass.Clone('qcdmc_rpf_full')
+            TH2_qcdmc_ratios['FULL'].Divide(TH2_qcdmc_fail)
+            TH2_qcdmc_ratios['FULL'] = header.smoothHist2D('qcdmc_rpf_full_smooth',TH2_qcdmc_ratios['FULL'],renormalize=False,skipEdges=True)
+            for c in ['LOW','SIG','HIGH']:
+                TH2_qcdmc_ratios[c] = header.copyHistWithNewXbins(TH2_qcdmc_ratios['FULL'],self.newXbins[c],'qcdmc_rpf_'+c+'_smooth')
+        
+        TH2_data_toy_ratios = {}
+        TH2_data_pass_toys = {}
+        TH2_data_fail_toys = {}
         # Need to build for each category
         for c in ['LOW','SIG','HIGH']:
             bin_list_fail = RooArgList()
@@ -1204,6 +1322,42 @@ class TwoDAlphabet:
 
             TH2_data_fail = self.orgFile.Get(self.organizedDict['data_obs']['fail_'+c]['nominal'])
             TH2_data_pass = self.orgFile.Get(self.organizedDict['data_obs']['pass_'+c]['nominal'])
+            
+            TH2_data_fail_toy = TH2_data_fail.Clone()
+            TH2_data_pass_toy = TH2_data_pass.Clone()
+
+            for process in self.organizedDict.keys():
+                if process == 'qcdmc': continue
+                elif self.inputConfig['PROCESS'][process]['CODE'] == 2: 
+                    to_subtract_fail = self.orgFile.Get(self.organizedDict[process]['fail_'+c]['nominal'])
+                    to_subtract_pass = self.orgFile.Get(self.organizedDict[process]['pass_'+c]['nominal'])
+                    
+                    TH2_data_fail_toy.Add(to_subtract_fail,-1)
+                    TH2_data_pass_toy.Add(to_subtract_pass,-1)
+
+            
+            if self.rpfRatio != False:
+                # "TH2_data_fail" is now going to be the true fail multiplied by the pass/fail ratio of the MC
+                # TH2_qcdmc_fail = self.orgFile.Get(self.organizedDict['qcdmc']['fail_'+c]['nominal'])
+                # TH2_qcdmc_pass = self.orgFile.Get(self.organizedDict['qcdmc']['pass_'+c]['nominal'])
+
+                # if 'SMOOTH' in self.inputConfig['OPTIONS']['rpfRatio'].keys() and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']:
+                #     TH2_qcdmc_fail = header.smoothHist2D('smooth_qcdmc_fail_'+c,TH2_qcdmc_fail)
+                #     TH2_qcdmc_pass = header.smoothHist2D('smooth_qcdmc_pass_'+c,TH2_qcdmc_pass)
+
+                # TH2_qcdmc_ratios[c] = TH2_qcdmc_pass.Clone()
+                # TH2_qcdmc_ratios[c].Divide(TH2_qcdmc_fail)
+
+                # if 'SMOOTH' in self.inputConfig['OPTIONS']['rpfRatio'].keys() and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']:
+                #     TH2_qcdmc_ratios[c] = header.smoothHist2D('smooth_rpf_MC',TH2_qcdmc_ratios[c],renormalize=False)
+
+                # TH2_qcdmc_ratio = TH2_qcdmc_ratios[c]
+
+                TH2_data_toy_ratios[c] = TH2_data_pass_toy.Clone()
+                TH2_data_toy_ratios[c].Divide(TH2_data_fail_toy)
+            else:
+                TH2_data_fail_toys[c] = TH2_data_fail_toy
+                TH2_data_pass_toys[c] = TH2_data_pass_toy
 
             # Get each bin
             for ybin in range(1,len(self.newYbins)):
@@ -1220,34 +1374,31 @@ class TwoDAlphabet:
 
                     # Initialize contents by subtracting minor non-QCD components (code 2)
                     bin_content    = TH2_data_fail.GetBinContent(xbin,ybin)
-                    bin_range_up   = bin_content + TH2_data_fail.GetBinErrorUp(xbin,ybin)*5
-                    bin_range_down = bin_content - TH2_data_fail.GetBinErrorLow(xbin,ybin)*5
-                    bin_err_up     = bin_content + TH2_data_fail.GetBinErrorUp(xbin,ybin)
-                    bin_err_down   = bin_content - TH2_data_fail.GetBinErrorLow(xbin,ybin)
+                    bin_range_up   = bin_content*3 #+ TH2_data_fail.GetBinErrorUp(xbin,ybin)*5
+                    bin_range_down = 1e-9#bin_content #- TH2_data_fail.GetBinErrorLow(xbin,ybin)*5
+                    bin_err_up     = TH2_data_fail.GetBinErrorUp(xbin,ybin)#bin_content + TH2_data_fail.GetBinErrorUp(xbin,ybin)
+                    bin_err_down   = TH2_data_fail.GetBinErrorLow(xbin,ybin)#bin_content - TH2_data_fail.GetBinErrorLow(xbin,ybin)
 
                     # Now subtract away the parts that we don't want
                     for process in self.organizedDict.keys():
                         this_TH2 = self.orgFile.Get(self.organizedDict[process]['fail_'+c]['nominal'])
 
                         # Check the code and change bin content and errors accordingly
-                        if self.inputConfig['PROCESS'][process]['CODE'] == 0: # signal
-                            continue
-                        elif self.inputConfig['PROCESS'][process]['CODE'] == 1: # data
-                            continue
+                        if process == 'qcdmc': continue
+                        elif self.inputConfig['PROCESS'][process]['CODE'] == 0: continue # signal
+                        elif self.inputConfig['PROCESS'][process]['CODE'] == 1: continue # data
                         elif self.inputConfig['PROCESS'][process]['CODE'] == 2: # MC
                             bin_content    = bin_content     - this_TH2.GetBinContent(xbin,ybin)
-                            bin_range_up   = bin_range_up    - 0.5*this_TH2.GetBinContent(xbin,ybin)
-                            bin_range_down = bin_range_down  - 1.5*this_TH2.GetBinContent(xbin,ybin)
-                            bin_err_up     = bin_err_up      - this_TH2.GetBinContent(xbin,ybin) + this_TH2.GetBinErrorUp(xbin,ybin)             # Just propagate errors normally
-                            bin_err_down   = bin_err_down    - this_TH2.GetBinContent(xbin,ybin) - this_TH2.GetBinErrorLow(xbin,ybin)
+                            bin_err_up     = bin_err_up      + this_TH2.GetBinErrorUp(xbin,ybin) #- this_TH2.GetBinContent(xbin,ybin)             # Just propagate errors normally
+                            bin_err_down   = bin_err_down    - this_TH2.GetBinErrorLow(xbin,ybin) #- this_TH2.GetBinContent(xbin,ybin)
 
                     # If bin content is <= 0, treat this bin as a RooConstVar at value close to 0
-                    if (bin_content <= 0) or (this_pass_bin_zero == True):
+                    if (bin_content <= 0):# or (this_pass_bin_zero == True):
                         binRRV = RooConstVar(fail_bin_name, fail_bin_name, max(1e-9,bin_content))
                         bin_list_fail.add(binRRV)
                         self.allVars.append(binRRV)
 
-                        # Then get bin center and assign it to a RooConstVar
+                        # Then get bin center 
                         x_center = TH2_data_fail.GetXaxis().GetBinCenter(xbin)
                         y_center = TH2_data_fail.GetYaxis().GetBinCenter(ybin)
 
@@ -1255,17 +1406,14 @@ class TwoDAlphabet:
                         x_center_mapped = (x_center - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
                         y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
 
-                        x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center_mapped)
-                        y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center_mapped)
-
+                        # And assign it to a RooConstVar 
+                        x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center if self.rpf.fitType == 'cheb' else x_center_mapped)
+                        y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center if self.rpf.fitType == 'cheb' else y_center_mapped)
+                        
+                        # Now get the Rpf function value for this bin 
                         self.allVars.append(x_const)
                         self.allVars.append(y_const)
-
-                        # # And now get the Rpf function value for this bin 
-                        if self.rpf.fitType == 'cheb':
-                            this_rpf = self.rpf.evalRpf(x_center_mapped, y_center_mapped,this_full_xbin,ybin) # chebyshev class takes different input
-                        else:
-                            this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
+                        this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
 
                         this_bin_pass = RooConstVar(pass_bin_name, pass_bin_name, 1e-9)
                         bin_list_pass.add(this_bin_pass)
@@ -1276,24 +1424,22 @@ class TwoDAlphabet:
                         if self.freezeFail:
                             binRRV = RooConstVar(fail_bin_name, fail_bin_name, bin_content)
 
-                        elif bin_content < 1: # Give larger floating to range to bins with fewer events
-                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,0.1), 1e-9, 10)
-                            print fail_bin_name + ' < 1'
-
-                        elif bin_content < 10: # Give larger floating to range to bins with fewer events
-                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,1), 1e-9, 50)
-                            print fail_bin_name + ' < 10'
                         else:
-                            binRRV = RooRealVar(fail_bin_name, fail_bin_name, bin_content, max(1,bin_range_down), bin_range_up)
+                            if bin_content < 1: # Give larger floating to range to bins with fewer events
+                                binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,0.1), 1e-9, 10)
+                                print fail_bin_name + ' < 1'
 
+                            elif bin_content < 10: # Give larger floating to range to bins with fewer events
+                                binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,1), 1e-9, 50)
+                                print fail_bin_name + ' < 10'
+                            else:
+                                binRRV = RooRealVar(fail_bin_name, fail_bin_name, bin_content, max(1e-9,bin_range_down), bin_range_up)
 
-                        if not self.freezeFail and bin_content >= 10:
-                            if bin_content - bin_err_down < 0.001:
-                                bin_err_down = bin_content - 0.001#binRRV.getMin()     # For the rare case when bin error is larger than the content
+                            if bin_content - bin_err_down < 0.0001:
+                                bin_err_down = bin_content - 0.0001#binRRV.getMin()     # For the rare case when bin error is larger than the content
                             
                             binRRV.setAsymError(bin_err_down,bin_err_up)
                             self.floatingBins.append(fail_bin_name)
-
 
                         # Store the bin
                         bin_list_fail.add(binRRV)
@@ -1307,22 +1453,29 @@ class TwoDAlphabet:
                         x_center_mapped = (x_center - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
                         y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
 
-                        x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center_mapped)
-                        y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center_mapped)
+                        # And now get the Rpf function value for this bin 
+                        x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center if self.rpf.fitType == 'cheb' else x_center_mapped)
+                        y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center if self.rpf.fitType == 'cheb' else y_center_mapped)
 
                         self.allVars.append(x_const)
                         self.allVars.append(y_const)
 
-                        # And now get the Rpf function value for this bin 
-                        if self.rpf.fitType == 'cheb':
-                            this_rpf = self.rpf.evalRpf(x_center_mapped, y_center_mapped,this_full_xbin,ybin) # chebyshev class takes different input
-                        else:
-                            this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
+                        this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
 
-                        formula_arg_list = RooArgList(binRRV,this_rpf)
-                        this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1",formula_arg_list)
+                        if self.rpfRatio == False:
+                            formula_arg_list = RooArgList(binRRV,this_rpf)
+                            this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1",formula_arg_list)
+                            
+                        else:
+                            mc_ratio_var = RooConstVar("mc_ratio_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, "mc_ratio_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, TH2_qcdmc_ratios[c].GetBinContent(xbin,ybin))
+                            formula_arg_list = RooArgList(binRRV,this_rpf,mc_ratio_var)
+                            this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1*@2",formula_arg_list)
+                            self.allVars.append(mc_ratio_var)
+
                         bin_list_pass.add(this_bin_pass)
+                        self.allVars.append(formula_arg_list)
                         self.allVars.append(this_bin_pass)
+                        self.allVars.append(this_rpf)
 
 
             print "Making RPH2Ds"
@@ -1334,11 +1487,28 @@ class TwoDAlphabet:
             Roo_dict['qcd']['pass_'+c]['RPH2D'] = RooParametricHist2D('qcd_pass_'+c+'_'+self.name,'qcd_pass_'+c+'_'+self.name,x_vars[c], y_var, bin_list_pass, TH2_data_fail)
             Roo_dict['qcd']['pass_'+c]['norm']  = RooAddition('qcd_pass_'+c+'_'+self.name+'_norm','qcd_pass_'+c+'_'+self.name+'_norm',bin_list_pass)
 
+        if self.rpfRatio != False:
+            mc_rpf = TH2_qcdmc_ratios['FULL']#header.stitchHistsInX('mc_ratio',self.fullXbins,self.newYbins,[TH2_qcdmc_ratios['LOW'],TH2_qcdmc_ratios['SIG'],TH2_qcdmc_ratios['HIGH']])
+            data_rpf = header.stitchHistsInX('data_ratio',self.fullXbins,self.newYbins,[TH2_data_toy_ratios['LOW'],TH2_data_toy_ratios['SIG'],TH2_data_toy_ratios['HIGH']],blinded=[1] if self.blindedPlots else [])
+            rpf_ratio = data_rpf.Clone()
+            rpf_ratio.Divide(mc_rpf)
+            rpf_ratio.SetMaximum(2.5)
+            # mc_rpf.SetMaximum(1)
+            # data_rpf.SetMaximum(1)
+
+            header.makeCan('rpf_ratio',self.projPath,[data_rpf,mc_rpf,rpf_ratio],titles=["Data Ratio","MC Ratio","Ratio of ratios"],year=self.year)
+        else: 
+            data_fail = header.stitchHistsInX('data_fail',self.fullXbins,self.newYbins,[TH2_data_fail_toys['LOW'],TH2_data_fail_toys['SIG'],TH2_data_fail_toys['HIGH']],blinded=[1] if self.blindedPlots else [])
+            data_pass = header.stitchHistsInX('data_fail',self.fullXbins,self.newYbins,[TH2_data_pass_toys['LOW'],TH2_data_pass_toys['SIG'],TH2_data_pass_toys['HIGH']],blinded=[1] if self.blindedPlots else [])
+            data_rpf = data_pass.Clone()
+            data_rpf.Divide(data_fail)
+            header.makeCan('data_ratio',self.projPath,[data_pass,data_fail,data_rpf],titles=["Data Pass","Data Fail","R_{P/F}"],year=self.year)
+
         print "Making workspace..."
         # Make workspace to save in
         self.workspace = RooWorkspace("w_"+self.name)
         for process in Roo_dict.keys():
-            for cat in [k for k in Roo_dict[process].keys() if 'file' not in k]:
+            for cat in [k for k in Roo_dict[process].keys() if 'file' not in k and 'FULL' not in k]:
                 if process == 'qcd':
                     rooObj = Roo_dict[process][cat]
                     # if type(rooObj) != dict:
@@ -1378,7 +1548,8 @@ class TwoDAlphabet:
         # Get the length of the list of all process that have CODE 2 (and ignore "HELP" key) and add 1 for qcd (which won't be in the inputConfig)
         jmax = str(len([proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and self.inputConfig['PROCESS'][proc]['CODE'] == 2]) + 1)
         # Get the length of the lsit of all systematics (and ignore "HELP" key)
-        kmax = str(len([syst for syst in self.inputConfig['SYSTEMATIC'].keys() if syst != 'HELP']))
+        n_uncorr_systs = len([syst for syst in self.inputConfig['SYSTEMATIC'].keys() if syst != 'HELP' and 'UNCORRELATED' in self.inputConfig['SYSTEMATIC'][syst] and self.inputConfig['SYSTEMATIC'][syst]['UNCORRELATED']])
+        kmax = str(len([syst for syst in self.inputConfig['SYSTEMATIC'].keys() if syst != 'HELP'])+n_uncorr_systs)
 
         card_new.write('imax '+imax+'\n')      
         card_new.write('jmax '+jmax+'\n')
@@ -1436,7 +1607,12 @@ class TwoDAlphabet:
                 print 'Systematic ' + syst + ' does not have one of the four allowed codes (0,1,2,3). Quitting.'
                 quit()
             
-            syst_lines[syst] = syst + ' ' + syst_type + ' '
+            # NEW
+            if 'UNCORRELATED' in self.inputConfig['SYSTEMATIC'][syst].keys() and self.inputConfig['SYSTEMATIC'][syst]['UNCORRELATED']:
+                syst_lines[syst+'_pass'] = syst + '_pass ' + syst_type + ' '
+                syst_lines[syst+'_fail'] = syst + '_fail ' + syst_type + ' '
+            else:
+                syst_lines[syst] = syst + ' ' + syst_type + ' '
 
         signal_procs = [proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and proc != 'data_obs' and self.inputConfig['PROCESS'][proc]['CODE'] == 0]
         MC_bkg_procs = [proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and proc != 'data_obs' and (self.inputConfig['PROCESS'][proc]['CODE'] == 2 or self.inputConfig['PROCESS'][proc]['CODE'] == 3)]
@@ -1472,18 +1648,29 @@ class TwoDAlphabet:
 
                 # Fill systematic lines
                 for syst_line_key in syst_lines.keys():
+                    # Check for case when pass and fail are uncorrelated
+                    if syst_line_key.split('_')[-1] in ['pass','fail']:
+                        chan_specific = syst_line_key.split('_')[-1] 
+                    else:
+                        chan_specific = False
+
                     # If the systematic is applicable to the process
                     if proc != 'qcd':
-                        if syst_line_key in self.inputConfig['PROCESS'][proc]['SYSTEMATICS']:
+                        base_syst_line_key = syst_line_key.replace('_pass','').replace('_fail','')
+                        if base_syst_line_key in self.inputConfig['PROCESS'][proc]['SYSTEMATICS']:
+                            # If we have the pass(fail) specific systematic and this is a fail(pass) region, go to next and skip the rest below
+                            if chan_specific != False and chan_specific not in chan: 
+                                thisVal = '-'
+
                             # If symmetric lnN...
-                            if self.inputConfig['SYSTEMATIC'][syst_line_key]['CODE'] == 0:
-                                thisVal = str(self.inputConfig['SYSTEMATIC'][syst_line_key]['VAL'])
+                            elif self.inputConfig['SYSTEMATIC'][base_syst_line_key]['CODE'] == 0:
+                                thisVal = str(self.inputConfig['SYSTEMATIC'][base_syst_line_key]['VAL'])
                             # If asymmetric lnN...
-                            elif self.inputConfig['SYSTEMATIC'][syst_line_key]['CODE'] == 1:
-                                thisVal = str(self.inputConfig['SYSTEMATIC'][syst_line_key]['VALDOWN']) + '/' + str(self.inputConfig['SYSTEMATIC'][syst_line_key]['VALUP'])
+                            elif self.inputConfig['SYSTEMATIC'][base_syst_line_key]['CODE'] == 1:
+                                thisVal = str(self.inputConfig['SYSTEMATIC'][base_syst_line_key]['VALDOWN']) + '/' + str(self.inputConfig['SYSTEMATIC'][base_syst_line_key]['VALUP'])
                             # If shape...
                             else:
-                                thisVal = str(self.inputConfig['SYSTEMATIC'][syst_line_key]['SCALE'])
+                                thisVal = str(self.inputConfig['SYSTEMATIC'][base_syst_line_key]['SCALE'])
                         # Otherwise place a '-'
                         else:
                             thisVal = '-'  
@@ -1519,7 +1706,7 @@ class TwoDAlphabet:
            
         card_new.close() # need to add masking if blinded
 
-    def plotFitResults(self,fittag,simfit=False): # fittag means 'b' or 's'
+    def plotFitResults(self,fittag):#,simfit=False): # fittag means 'b' or 's'
         allVars = []
 
         #####################
@@ -1527,12 +1714,12 @@ class TwoDAlphabet:
         #####################
 
         # File with histograms and RooFitResult parameters
-        if simfit == False:
-            post_file = TFile.Open(self.projPath+'/postfitshapes_'+fittag+'.root')
-            fd_file = TFile.Open(self.projPath+'/fitDiagnostics.root')
-        else:
-            post_file = TFile.Open(self.tag+'/postfitshapes_'+fittag+'.root')
-            fd_file = TFile.Open(self.tag+'/fitDiagnostics.root')
+        # if simfit == False:
+        #     post_file = TFile.Open(self.projPath+'/postfitshapes_'+fittag+'.root')
+        #     fd_file = TFile.Open(self.projPath+'/fitDiagnostics.root')
+        # else:
+        post_file = TFile.Open(self.tag+'/postfitshapes_'+fittag+'.root')
+        fd_file = TFile.Open(self.tag+'/fitDiagnostics.root')
 
         fit_result = fd_file.Get('fit_'+fittag)
 
@@ -1544,7 +1731,8 @@ class TwoDAlphabet:
 
         # Define low, middle, high projection regions for y (x regions defined already via signal region bounds)
         y_turnon_endBin = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').ProjectionY().GetMaximumBin()
-        y_tail_beginningBin = int((y_nbins - y_turnon_endBin)/2.0 + y_turnon_endBin)
+        y_turnon_endVal = int(post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetYaxis().GetBinUpEdge(y_turnon_endBin))
+        y_tail_beginningBin = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetYaxis().FindBin((y_high - y_turnon_endVal)/3.0 + y_turnon_endVal)
         print 'Finding start and end bin indexes of signal range. Looking for '+str(self.sigStart)+', '+str(self.sigEnd)
         for ix,xwall in enumerate(self.fullXbins):
             if xwall == self.sigStart:
@@ -1557,7 +1745,7 @@ class TwoDAlphabet:
         if y_turnon_endBin > y_nbins/2.0:  # in case this isn't a distribution with a turn-on
             y_turnon_endBin = int(round(y_nbins/3.0))
             y_tail_beginningBin = 2*y_turnon_endBin
-        y_turnon_endVal = str(int(post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetYaxis().GetBinUpEdge(y_turnon_endBin)))
+        y_turnon_endVal = str(y_turnon_endVal)
         y_tail_beginningVal = str(int(post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetYaxis().GetBinLowEdge(y_tail_beginningBin)))
      
 
@@ -1567,7 +1755,9 @@ class TwoDAlphabet:
             tree_fit_sb.GetEntry(0)
             signal_strength = tree_fit_sb.r
         else:
-            signal_strength = 0
+            tree_fit_b = fd_file.Get('tree_fit_b')
+            tree_fit_b.GetEntry(0)
+            signal_strength = tree_fit_b.r
 
         #####################
         #    Data vs Bkg    #
@@ -1576,7 +1766,7 @@ class TwoDAlphabet:
         hist_dict = {}
 
         # Organize and make any projections or 2D distributions
-        for process in [process for process in self.inputConfig['PROCESS'] if process != 'HELP']+['qcd']:
+        for process in [process for process in self.inputConfig['PROCESS'] if process != 'HELP']+['qcd','TotalBkg']:
             hist_dict[process] = {}
             for cat in ['fail','pass']:
                 hist_dict[process][cat] = {'LOW':{},'SIG':{},'HIGH':{}}
@@ -1643,28 +1833,33 @@ class TwoDAlphabet:
 
         post_file.Close()
 
+        # NOT CURRENTLY WORKING
         # Add together processes that we want to see as one
-        if self.plotTogether != False:
+        if False:#self.plotTogether != False:
             hist_dict = self.plotProcessesTogether(hist_dict)
             
         process_list = hist_dict.keys()
 
         # Create lists for the 2D projections (ones you want to see together)
         for process in hist_dict.keys():    # Canvas
-            isSignal = (process != 'qcd' and self.inputConfig['PROCESS'][process]['CODE'] == 0)
-            twoDList = []         
+            isSignal = (process != 'qcd' and process != 'TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] == 0)
+            twoDList = []
+            twoDtitles = []   
             for cat in ['fail','pass']:
                 for fit in ['prefit', 'postfit']:
                     if isSignal and fittag == 's' and fit == 'postfit':
                         hist_dict[process][cat][fit+'_2D'].Scale(signal_strength)
-                        twoDList.append(hist_dict[process][cat][fit+'_2D'])
-                    else:
-                        twoDList.append(hist_dict[process][cat][fit+'_2D'])
+
+                    twoDList.append(hist_dict[process][cat][fit+'_2D'])
+                    twoDtitles.append(process + ', '+cat+', '+fit)
+
+            if isSignal: # BSTAR SPECIFIC
+                mass = process.split('signal')[1][2:]
 
             if isSignal and fittag != 's':
                 continue
             else:
-                header.makeCan('fit_'+fittag+'/'+process+'_fit'+fittag+'_2D',self.projPath,twoDList,xtitle=self.xVarTitle,ytitle=self.yVarTitle)
+                header.makeCan('plots/fit_'+fittag+'/'+process+'_fit'+fittag+'_2D',self.projPath,twoDList,titles=twoDtitles,xtitle=self.xVarTitle,ytitle=self.yVarTitle,year=self.year)
 
         # Invert the last two items (unique to b*) - customize as needed
         process_list[-1],process_list[-2] = process_list[-2],process_list[-1]
@@ -1675,7 +1870,7 @@ class TwoDAlphabet:
             if process != 'data_obs':
                 if process not in self.inputConfig['PROCESS'].keys():
                     continue
-                if (process != 'qcd' and self.inputConfig['PROCESS'][process]['CODE'] != 0):
+                if (process != 'qcd' and process !='TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] != 0):
                     if (process in self.inputConfig['PROCESS'].keys()) and ('COLOR' in self.inputConfig['PROCESS'][process].keys()):
                         colors.append(self.inputConfig['PROCESS'][process]["COLOR"])
                     else:
@@ -1687,64 +1882,95 @@ class TwoDAlphabet:
         # Create lists for makeCan of the projections
         for plotType in ['postfit_projx','postfit_projy']:   # Canvases
             bkgList = []
+            bkgNameList = []
             dataList = []
             signal_list = []
-            
+            title_list = []
+            totalBkgs = []
             for cat in ['fail','pass']: # Row 
                 for regionNum in range(1,4):    # Column
                     bkg_process_list = []
+                    bkg_process_names = []
+                    this_totalbkg = hist_dict['TotalBkg'][cat][plotType+str(regionNum)]
+                    totalBkgs.append(this_totalbkg)
+                    if 'y' in plotType:
+                        if regionNum == 1: low_str,high_str = str(x_low),str(self.sigStart)
+                        elif regionNum == 2: low_str,high_str = str(self.sigStart),str(self.sigEnd)
+                        elif regionNum == 3: low_str,high_str = str(self.sigEnd),str(x_high)
+                    elif 'x' in plotType:
+                        if regionNum == 1: low_str,high_str = str(y_low),str(y_turnon_endVal)
+                        elif regionNum == 2: low_str,high_str = str(y_turnon_endVal),str(y_tail_beginningVal)
+                        elif regionNum == 3: low_str,high_str = str(y_tail_beginningVal),str(y_high)
                     for process in process_list:
                         if process != 'data_obs':
-                            if (process != 'qcd' and self.inputConfig['PROCESS'][process]['CODE'] != 0):
+                            if (process != 'qcd' and process != 'TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] != 0):
                                 bkg_process_list.append(hist_dict[process][cat][plotType+str(regionNum)])
-                            elif (process != 'qcd' and self.inputConfig['PROCESS'][process]['CODE'] == 0):
-                                hist_dict[process][cat][plotType+str(regionNum)].Scale(signal_strength)
-                                signal_list.append(hist_dict[process][cat][plotType+str(regionNum)])
-
+                                bkg_process_names.append(process)
+                            elif (process != 'qcd' and process != 'TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] == 0):
+                                if self.plotPrefitSigInFitB and fittag == 'fit_b':
+                                    signal_list.append(hist_dict[process][cat][plotType.replace("postfit","prefit")+str(regionNum)])
+                                else:
+                                    hist_dict[process][cat][plotType+str(regionNum)].Scale(signal_strength)
+                                    signal_list.append(hist_dict[process][cat][plotType+str(regionNum)])
+                                
                         else:
-                            dataList.append(hist_dict[process][cat][plotType+str(regionNum)])
-
-                    
-                    ## Need to do this ##
-                    # if 'x' in plotType:
-                    #     hist_dict['qcd'][cat][plotType+str(regionNum)].GetXaxis().Set(len(self.fullXbins)-1,array.array('d',self.fullXbins))
-                    # elif 'y' in plotType:
-                    #     hist_dict['qcd'][cat][plotType+str(regionNum)].GetXaxis().Set(len(self.newYbins)-1,array.array('d',self.newYbins))
-                    ## otherwise a bunch of dumb warnings are thrown about bin limits ##
+                            this_data = hist_dict[process][cat][plotType+str(regionNum)]
+                            dataList.append(this_data)
 
                     # Put QCD on bottom of stack since it's smooth
                     bkg_process_list = [hist_dict['qcd'][cat][plotType+str(regionNum)]]+bkg_process_list
-
-
+                    bkgNameList.append(['qcd']+bkg_process_names)
                     bkgList.append(bkg_process_list)
 
-            # An attempt to debug the warning about adding histograms with different bin limits - seems there's no reason the warning should be coming up
-            # for i,data in enumerate(dataList):
-            #     print data.GetName()
-            #     for b in bkgList[i]:
-            #         for i in range(data.GetXaxis().GetXbins().fN):
-            #             if not TMath.AreEqualRel(data.GetXaxis().GetXbins().GetAt(i),b.GetXaxis().GetXbins().GetAt(i),0.00000000001):
-            #                 print b.GetName() + ' does not agree. Data: '+str(data.GetXaxis().GetXbins().GetAt(i)) +' vs Bkg: '+str(b.GetXaxis().GetXbins().GetAt(i))
+                    title_list.append('Data vs bkg - %s - [%s,%s]'%(cat,low_str,high_str))
+
+                    # Make the "money plot" of just the y projection of the signal region
+                    if ('y' in plotType) and (cat == 'pass') and (regionNum == 2): 
+                        money_title = 'Data vs Background - '+self.yVarTitle
+                        header.makeCan('plots/fit_'+fittag+'/postfit_signal_region_only',self.projPath,[this_data],[bkg_process_list],totalBkg=[this_totalbkg],signals=signal_list,titles=[money_title],bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,colors=colors,xtitle=self.yVarTitle,year=self.year)
+
 
 
             if 'x' in plotType:
-                header.makeCan('fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=self.xVarTitle)
-                header.makeCan('fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=self.xVarTitle,logy=True)
+                header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
+                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
+                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
+                    colors=colors,xtitle=self.xVarTitle,year=self.year)
+                header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
+                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
+                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
+                    colors=colors,xtitle=self.xVarTitle,logy=True,year=self.year)
             elif 'y' in plotType:
-                header.makeCan('fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=self.yVarTitle)
-                header.makeCan('fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,dataList,bkglist=bkgList,signals=signal_list,colors=colors,xtitle=self.yVarTitle,logy=True)
+                header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
+                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
+                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
+                    colors=colors,xtitle=self.yVarTitle,year=self.year)
+                header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
+                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
+                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
+                    colors=colors,xtitle=self.yVarTitle,logy=True,year=self.year)
 
         # Make comparisons for each background process of pre and post fit projections
         for plotType in ['projx','projy']:
             for process in process_list:
-                if process != 'data_obs':
+                if process != 'data_obs' and process != 'TotalBkg':
                     pre_list = []
                     post_list = []
+                    title_list = []
                     for cat in ['fail','pass']: # Row 
                         for regionNum in range(1,4):    # Column
+                            if 'y' in plotType:
+                                if regionNum == 1: low_str,high_str = str(x_low),str(self.sigStart)
+                                elif regionNum == 2: low_str,high_str = str(self.sigStart),str(self.sigEnd)
+                                elif regionNum == 3: low_str,high_str = str(self.sigEnd),str(x_high)
+                            elif 'x' in plotType:
+                                if regionNum == 1: low_str,high_str = str(y_low),str(y_turnon_endVal)
+                                elif regionNum == 2: low_str,high_str = str(y_turnon_endVal),str(y_tail_beginningVal)
+                                elif regionNum == 3: low_str,high_str = str(y_tail_beginningVal),str(y_high)
+
                             pre_list.append([hist_dict[process][cat]['prefit_'+plotType+str(regionNum)]])  # in terms of makeCan these are "bkg hists"
                             post_list.append(hist_dict[process][cat]['postfit_'+plotType+str(regionNum)])   # and these are "data hists"
-                            if process != 'qcd':
+                            if process != 'qcd' and process != 'TotalBkg':
                                 if 'COLOR' in self.inputConfig['PROCESS'][process].keys():
                                     prepostcolors = [self.inputConfig['PROCESS'][process]['COLOR']]
                                 else:
@@ -1752,17 +1978,26 @@ class TwoDAlphabet:
                             else:
                                 prepostcolors = [kYellow]
 
-                    if 'x' in plotType: header.makeCan('fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=self.xVarTitle,datastyle='histe')
-                    if 'y' in plotType: header.makeCan('fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=self.yVarTitle,datastyle='histe')
+                            title_list.append('Pre vs Postfit - %s - %s - [%s,%s]'%(process,cat,low_str,high_str))
+
+                    if 'x' in plotType: header.makeCan('plots/fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,
+                        post_list,bkglist=pre_list,totalBkg=[b[0] for b in pre_list],
+                        titles=title_list,bkgNames=['Prefit, '+process],dataName='        Postfit, '+process,
+                        colors=prepostcolors,xtitle=self.xVarTitle,datastyle='histpe',year=self.year)
+                    if 'y' in plotType: header.makeCan('plots/fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,
+                        post_list,bkglist=pre_list,totalBkg=[b[0] for b in pre_list],
+                        titles=title_list,bkgNames=['Prefit, '+process],dataName='        Postfit, '+process,
+                        colors=prepostcolors,xtitle=self.yVarTitle,datastyle='histpe',year=self.year)
 
 
         ##############
         #    Rp/f    #
-        ##############
+        ##############           
         # Need to sample the space to get the Rp/f with proper errors (1000 samples)
         rpf_xnbins = len(self.fullXbins)-1
         rpf_ynbins = len(self.newYbins)-1
-        rpf_zbins = [i/1000. for i in range(0,1001)]
+        if self.rpfRatio == False: rpf_zbins = [i/1000. for i in range(0,1001)]
+        else: rpf_zbins = [i/1000. for i in range(0,5001)]
         rpf_samples = TH3F('rpf_samples','rpf_samples',rpf_xnbins, array.array('d',self.fullXbins), rpf_ynbins, array.array('d',self.newYbins), len(rpf_zbins)-1, array.array('d',rpf_zbins))# TH3 to store samples
         sample_size = 500
 
@@ -1777,6 +2012,58 @@ class TwoDAlphabet:
             for i in range(sample_size):
                 sys.stdout.write('\rSampling '+str(100*float(i)/float(sample_size)) + '%')
                 sys.stdout.flush()
+                param_sample = fit_result.randomizePars()
+
+                # Set params of the Rpf object
+                coeffIter_sample = param_sample.createIterator()
+                coeff_sample = coeffIter_sample.Next()
+                while coeff_sample:
+                    # Set the rpf parameter to the sample value
+                    if coeff_sample.GetName() in self.rpf.rpfVars.keys():
+                        self.rpf.setRpfParam(coeff_sample.GetName(), coeff_sample.getValV())
+                    coeff_sample = coeffIter_sample.Next()
+
+                # Loop over bins and fill
+                for xbin in range(1,rpf_xnbins+1):
+                    for ybin in range(1,rpf_ynbins+1):
+                        bin_val = 0
+
+                        thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
+                        thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
+
+                        # thisXMapped = (thisXCenter - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
+                        # thisYMapped = (thisYCenter - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
+
+                        # Determine the category
+                        if thisXCenter > self.newXbins['LOW'][0] and thisXCenter < self.newXbins['LOW'][-1]: # in the LOW category
+                            thisxcat = 'LOW'
+                        elif thisXCenter > self.newXbins['SIG'][0] and thisXCenter < self.newXbins['SIG'][-1]: # in the SIG category
+                            thisxcat = 'SIG'
+                        elif thisXCenter > self.newXbins['HIGH'][0] and thisXCenter < self.newXbins['HIGH'][-1]: # in the HIGH category
+                            thisxcat = 'HIGH'
+
+                        bin_val = self.rpf.getRpfBinVal(thisxcat,xbin,ybin)
+
+                        rpf_samples.Fill(thisXCenter,thisYCenter,bin_val)
+
+        elif self.rpf.fitType == 'cheb':
+            # Import the basis shapes
+            cheb_shapes = TFile.Open(self.projPath+'basis_plots/basis_shapes.root')
+            first_shape_name = cheb_shapes.GetListOfKeys().First().GetName()
+            first_shape = cheb_shapes.Get(first_shape_name) # just used to grab binning and such
+            cheb_xnbins = first_shape.GetNbinsX()
+            cheb_xmin = first_shape.GetXaxis().GetXmin()
+            cheb_xmax = first_shape.GetXaxis().GetXmax()
+            cheb_ynbins = first_shape.GetNbinsY()
+            cheb_ymin = first_shape.GetYaxis().GetXmin()
+            cheb_ymax = first_shape.GetYaxis().GetXmax()
+
+            # Loop over samples
+            for i in range(sample_size):
+                sys.stdout.write('\rSampling '+str(100*float(i)/float(sample_size)) + '%')
+                sys.stdout.flush()
+
+                # Randomize the parameters
                 param_sample = fit_result.randomizePars()
 
                 # Set params of the Rpf object
@@ -1811,58 +2098,36 @@ class TwoDAlphabet:
 
                         rpf_samples.Fill(thisXCenter,thisYCenter,bin_val)
 
-        elif self.rpf.fitType == 'cheb':
-            # Import the basis shapes
-            cheb_shapes = TFile.Open(globalDir+'basis_plots/basis_shapes.root')
-            first_shape_name = cheb_shapes.GetListOfKeys().First().GetName()
-            first_shape = cheb_shapes.Get(first_shape_name) # just used to grab binning and such
-            cheb_xnbins = first_shape.GetNbinsX()
-            cheb_xmin = first_shape.GetXaxis().GetXmin()
-            cheb_xmax = first_shape.GetXaxis().GetXmax()
-            cheb_ynbins = first_shape.GetNbinsY()
-            cheb_ymin = first_shape.GetYaxis().GetXmin()
-            cheb_ymax = first_shape.GetYaxis().GetXmax()
 
-            # Loop over samples
-            for i in range(sample_size):
-                sys.stdout.write('\rSampling '+str(100*float(i)/float(sample_size)) + '%')
-                sys.stdout.flush()
+                # # Make TH2 for this sample
+                # chebSum = TH2F('chebSum','chebSum',cheb_xnbins,cheb_xmin,cheb_xmax,cheb_ynbins,cheb_ymin,cheb_ymax)
 
-                # Randomize the parameters
-                param_sample = fit_result.randomizePars()
+                # # Grab relevant coefficients and loop over them to sum over the shapes
+                # chebCoeffs = param_sample.selectByName('ChebCoeff_*x*y*'+self.name)        # Another trick here - if suffix='', this will grab everything including those
+                
+                # # Looping...
+                # chebIter = chebCoeffs.createIterator()
+                # chebCoeff = chebIter.Next()
+                # while chebCoeff:
+                #     chebName = chebCoeff.GetName()
+                #     xLabel = chebName[len('ChebCoeff_'):len('ChebCoeff_')+2] 
+                #     yLabel = chebName[len('ChebCoeff_'+xLabel):len('hebCoeff_'+xLabel)+2]
 
-                # Make TH2 for this sample
-                chebSum = TH2F('chebSum','chebSum',cheb_xnbins,cheb_xmin,cheb_xmax,cheb_ynbins,cheb_ymin,cheb_ymax)
+                #     # Grab and scale the basis shape
+                #     tempScaled = cheb_shapes.Get('cheb_Tx'+xLabel[-1]+'_Ty'+yLabel[-1]).Clone()
+                #     tempScaled.Scale(chebCoeffs.find(chebName).getValV())
 
-                # Grab relevant coefficients and loop over them to sum over the shapes
-                chebCoeffs = param_sample.selectByName('ChebCoeff_*x*y*'+suffix)        # Another trick here - if suffix='', this will grab everything including those
-                if suffix == '':                                                        # polyCoeffs with the suffix. Need to remove those by explicitely grabbing them
-                    chebCoeffsToRemove = param_sample.selectByName('ChebCoeff_*x*y*_*') # and using .remove(collection)
-                    chebCoeffs.remove(chebCoeffsToRemove)
+                #     # Add to the sum
+                #     chebSum.Add(tempScaled)
+                #     chebCoeff = chebIter.Next()
 
-                # Looping...
-                chebIter = chebCoeffs.createIterator()
-                chebCoeff = chebIter.Next()
-                while chebCoeff:
-                    chebName = chebCoeff.GetName()
-                    xLabel = chebName[len('chebCoeff_'):len('chebCoeff_')+2] 
-                    yLabel = chebName[len('chebCoeff_'+xLabel):len('chebCoeff_'+xLabel)+2]
+                # for xbin in range(1,chebSum.GetNbinsX()+1):
+                #     for ybin in range(1,chebSum.GetNbinsY()+1):
+                #         thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
+                #         thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
+                #         rpf_samples.Fill(thisXCenter,thisYCenter,chebSum.GetBinContent(xbin,ybin))
 
-                    # Grab and scale the basis shape
-                    tempScaled = cheb_shapes.Get('cheb_Tx'+xLabel[-1]+'_Ty'+yLabel[-1]).Clone()
-                    tempScaled.Scale(chebCoeffs.find(chebName).getValV())
-
-                    # Add to the sum
-                    chebSum.Add(tempScaled)
-                    chebCoeff = chebIter.Next()
-
-                for xbin in range(1,chebSum.GetNbinsX()+1):
-                    for ybin in range(1,chebSum.GetNbinsY()+1):
-                        thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
-                        thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
-                        rpf_samples.Fill(thisXCenter,thisYCenter,chebSum.GetBinContent(xbin,ybin))
-
-                del chebSum
+                # del chebSum
 
         print '\n'
         rpf_final = TH2F('rpf_final','rpf_final',rpf_xnbins, array.array('d',self.fullXbins), rpf_ynbins, array.array('d',self.newYbins))
@@ -1876,46 +2141,26 @@ class TwoDAlphabet:
 
         rpf_c = TCanvas('rpf_c','Post-fit R_{P/F}',800,700)
         rpf_final.Draw('lego')
-        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_lego.pdf','pdf')
+        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_lego.png','png')
+        rpf_final.Draw('surf')
+        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_surf.png','png')
         rpf_final.Draw('pe')
-        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_errs.pdf','pdf')
+        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_errs.png','png')
 
-        if os.path.isfile(self.projPath+'plots/rpf_comparisons.root'):
+        rpf_file = TFile.Open(self.projPath+'/plots/postfit_rpf_fit'+fittag+'.root','RECREATE')
+        rpf_file.cd()
+        rpf_final.Write()
+        rpf_file.Close()
 
-            rpf_file = TFile.Open(globalDir+'/plots/rpf_comparisons.root','UPDATE')
-
-            # Do a ratio and diff with pre-fit
-            prefit_rpf = rpf_file.Get('RpfToRemap_unit')
-
-            # Ratio
-            rpf_ratio = rpf_final.Clone('rpf_ratio_fit'+fittag)
-            rpf_ratio.Divide(prefit_rpf)
-
-            # Difference
-            rpf_diff = rpf_final.Clone('rpf_diff_fit'+fittag)
-            rpf_diff.Add(prefit_rpf,-1)
-
-
-            # rpf_ratio_c = TCanvas('rpf_ratio_c','Ratio of post-fit to pre-fit R_{P/F}',800,700)
-            # rpf_ratio.Draw('surf')
-            # rpf_ratio_c.Print(globalDir+'/plots/rpf_post-to-pre_ratio.pdf','pdf')
-
-            rpf_file.cd()
-            rpf_final.Write()
-            rpf_ratio.Write()
-            rpf_diff.Write()
-
-            rpf_file.Close()
-
-    def plotProcessesTogether(self,histDict):
-        process_list = histDict.keys()
+    def plotProcessesTogether(self,hist_dict):
+        process_list = hist_dict.keys()
 
         for summation in self.plotTogether.keys():  # For each set we're add together
             process_list.append(summation)   # add the name to a list so we can keep track
             hist_dict[summation] = {}
             first_process = self.plotTogether[summation][0]
-            self.inputConfig["PROCESS"][summation] = {"COLOR":inputConfig["PROCESS"][first_process]["COLOR"],
-                                                     "CODE":inputConfig["PROCESS"][first_process]["CODE"] }
+            self.inputConfig["PROCESS"][summation] = {"COLOR":self.inputConfig["PROCESS"][first_process]["COLOR"],
+                                                     "CODE":self.inputConfig["PROCESS"][first_process]["CODE"] }
 
             for cat in hist_dict[first_process].keys():   # for each pass/fail
                 hist_dict[summation][cat] = {}
@@ -1933,7 +2178,7 @@ class TwoDAlphabet:
         return histDict
 
 # WRAPPER FUNCTIONS
-def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
+def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,prerun=False):
     # Set verbosity - chosen from first of configs
     verbose = ''
     if twoDs[0].verbosity != False:
@@ -1969,29 +2214,18 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
         blind_option = '--text2workspace "--channel-masks" --setParameters' + blind_option
 
     # Set card name and project directory
-    if plotOn == '':
-        if len(twoDs) > 1:
-            card_name = 'card_'+twoDs[0].tag+'.txt'
-            projDir = twoDs[0].tag
-        else:
-            card_name = 'card_'+twoDs[0].name+'.txt'
-            projDir = twoDs[0].projPath
-    else:
-        if len(twoDs) > 1:
-            card_name = 'card_'+plotOn.split('/')[1]+'.txt'
-            projDir = twoDs[0].tag
+    card_name = 'card_'+twoDs[0].tag+'.txt' if not prerun else 'card_'+twoDs[0].name+'.txt'
+    projDir = twoDs[0].tag if not prerun else twoDs[0].projPath
 
-        else:
-            card_name = 'card_'+plotOn.split('/')[1]+'.txt'
-            projDir = twoDs[0].projPath
-
-        if plotOn[-1] != '/': plotOn_depth = '../'*(len(plotOn.count('/'))+1)
-        else: plotOn_depth = '../'*(len(plotOn.count('/')))
+    # Determine if any nuisance/sysetmatic parameters should be set before fitting
+    if systsToSet != '':
+        if blind_option != '': blind_option = blind_option+','+systsToSet
+        else: blind_option = '--setParameters '+systsToSet
 
     # Run Combine
     print 'cd '+projDir
-    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace --cminDefaultMinimizerStrategy 0' + sig_option +verbose #+syst_option -> now out of date
-    print 'Executing '+FitDiagnostics_command
+    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace --cminDefaultMinimizerStrategy 0 ' + sig_option +verbose #+syst_option -> now out of date
+    # print 'Executing '+FitDiagnostics_command
 
     with header.cd(projDir):
         command_saveout = open('FitDiagnostics_command.txt','w')
@@ -2014,6 +2248,13 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
 
         systematic_analyzer_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py '+card_name+' --all -f html > systematics_table.html'
         header.executeCmd(systematic_analyzer_cmd)
+
+        # Make a PDF of the nuisance_pulls.root
+        if os.path.exists('nuisance_pulls.root'):
+            nuis_file = TFile.Open('nuisance_pulls.root')
+            nuis_can = nuis_file.Get('nuisances')
+            nuis_can.Print('nuisance_pulls.pdf','pdf')
+            nuis_file.Close()
 
     # Save out Rp/f to a text file and make a re-run config
     for twoD in twoDs:
@@ -2054,22 +2295,29 @@ def runMLFit(twoDs,rMin,rMax,skipPlots=False,plotOn=''):
             rerun_out.close()
 
     if not skipPlots:
-        if plotOn == '':
-            with header.cd(projDir):
-                bshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
-                header.executeCmd(bshapes_cmd)
-                sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
-                header.executeCmd(sshapes_cmd)
+        with header.cd(projDir):
+            bshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f fitDiagnostics.root:fit_b --postfit --sampling --samples 100 --print 2> PostFitShapes2D_stderr_b.txt'
+            header.executeCmd(bshapes_cmd)
+            sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f fitDiagnostics.root:fit_s --postfit --sampling --samples 100 --print 2> PostFitShapes2D_stderr_s.txt'
+            header.executeCmd(sshapes_cmd)
 
-        else:
-            with header.cd(plotOn):
-                print 'Plotting fit result from '+projDir+' onto workspace from '+card_name
-                bshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_b.root -f '+plotOn_depth+'fitDiagnostics.root:fit_b --postfit --sampling --print 2> PostFitShapes2D_stderr_b.txt'
-                header.executeCmd(bshapes_cmd)
-                sshapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_s.root -f '+plotOn_depth+'fitDiagnostics.root:fit_s --postfit --sampling --print 2> PostFitShapes2D_stderr_s.txt'
-                header.executeCmd(sshapes_cmd)
+            covMtrx_File = TFile.Open('fitDiagnostics.root')
+            fit_result = covMtrx_File.Get("fit_b")
+            if hasattr(fit_result,'correlationMatrix'):
+                corrMtrx = header.reducedCorrMatrixHist(fit_result)
+                corrMtrxCan = TCanvas('c','c',1400,1000)
+                corrMtrxCan.cd()
+                corrMtrxCan.SetBottomMargin(0.22)
+                corrMtrxCan.SetLeftMargin(0.17)
+                corrMtrxCan.SetTopMargin(0.06)
 
-def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
+                corrMtrx.Draw('colz text')
+                corrMtrxCan.Print('correlation_matrix.png','png')
+            else:
+                print 'WARNING: Not able to produce correlation matrix.'
+
+
+def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
     # Set verbosity - chosen from first of configs
     verbose = ''
     if twoDs[0].verbosity != False:
@@ -2090,6 +2338,8 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
     # Run blind (turns off data everywhere) but don't mask (examines signal region)
     if blindData:
         blind_option = ' --run blind'
+    else:
+        blind_option = ''
 
     # Set the project directory
     if len(twoDs) > 1:
@@ -2110,6 +2360,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
     with header.cd(projDir):
         t2w_cmd = 'text2workspace.py -b '+card_name+' -o limitworkspace.root' 
         header.executeCmd(t2w_cmd)
+        # header.setSnapshot(os.environ['CMSSW_BASE']+'/src/2DAlphabet/'+postfitWorkspaceDir+'/')
 
     # Morph workspace according to imported fit result
     prefit_file = TFile(projDir+'/limitworkspace.root','update')
@@ -2130,7 +2381,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
 
     current_dir = os.getcwd()
 
-    aL_cmd = 'combine -M Asymptotic limitworkspace.root -w w --saveWorkspace' +blind_option + syst_option# + sig_option 
+    aL_cmd = 'combine -M AsymptoticLimits limitworkspace.root --saveWorkspace' +blind_option + syst_option# + sig_option 
 
     # Run combine if not on condor
     if location == 'local':    
@@ -2138,7 +2389,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
         with header.cd(projDir):
             header.executeCmd(aL_cmd)
     # If on condor, write a script to run (python will then release its memory usage)
-    else:
+    elif location == 'condor':
         # Do all of the project specific shell scripting here
         shell_finisher = open('shell_finisher.sh','w')
         shell_finisher.write('#!/bin/sh\n')
@@ -2146,5 +2397,5 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location='local'):
         shell_finisher.write(aL_cmd+'\n')
         shell_finisher.write('cd '+current_dir+'\n')
         shell_finisher.write('tar -czvf '+identifier+'.tgz '+projDir+'/\n')
-        shell_finisher.write('cp '+identifier+'.tgz ../../../')
+        shell_finisher.write('cp '+identifier+'.tgz $CMSSW_BASE/../')
         shell_finisher.close()
