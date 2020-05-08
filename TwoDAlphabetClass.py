@@ -1901,7 +1901,7 @@ class TwoDAlphabet:
                                 bkg_process_list.append(hist_dict[process][cat][plotType+str(regionNum)])
                                 bkg_process_names.append(process)
                             elif (process != 'qcd' and process != 'TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] == 0):
-                                if self.plotPrefitSigInFitB and fittag == 'fit_b':
+                                if self.plotPrefitSigInFitB and fittag == 'b':
                                     signal_list.append(hist_dict[process][cat][plotType.replace("postfit","prefit")+str(regionNum)])
                                 else:
                                     hist_dict[process][cat][plotType+str(regionNum)].Scale(signal_strength)
