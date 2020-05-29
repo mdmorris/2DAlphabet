@@ -28,6 +28,10 @@ parser.add_option("--recycleAll", action="store_true",
                 default =   False,
                 dest    =   "recycleAll",
                 help    =   "Recycle everything from the previous run with this tag")
+parser.add_option("--recycle", action="store", type='string', 
+                default =   '',
+                dest    =   "recycle",
+                help    =   "Recycle comma separated list of items")
 parser.add_option("--skipFit", action="store_true", 
                 default =   False,
                 dest    =   "skipFit",
@@ -53,6 +57,7 @@ for i,c in enumerate(inputConfigsAndArgs):
 print 'Setting on-fly parameters:'
 print '\ttag\t\t = '+options.quicktag
 print '\trecycleAll\t = '+str(options.recycleAll)
+print '\trecycle\t\t = '+str(options.recycle)
 print '\tskipFit\t\t = '+str(options.skipFit)
 print 'Remaining arguments:'
 for i in inputConfigs:
@@ -64,8 +69,9 @@ twoDinstances = []
 # if len(inputConfigs) > 1:
 ##############
 # Instantiate all class instances
+recycle = [r for r in options.recycle.split(',') if r !='']
 for i in inputConfigs:
-    instance = TwoDAlphabet(i,options.quicktag,options.recycleAll,stringSwaps=stringSwaps)
+    instance = TwoDAlphabet(i,options.quicktag,options.recycleAll,recycle,stringSwaps=stringSwaps)
     twoDinstances.append(instance)
 
 # For each instance, check tags match and if they don't, ask the user for one
@@ -96,15 +102,16 @@ if not options.skipPlots:
     with header.cd(thistag):
         covMtrx_File = TFile.Open('fitDiagnostics.root')
         fit_result = covMtrx_File.Get("fit_b")
-        corrMtrx = header.reducedCorrMatrixHist(fit_result)
-        corrMtrxCan = TCanvas('c','c',1400,1000)
-        corrMtrxCan.cd()
-        corrMtrxCan.SetBottomMargin(0.22)
-        corrMtrxCan.SetLeftMargin(0.17)
-        corrMtrxCan.SetTopMargin(0.06)
+        if hasattr(fit_result,'correlationMatrix'):
+            corrMtrx = header.reducedCorrMatrixHist(fit_result)
+            corrMtrxCan = TCanvas('c','c',1400,1000)
+            corrMtrxCan.cd()
+            corrMtrxCan.SetBottomMargin(0.22)
+            corrMtrxCan.SetLeftMargin(0.17)
+            corrMtrxCan.SetTopMargin(0.06)
 
-        corrMtrx.Draw('colz')
-        corrMtrxCan.Print('correlation_matrix.png','png')
+            corrMtrx.Draw('colz')
+            corrMtrxCan.Print('correlation_matrix.png','png')
 
     for t in twoDinstances:
         try:

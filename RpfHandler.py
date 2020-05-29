@@ -1,7 +1,7 @@
 import ROOT
 from ROOT import *
 
-import header, os, subprocess
+import header, os, subprocess, copy
 
 class RpfHandler():
     def __init__ (self,fitDict,name,dummy_TH2=None,tag=''):
@@ -9,11 +9,13 @@ class RpfHandler():
         self.projDir = name+'/'+tag
         self.fitType = self.fitType()
         self.name = name
+        self.tag = tag
+        self.dummy_TH2 = dummy_TH2
         self.rpfVars = {}
         self.binVars = {} # RooFormulaVars for each bin for later evaluation
         self.allVars = []
 
-        # Initialize rpfVars according to 
+        # Initialize rpfVars according to form of function
         if self.fitType == 'splitPoly':
             # Do some quick checks to make sure these are formatted correctly
             header.checkFitForm(self.fitDict['XPFORM'],self.fitDict['YPFORM'])
@@ -50,7 +52,7 @@ class RpfHandler():
                         else:
                             self.rpfVars[varname] = RooConstVar(varname,varname,this_nom)
 
-                    self.allVars.append(self.rpfVars[varname])
+                    # self.allVars.append(self.rpfVars[varname])
 
         elif self.fitType == 'fullPoly':
             # Polynomial Order
@@ -92,7 +94,7 @@ class RpfHandler():
                             quit()
                         else:
                             self.rpfVars[varname] = RooConstVar(varname,varname,this_nom)
-                    self.allVars.append(self.rpfVars[varname])
+                    # self.allVars.append(self.rpfVars[varname])
 
         elif self.fitType == 'generic':
             for c in sorted(self.fitDict.keys()):
@@ -116,7 +118,7 @@ class RpfHandler():
                             quit()
                         else:
                             self.rpfVars[varname] = RooConstVar(varname,varname,this_nom)
-                    self.allVars.append(self.rpfVars[varname])
+                    # self.allVars.append(self.rpfVars[varname])
 
             
         elif self.fitType == 'cheb':
@@ -250,5 +252,15 @@ class RpfHandler():
         formula_name = 'formula_'+c+'_bin_'+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
         return self.binVars[formula_name].getValV()
 
+    def getRpfBinRRV(self,c,xbin,ybin):
+        formula_name = 'formula_'+c+'_bin_'+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
+        return self.binVars[formula_name]
+
     def getRpfVarNames(self):
         return sorted(self.rpfVars.keys())
+
+    # Removes everything but basic values for storage
+    def getReducedCopy(self):
+        newcopy = RpfHandler(self.fitDict,self.name,self.dummy_TH2,self.tag)
+        newcopy.rpfVars = copy.deepcopy(self.rpfVars)
+        return newcopy

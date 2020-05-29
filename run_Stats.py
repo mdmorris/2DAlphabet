@@ -1,4 +1,4 @@
-import sys, os, time, decimal, pickle
+import sys, os, time, decimal, pickle, tempfile
 import header
 import random
 import ROOT
@@ -139,8 +139,8 @@ with header.cd(projDir):
     if options.workspace == '' and not options.post:
         workspace_name = 'stats_workspace.root'
         t2w_cmd = 'text2workspace.py --channel-masks -b card_'+card_tag+'.txt -o '+workspace_name
-        if not (os.path.exists(workspace_name) and options.ftest == 'pvalue'):
-            header.executeCmd(t2w_cmd,options.dryrun)
+        # if not (os.path.exists(workspace_name)):# and options.ftest == 'pvalue'):
+        header.executeCmd(t2w_cmd,options.dryrun)
     else:
         workspace_name = options.workspace
 
@@ -198,7 +198,7 @@ with header.cd(projDir):
 
             gof_data_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated '+blind_string+freeze_r_string+' -n gof_data'
             header.executeCmd(gof_data_cmd,options.dryrun)
-            gof_toy_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated --saveWorkspace --saveToys '+blind_string+freeze_r_string+' -t '+str(ntoys)+' -s '+str(seed) +' -n '+run_name
+            gof_toy_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --saveWorkspace '+blind_string+freeze_r_string+' -t '+str(ntoys)+' -s '+str(seed) +' -n '+run_name
 
             if options.condor == True:
                 tar_files = ['run_Stats.py',
@@ -212,19 +212,21 @@ with header.cd(projDir):
 
             else:
                 # header.executeCmd(gen_command,options.dryrun)
+                header.executeCmd(gen_command)
                 header.executeCmd(gof_toy_cmd)
 
         if not options.condor:
             if options.post:
                 with header.cd('condor_'+run_name):
+                    tmpdir = tempfile.mkdtemp() 
                     if toyjobs > 1:
-                        header.executeCmd('cat '+run_name+'*.tgz | tar zxvf - -i')
+                        header.executeCmd('cat '+run_name+'*.tgz | tar zxvf - -i -C '+tmpdir+'/')
                         toyLimitTree = TChain('limit')
-                        toyLimitTree.Add('higgsCombine*.GoodnessOfFit.mH120.*.root')
+                        toyLimitTree.Add(tmpdir+'/higgsCombine*.GoodnessOfFit.mH120.*.root') 
                         # header.executeCmd('hadd ../fitDiagnostics'+run_name+'.root fitDiagnostics'+run_name+'_*.root')
                     else:
-                        header.executeCmd('tar xzvf *.tgz')
-                        toyOutput = TFile.Open('higgsCombine'+run_name+'.GoodnessOfFit.mH120.'+str(seed)+'.root')
+                        header.executeCmd('tar xzvf *.tgz -C '+tmpdir+'/')
+                        toyOutput = TFile.Open(tmpdir+'/higgsCombine'+run_name+'.GoodnessOfFit.mH120.'+str(seed)+'.root')
                         toyLimitTree = toyOutput.Get('limit')
             else:
                 toyOutput = TFile.Open('higgsCombine'+run_name+'.GoodnessOfFit.mH120.'+str(seed)+'.root')
@@ -242,7 +244,14 @@ with header.cd(projDir):
             # Get toys
             # toyOutput = TFile.Open('higgsCombine'+run_name+'.GoodnessOfFit.mH120.'+str(seed)+'.root')
             # toyLimitTree = toyOutput.Get('limit')
-            toyLimitTree.Draw('limit>>hlimit','limit>0.001') 
+            # toyLimitTree.Draw('>>limitEntryList','limit>1.0','entrylist')
+            # limitEntryList = gDirectory.Get('limitEntryList')
+
+            # toyLimitTree.SetEntryList(limitEntryList)
+            # toyLimitTree.Print()
+            # print toyLimitTree.GetMinimum('limit')
+            # toyLimits = TH1F('hlimit','hlimit',25,800,1.2*max(toyLimitTree.GetMaximum('limit'),gofLimit))
+            toyLimitTree.Draw('limit>>hlimit','limit>1.0 && limit<%s && limit != %s'%(gofLimit*2.0,gofLimit)) 
             toyLimits = gDirectory.Get('hlimit')
             time.sleep(1) # if you don't sleep the code moves too fast and won't perform the fit
             toyLimits.Fit("gaus")
@@ -265,7 +274,7 @@ with header.cd(projDir):
                 xmin = toyLimits.GetXaxis().GetXmin()
                 new_xmax = int(gofLimit*1.1)
                 new_nbins = int((new_xmax-xmin)/binwidth)
-                toyLimitTree.Draw('limit>>hlimitrebin('+str(new_nbins)+', '+str(xmin)+', '+str(new_xmax)+')','limit>0') 
+                toyLimitTree.Draw('limit>>hlimitrebin('+str(new_nbins)+', '+str(xmin)+', '+str(new_xmax)+')','limit>0.001 && limit<1500') 
                 toyLimits = gDirectory.Get('hlimitrebin')
                 toyLimits.Fit("gaus")
                 gaus = toyLimits.GetFunction("gaus")
@@ -327,13 +336,14 @@ with header.cd(projDir):
             # If need to post-process a condor task
             if options.post:
                 with header.cd('condor_'+run_name):
+                    tmpdir = tempfile.mkdtemp() 
                     if toyjobs > 1:
-                        header.executeCmd('cat '+run_name+'*.tgz | tar zxvf - -i')
+                        header.executeCmd('cat '+run_name+'*.tgz | tar zxvf - -i -C '+tmpdir+'/')
                         tree_fit_sb = TChain('tree_fit_sb')
-                        tree_fit_sb.Add('fitDiagnostics'+run_name+'_*.root')
+                        tree_fit_sb.Add(tmpdir+'/fitDiagnostics'+run_name+'_*.root')
                     else:
-                        header.executeCmd('tar xzvf *.tgz')
-                        post_file = TFile.Open('fitDiagnostics'+run_name+'.root')
+                        header.executeCmd('tar xzvf *.tgz -C '+tmpdir+'/')
+                        post_file = TFile.Open(tmpdir+'/fitDiagnostics'+run_name+'.root')
                         tree_fit_sb = post_file.Get('tree_fit_sb')
             else:
                 post_file = TFile.Open('fitDiagnostics'+run_name+'.root')
@@ -365,8 +375,8 @@ with header.cd(projDir):
             hsignstrength.Draw('pe')
             result_can.Print(run_name+'_sigstrength.png','png')
 
-            header.executeCmd('rm condor_'+run_name+'/fitDiagnostics*.root condor_'+run_name+'/higgsCombine*.root')
-
+            #header.executeCmd('rm condor_'+run_name+'/fitDiagnostics*.root condor_'+run_name+'/higgsCombine*.root')
+ 
 # Can run against other models or one model against itself to do a b-only vs s+b comparison
 if options.biasStudy !='' or options.ftest:
 
@@ -376,8 +386,8 @@ if options.biasStudy !='' or options.ftest:
             # if options.workspace == '':
             altworkspace_name = 'stats_workspace.root'
             t2w_cmd = 'text2workspace.py --channel-masks -b card_'+altcard_tag+'.txt -o '+altworkspace_name
-            if not (os.path.exists(workspace_name) and options.ftest == 'pvalue'):
-                header.executeCmd(t2w_cmd,options.dryrun)
+            # if not (os.path.exists(workspace_name)):# and options.ftest == 'pvalue'):
+            header.executeCmd(t2w_cmd,options.dryrun)
 
     ##############
     # Bias study #
@@ -465,6 +475,9 @@ if options.biasStudy !='' or options.ftest:
         # 2) Run frequentist toy generation (from data) from base model
         # 3) Run GOF for both models over toys
         # 4) Compare results from steps 1 and 3
+        base_fit_cmd = 'combine -d '+workspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_r_string
+        if options.ftest == 'pvalue' or options.ftest == 'fitAlt': alt_fit_cmd = 'combine -d '+altworkspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_r_string
+
         if options.ftest == 'generate':#not options.plotOnly and options.ftest != 'post':
             # Base
             with header.cd(projDir):
@@ -472,16 +485,12 @@ if options.biasStudy !='' or options.ftest:
             
         elif options.ftest == 'pvalue':
             with header.cd(projDir):
-                base_fit_cmd = 'combine -d '+workspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_r_string
                 header.executeCmd(base_fit_cmd) 
-
             with header.cd(altDir):
-                alt_fit_cmd = 'combine -d '+altworkspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_r_string
                 header.executeCmd(alt_fit_cmd)
 
         elif options.ftest == 'fitMain':
             with header.cd(projDir):
-                base_fit_cmd = 'combine -d '+workspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_r_string
                 header.executeCmd(base_fit_cmd) 
                 # Base fit to toys
                 base_toy_fit_cmd = 'combine -d '+workspace_name+' -M GoodnessOfFit --rMax 10.0 --rMin -10.0 --algo saturated '+blind_string+freeze_r_string+' -t '+str(ntoys)+' --toysFile higgsCombineFTest.GenerateOnly.mH120.'+ftestseed+'.root -n FTestToyFits -s '+str(ftestseed)
@@ -503,7 +512,6 @@ if options.biasStudy !='' or options.ftest:
 
         elif options.ftest == 'fitAlt':
             with header.cd(altDir):
-                alt_fit_cmd = 'combine -d '+altworkspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_r_string
                 header.executeCmd(alt_fit_cmd)
                 # Alt fit to toys
                 alt_toy_fit_cmd = 'combine -d '+altworkspace_name+' -M GoodnessOfFit --rMax 10.0 --rMin -10.0 --algo saturated '+blind_string+freeze_r_string+' -t '+str(ntoys)+' --toysFile '+altDir_depth+projDir+'/higgsCombineFTest.GenerateOnly.mH120.'+ftestseed+'.root -n '+run_name+' -s '+str(ftestseed)
@@ -534,11 +542,13 @@ if options.biasStudy !='' or options.ftest:
             # If ran with condor, go grab the output jobs
             if options.condor: 
                 with header.cd(projDir+'/condor_'+run_name):
-                    header.executeCmd('tar -xzvf '+run_name+'.tgz')
+                    header.executeCmd('mkdir tmp/')
+                    header.executeCmd('tar -xzvf '+run_name+'.tgz -C tmp/')
                 header.executeCmd('mv '+projDir+'/condor_'+run_name+'/'+toy_fit_filename_main+' '+projDir+'/')
 
                 with header.cd(altDir+'/condor_'+run_name):
-                    header.executeCmd('tar -xzvf '+run_name+'.tgz')
+                    header.executeCmd('mkdir tmp/')
+                    header.executeCmd('tar -xzvf '+run_name+'.tgz -C tmp/')
                 header.executeCmd('mv '+altDir+'/condor_'+run_name+'/'+toy_fit_filename_alt+' '+altDir+'/')
 
             # If the number of bins in the two models doesn't match, specify which to use or quit
@@ -746,4 +756,6 @@ if options.biasStudy !='' or options.ftest:
                 # c.SaveAs(projDir+'/ftesst_vs_'+alttag+".root")
                 c.SaveAs(projDir+'/ftest_vs_'+alttag+".pdf")
                 c.SaveAs(projDir+'/ftest_vs_'+alttag+".png")
-
+            if options.condor:
+                header.executeCmd('rm -r '+altDir+'/condor_'+run_name+'/tmp/')
+                header.executeCmd('rm -r '+projDir+'/condor_'+run_name+'/tmp/')    

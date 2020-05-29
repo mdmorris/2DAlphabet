@@ -10,7 +10,7 @@
 #                       Imports                         #
 #########################################################
 from optparse import OptionParser
-import subprocess
+import subprocess, CMS_lumi
 import cPickle as pickle
 import os, sys, array, json
 import pprint
@@ -33,7 +33,7 @@ class TwoDAlphabet:
         del self.workspace
 
     # Initialization setup to just build workspace. All other steps must be called with methods
-    def __init__ (self,jsonFileName,quicktag='',recycleAll=False,stringSwaps={}): # jsonFileNames is a list
+    def __init__ (self,jsonFileName,quicktag='',recycleAll=False,recycle=False,stringSwaps={}): # jsonFileNames is a list
         self.allVars = []    # This is a list of all RooFit objects made. It never gets used for anything but if the
                         # objects never get saved here, then the python memory management will throw them out
                         # because of conflicts with the RooFit memory management. It's a hack.
@@ -74,7 +74,7 @@ class TwoDAlphabet:
         self.fitGuesses = self._getOption('fitGuesses')
         self.prerun = self._getOption('prerun')
         self.overwrite = self._getOption('overwrite')
-        self.recycle = self._getOption('recycle')
+        self.recycle = recycle if recycle != False else self._getOption('recycle')
         self.plotTogether = self._getOption('plotTogether')
         self.rpfRatio = self._getOption('rpfRatio')
         self.year = self._getOption('year')
@@ -84,9 +84,35 @@ class TwoDAlphabet:
         # Setup a directory to save
         self.projPath = self._projPath()
 
+        # Determine whether we need rpfRatio templates
+        if self.rpfRatio != False:
+            if 'SYSTEMATICS' in self.inputConfig['OPTIONS']['rpfRatio'].keys() and len(self.inputConfig['OPTIONS']['rpfRatio']['SYSTEMATICS']) > 0:
+                if len(self.inputConfig['OPTIONS']['rpfRatio']['SYSTEMATICS']) == 1 and self.inputConfig['OPTIONS']['rpfRatio']['SYSTEMATICS'][0] == 'KDEbandwidth':
+                    self.rpfRatioVariations = ['up','down']
+                else:
+                    raise ValueError('Only "KDEbandwidth" is accepted as a systematic uncertainty for the qcd mc Rpf ratio.')
+            else:
+                self.rpfRatioVariations = False
+
+        # Check if doing an external import
+        importOrgDict = False
+        importExternalTemplates = False
+        print 'Checking for external imports...'
+        for i in self.recycle:
+            if 'organizedDict' in i:
+                importOrgDict = True
+                if '{' in i:
+                    importExternalTemplates = i[i.find('{')+1:i.find('}')]
+                    print 'Will import organized files from %s'%importExternalTemplates
+                else:
+                    importExternalTemplates = False
+
+                break
+
         # Pickle reading if recycling
-        if self.recycle != [] or self.recycleAll:
-            self.pickleFile = pickle.load(open(self.projPath+'saveOut.p','rb'))
+        if (self.recycle != False and self.recycle != []) or self.recycleAll:
+            if not (len(self.recycle) == 1 and importExternalTemplates != False):
+                self.pickleFile = pickle.load(open(self.projPath+'saveOut.p','rb'))
         
         # Dict to pickle at the end
         self.pickleDict = {}
@@ -115,21 +141,28 @@ class TwoDAlphabet:
         for c in ['SIG','HIGH']:
             self.fullXbins.extend(self.newXbins[c][1:])
 
+        print '\n'
         print self.fullXbins
+        print self.newYbins
 
         # Run pseudo2D for fit guesses and make the config to actually run on
         if ("runConfig" not in self.recycle and not self.recycleAll):
             if self.fitGuesses: self._makeFitGuesses()
 
-        # Initialize rpf class
-        if 'organizedDict' not in self.recycle and not self.recycleAll:
-        #     self.rpf = self._readIn('rpf')
-        # else:
+        # Initialize rpf class       
+        if 'rpf' not in self.recycle and not self.recycleAll:
             self.rpf = RpfHandler.RpfHandler(self.inputConfig['FIT'],self.name,self._dummyTH2(),self.tag)
+        else:
+            self.rpf = self._readIn('rpf')
 
         # Organize everything for workspace building
-        if 'organizedDict' in self.recycle or self.recycleAll:
-            self.organizedDict = self._readIn('organizedDict')
+        if importOrgDict or self.recycleAll:
+            if importExternalTemplates != False:
+                self.organizedDict = self._readIn('organizedDict',importExternalTemplates)
+                header.executeCmd('cp '+importExternalTemplates+'/'+self.name+'/organized_hists.root '+self.projPath+'organized_hists.root')
+                # self.orgFile = TFile.Open(importExternalTemplates+'/'+self.name+'/organized_hists.root') # have to save out the histograms to keep them persistent past this function
+            else:
+                self.organizedDict = self._readIn('organizedDict')
             self.orgFile = TFile.Open(self.projPath+'organized_hists.root') # have to save out the histograms to keep them persistent past this function
         else:
             self.orgFile = TFile(self.projPath+'organized_hists.root','RECREATE') # have to save out the histograms to keep them persistent past this function
@@ -185,6 +218,8 @@ class TwoDAlphabet:
 
         # Very last thing - get a seg fault otherwise
         del self.workspace
+        self.orgFile.Close()
+        del self.pickleDict
 
     # FUNCTIONS USED IN INITIALIZATION
     def _configGlobalVarReplacement(self):
@@ -466,8 +501,8 @@ class TwoDAlphabet:
         self.pickleDict['blindedFit'] = self.blindedFit
         self.pickleDict['plotTogether'] = self.plotTogether
 
-        # Setup a directory to save
-        self.projPath = self._projPath()
+        # # Setup a directory to save
+        # self.projPath = self._projPath()
 
         # bins
         self.pickleDict['newXbins'] = self.newXbins
@@ -475,8 +510,8 @@ class TwoDAlphabet:
         self.pickleDict['newYbins'] = self.newYbins
 
         # rpf - Don't do this - takes up +5 GB
-        # self.pickleDict['rpf'] = self.rpf
-        self.pickleDict['rpfVarNames'] = self.rpf.getRpfVarNames()
+        self.pickleDict['rpf'] = self.rpf.getReducedCopy()
+        # self.pickleDict['rpfVarNames'] = self.rpf.getRpfVarNames()
 
         # organizedDict
         self.pickleDict['organizedDict'] = self.organizedDict
@@ -487,24 +522,30 @@ class TwoDAlphabet:
         # workspace
         self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
 
-    def _readIn(self,attrname):
+    def _readIn(self,attrname,extOption=''):
+        if extOption != '':
+            thispickle = pickle.load(open(extOption+'/'+self.name+'/saveOut.p','rb'))
+            self.allVars.append(thispickle)
+        else:
+            thispickle = self.pickleFile
+
         if attrname == 'runConfig':
             return header.openJSON(self.projPath+'runConfig.json')
 
         elif attrname == 'newXbins': 
-            return self.pickleFile['newXbins']
+            return thispickle['newXbins']
 
         elif attrname == 'newYbins':
-            return self.pickleFile['newYbins']
+            return thispickle['newYbins']
 
-        # elif attrname == 'rpf': 
-        #     return self.pickleFile['rpf']
+        elif attrname == 'rpf': 
+            return thispickle['rpf']
 
         elif attrname == 'organizedDict':
-            return self.pickleFile['organizedDict']
+            return thispickle['organizedDict']
 
         elif attrname == 'floatingBins':
-            return self.pickleFile['floatingBins']
+            return thispickle['floatingBins']
 
         elif attrname == 'workspace':
             return TFile.Open(self.projPath+'base_'+self.name+'.root').Get('w_'+self.name)
@@ -1088,7 +1129,7 @@ class TwoDAlphabet:
             dict_hists[process]['fail']['nominal'] = hist_fail
 
             # If there are systematics
-            if process == 'qcdmc' or len(this_process_dict['SYSTEMATICS']) == 0:
+            if 'SYSTEMATICS' not in this_process_dict.keys() or len(this_process_dict['SYSTEMATICS']) == 0:
                 print 'No systematics for process ' + process
             else:
                 # Loop through them and grab info from inputConfig['SYSTEMATIC']
@@ -1283,6 +1324,7 @@ class TwoDAlphabet:
 
         # For procees, cat, dict...
         for process in self.organizedDict.keys():
+            if process == 'qcdmc': continue
             for cat in ['pass','fail']:
                 for c in ['LOW','SIG','HIGH']:
                     for dist in self.organizedDict[process][cat+'_'+c].keys():
@@ -1305,17 +1347,16 @@ class TwoDAlphabet:
         for r in ['pass','fail']:
             for c in ['LOW','SIG','HIGH']:
                 Roo_dict['qcd'][r+'_'+c] = {}
-
-        TH2_qcdmc_ratios = {}
+        
         if self.rpfRatio != False:
+            TH2_qcdmc_ratios = {}
             TH2_qcdmc_fail = self.orgFile.Get(self.organizedDict['qcdmc']['fail_FULL']['nominal'])
             TH2_qcdmc_pass = self.orgFile.Get(self.organizedDict['qcdmc']['pass_FULL']['nominal'])
-            # for ismooth in range(3):
-            #     TH2_qcdmc_fail.Smooth(1,"k5a")
-            #     TH2_qcdmc_pass.Smooth(1,"k5a")
+
             TH2_qcdmc_ratios['FULL'] = TH2_qcdmc_pass.Clone('qcdmc_rpf_full')
             TH2_qcdmc_ratios['FULL'].Divide(TH2_qcdmc_fail)
-            TH2_qcdmc_ratios['FULL'].Smooth(1,"k5a") #= header.smoothHist2D('qcdmc_rpf_full_smooth',TH2_qcdmc_ratios['FULL'],renormalize=False,skipEdges=True)
+            if self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']:
+                TH2_qcdmc_ratios['FULL'].Smooth(1,"k5a") #= header.smoothHist2D('qcdmc_rpf_full_smooth',TH2_qcdmc_ratios['FULL'],renormalize=False,skipEdges=True)
             for c in ['LOW','SIG','HIGH']:
                 TH2_qcdmc_ratios[c] = header.copyHistWithNewXbins(TH2_qcdmc_ratios['FULL'],self.newXbins[c],'qcdmc_rpf_'+c+'_smooth')
         
@@ -1344,24 +1385,9 @@ class TwoDAlphabet:
 
             
             if self.rpfRatio != False:
-                # "TH2_data_fail" is now going to be the true fail multiplied by the pass/fail ratio of the MC
-                # TH2_qcdmc_fail = self.orgFile.Get(self.organizedDict['qcdmc']['fail_'+c]['nominal'])
-                # TH2_qcdmc_pass = self.orgFile.Get(self.organizedDict['qcdmc']['pass_'+c]['nominal'])
-
-                # if 'SMOOTH' in self.inputConfig['OPTIONS']['rpfRatio'].keys() and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']:
-                #     TH2_qcdmc_fail = header.smoothHist2D('smooth_qcdmc_fail_'+c,TH2_qcdmc_fail)
-                #     TH2_qcdmc_pass = header.smoothHist2D('smooth_qcdmc_pass_'+c,TH2_qcdmc_pass)
-
-                # TH2_qcdmc_ratios[c] = TH2_qcdmc_pass.Clone()
-                # TH2_qcdmc_ratios[c].Divide(TH2_qcdmc_fail)
-
-                # if 'SMOOTH' in self.inputConfig['OPTIONS']['rpfRatio'].keys() and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']:
-                #     TH2_qcdmc_ratios[c] = header.smoothHist2D('smooth_rpf_MC',TH2_qcdmc_ratios[c],renormalize=False)
-
-                # TH2_qcdmc_ratio = TH2_qcdmc_ratios[c]
-
                 TH2_data_toy_ratios[c] = TH2_data_pass_toy.Clone()
                 TH2_data_toy_ratios[c].Divide(TH2_data_fail_toy)
+                
             else:
                 TH2_data_fail_toys[c] = TH2_data_fail_toy
                 TH2_data_pass_toys[c] = TH2_data_pass_toy
@@ -1373,7 +1399,7 @@ class TwoDAlphabet:
                     # Now that we're in a specific bin, we need to process it
 
                     # First check if we have an empty pass bin
-                    this_pass_bin_zero = True if TH2_data_pass.GetBinContent(xbin,ybin) <= 0 else False 
+                    # this_pass_bin_zero = True if TH2_data_pass.GetBinContent(xbin,ybin) <= 0 else False 
                     
                     # Now that we know we aren't in the blinded region, make a name for the bin RRV
                     fail_bin_name = 'Fail_'+c+'_bin_'+str(xbin)+'-'+str(ybin)+'_'+self.name
@@ -1503,7 +1529,9 @@ class TwoDAlphabet:
             rpf_ratio.SetMaximum(2.5)
             rpf_ratio.GetZaxis().SetLabelSize(0.08)
 
-            header.makeCan('rpf_ratio',self.projPath,[data_rpf,mc_rpf,rpf_ratio],titles=["Data Ratio","MC Ratio","Ratio of ratios"],year=self.year)
+            header.makeCan('rpf_ratio',self.projPath,[data_rpf,mc_rpf,rpf_ratio],
+                titles=["Data Ratio;%s;%s;R_{P/F}"%(self.xVarTitle,self.yVarTitle),"MC Ratio;%s;%s;R_{P/F}"%(self.xVarTitle,self.yVarTitle),"Ratio of ratios;%s;%s;R_{Ratio}"%(self.xVarTitle,self.yVarTitle)],
+                year=self.year)
         else: 
             data_fail = header.stitchHistsInX('data_fail',self.fullXbins,self.newYbins,[TH2_data_fail_toys['LOW'],TH2_data_fail_toys['SIG'],TH2_data_fail_toys['HIGH']],blinded=[1] if self.blindedPlots else [])
             data_pass = header.stitchHistsInX('data_fail',self.fullXbins,self.newYbins,[TH2_data_pass_toys['LOW'],TH2_data_pass_toys['SIG'],TH2_data_pass_toys['HIGH']],blinded=[1] if self.blindedPlots else [])
@@ -1511,6 +1539,56 @@ class TwoDAlphabet:
             data_rpf.Divide(data_fail)
             header.makeCan('data_ratio',self.projPath,[data_pass,data_fail,data_rpf],titles=["Data Pass","Data Fail","R_{P/F}"],year=self.year)
             header.makeCan('data_ratio_lego',self.projPath,[data_pass,data_fail,data_rpf],titles=["Data Pass","Data Fail","R_{P/F}"],year=self.year,datastyle='lego')
+
+        # Determine whether we need rpfRatio templates
+        if self.rpfRatio != False and self.rpfRatioVariations != False:
+            for v in self.rpfRatioVariations:
+                TH2_qcdmc_fail = self.orgFile.Get(self.organizedDict['qcdmc']['fail_FULL']['KDEbandwidth'+v.capitalize()])
+                TH2_qcdmc_pass = self.orgFile.Get(self.organizedDict['qcdmc']['pass_FULL']['KDEbandwidth'+v.capitalize()])
+
+                TH2_qcdmc_ratios['FULL_'+v] = TH2_qcdmc_pass.Clone('qcdmc_rpf_full_'+v)
+                TH2_qcdmc_ratios['FULL_'+v].Divide(TH2_qcdmc_fail)
+
+                for c in ['LOW','SIG','HIGH']:
+                    TH2_qcdmc_ratios[c+'_'+v] = header.copyHistWithNewXbins(TH2_qcdmc_ratios['FULL_'+v],self.newXbins[c],'qcdmc_rpf_'+c+'_'+v)
+                    bin_list_fail = Roo_dict['qcd']['fail_'+c]['RPH2D'].getPars()
+                    bin_list_pass = RooArgList()
+                    for ybin in range(1,len(self.newYbins)):
+                        for xbin in range(1,len(self.newXbins[c])):
+                            this_full_xbin = self._getFullXbin(xbin,c)
+                            # Now that we're in a specific bin, we need to process it
+                            fail_bin_name = 'Fail_'+c+'_bin_'+str(xbin)+'-'+str(ybin)+'_'+self.name
+                            pass_bin_name = 'Pass_'+c+'_bin_'+str(xbin)+'-'+str(ybin)+'_'+self.name+'_'+v
+
+                            binRRV = bin_list_fail.find(fail_bin_name)
+                            bin_content = binRRV.getValV()
+                            # If fail bin content is <= 0, treat this bin as a RooConstVar at value close to 0
+                            if isinstance(binRRV,RooConstVar):# or (this_pass_bin_zero == True):
+                                this_bin_pass = RooConstVar(pass_bin_name, pass_bin_name, 1e-9)
+                                bin_list_pass.add(this_bin_pass)
+                                self.allVars.append(this_bin_pass)
+
+                            else:
+                                # And now get the Rpf function value for this bin 
+                                this_rpf = self.rpf.getRpfBinRRV(c,this_full_xbin,ybin)
+                                mc_ratio_var = RooConstVar("mc_ratio_"+v+"_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, 
+                                                           "mc_ratio_"+v+"_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, 
+                                                           TH2_qcdmc_ratios[c+'_'+v].GetBinContent(xbin,ybin))
+                                formula_arg_list = RooArgList(binRRV,this_rpf,mc_ratio_var)
+                                this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1*@2",formula_arg_list)
+                                
+                                bin_list_pass.add(this_bin_pass)
+                                self.allVars.append(formula_arg_list)
+                                self.allVars.append(this_bin_pass)
+                                self.allVars.append(mc_ratio_var)
+
+                    Roo_dict['qcd']['pass_'+c+'_'+v] = {}
+                    Roo_dict['qcd']['pass_'+c+'_'+v]['RPH2D'] = RooParametricHist2D('qcd_pass_'+c+'_'+self.name+'_KDEbandwidth'+v.capitalize(),
+                                                                                    'qcd_pass_'+c+'_'+self.name+'_KDEbandwidth'+v.capitalize(),
+                                                                                    x_vars[c], y_var, bin_list_pass, TH2_qcdmc_ratios[c+'_'+v])
+                    Roo_dict['qcd']['pass_'+c+'_'+v]['norm']  = RooAddition('qcd_pass_'+c+'_'+self.name+'_KDEbandwidth'+v.capitalize()+'_norm',
+                                                                            'qcd_pass_'+c+'_'+self.name+'_KDEbandwidth'+v.capitalize()+'_norm',
+                                                                            bin_list_pass)
 
         print "Making workspace..."
         # Make workspace to save in
@@ -1522,7 +1600,8 @@ class TwoDAlphabet:
                     for itemkey in rooObj.keys():
                         print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat + ', ' + itemkey
                         getattr(self.workspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes(),RooFit.Silence())
-                
+                elif process == 'qcdmc':
+                    continue
                 else:
                     for dist in Roo_dict[process][cat].keys():
                         rooObj = Roo_dict[process][cat][dist]
@@ -1549,7 +1628,8 @@ class TwoDAlphabet:
         jmax = str(len([proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and self.inputConfig['PROCESS'][proc]['CODE'] == 2]) + 1)
         # Get the length of the lsit of all systematics (and ignore "HELP" key)
         n_uncorr_systs = len([syst for syst in self.inputConfig['SYSTEMATIC'].keys() if syst != 'HELP' and 'UNCORRELATED' in self.inputConfig['SYSTEMATIC'][syst] and self.inputConfig['SYSTEMATIC'][syst]['UNCORRELATED']])
-        kmax = str(len([syst for syst in self.inputConfig['SYSTEMATIC'].keys() if syst != 'HELP'])+n_uncorr_systs)
+        kmax = str(len([syst for syst in self.inputConfig['SYSTEMATIC'].keys() if syst != 'HELP' and syst != 'KDEbandwidth'])+n_uncorr_systs)
+        if self.rpfRatioVariations != False: kmax = str(int(kmax)+1)
 
         card_new.write('imax '+imax+'\n')      
         card_new.write('jmax '+jmax+'\n')
@@ -1561,7 +1641,8 @@ class TwoDAlphabet:
         ##########
         procs_with_systs = [proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and len(self.inputConfig['PROCESS'][proc]['SYSTEMATICS']) != 0]
         procs_without_systs = [proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and len(self.inputConfig['PROCESS'][proc]['SYSTEMATICS']) == 0]
-        procs_without_systs.append('qcd')   # Again, qcd not in the input JSON but needs to be in the combine card!
+        if self.rpfRatioVariations == False: procs_without_systs.append('qcd')   # Again, qcd not in the input JSON but needs to be in the combine card!
+        else: procs_with_systs.append('qcd')
 
         for proc in procs_without_systs:
             card_new.write(header.colliMate('shapes  '+proc+' * base_'+self.name+'.root w_'+self.name+':'+proc+'_$CHANNEL\n'))
@@ -1599,6 +1680,7 @@ class TwoDAlphabet:
 
         # Fill syst_lines with keys to initialized strings
         for syst in [systematic for systematic in self.inputConfig['SYSTEMATIC'].keys() if systematic != 'HELP']:
+            # Get type
             if self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 0 or self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 1:        # lnN
                 syst_type = 'lnN'
             elif self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 2 or self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 3:      # shape
@@ -1607,12 +1689,17 @@ class TwoDAlphabet:
                 print 'Systematic ' + syst + ' does not have one of the four allowed codes (0,1,2,3). Quitting.'
                 quit()
             
-            # NEW
+            # Build line
             if 'UNCORRELATED' in self.inputConfig['SYSTEMATIC'][syst].keys() and self.inputConfig['SYSTEMATIC'][syst]['UNCORRELATED']:
                 syst_lines[syst+'_pass'] = syst + '_pass ' + syst_type + ' '
                 syst_lines[syst+'_fail'] = syst + '_fail ' + syst_type + ' '
+            elif syst == 'KDEbandwidth':
+                continue
             else:
                 syst_lines[syst] = syst + ' ' + syst_type + ' '
+
+        if self.rpfRatioVariations != False:
+            syst_lines['KDEbandwidth'] = 'KDEbandwidth shape '
 
         signal_procs = [proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and proc != 'data_obs' and self.inputConfig['PROCESS'][proc]['CODE'] == 0]
         MC_bkg_procs = [proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and proc != 'data_obs' and (self.inputConfig['PROCESS'][proc]['CODE'] == 2 or self.inputConfig['PROCESS'][proc]['CODE'] == 3)]
@@ -1670,8 +1757,11 @@ class TwoDAlphabet:
                         # Otherwise place a '-'
                         else:
                             thisVal = '-'  
+
+                    elif syst_line_key == 'KDEbandwidth' and proc == 'qcd' and 'pass' in chan:
+                        thisVal = '1.0'
                     else:
-                        thisVal = '-' 
+                        thisVal = '-'
 
                     syst_lines[syst_line_key] += (thisVal+' ')
 
@@ -1686,7 +1776,6 @@ class TwoDAlphabet:
         ############################
         for line_key in syst_lines.keys():
             card_new.write(header.colliMate(syst_lines[line_key]+'\n',column_width))
-
 
         ######################################################
         # Mark floating values as flatParams                 # 
@@ -1871,12 +1960,15 @@ class TwoDAlphabet:
                         colors.append(None)
 
         # Put QCD on bottom of stack since it's smooth
+        colors_logy = colors+[kYellow]
         colors = [kYellow]+colors
-
+    
         # Create lists for makeCan of the projections
         for plotType in ['postfit_projx','postfit_projy']:   # Canvases
             bkgList = []
             bkgNameList = []
+            bkgList_logy = []
+            bkgNameList_logy = []
             dataList = []
             signal_list = []
             title_list = []
@@ -1916,6 +2008,11 @@ class TwoDAlphabet:
                     bkgNameList.append(['qcd']+bkg_process_names)
                     bkgList.append(bkg_process_list)
 
+                    # Put QCD on top of logy
+                    bkg_process_list_logy = bkg_process_list[1:]+[hist_dict['qcd'][cat][plotType+str(regionNum)]]
+                    bkgNameList_logy.append(bkg_process_names+['qcd'])
+                    bkgList_logy.append(bkg_process_list_logy)
+
                     title_list.append('Data vs bkg - %s - [%s,%s]'%(cat,low_str,high_str))
 
                     # Make the "money plot" of just the y projection of the signal region
@@ -1931,18 +2028,18 @@ class TwoDAlphabet:
                     bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
                     colors=colors,xtitle=self.xVarTitle,year=self.year)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
-                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
-                    colors=colors,xtitle=self.xVarTitle,logy=True,year=self.year)
+                    dataList,bkglist=bkgList_logy,totalBkg=totalBkgs,signals=signal_list,
+                    bkgNames=bkgNameList_logy,signalNames='b* %s GeV'%mass,titles=title_list,
+                    colors=colors_logy,xtitle=self.xVarTitle,logy=True,year=self.year)
             elif 'y' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
                     dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
                     bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
                     colors=colors,xtitle=self.yVarTitle,year=self.year)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
-                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
-                    colors=colors,xtitle=self.yVarTitle,logy=True,year=self.year)
+                    dataList,bkglist=bkgList_logy,totalBkg=totalBkgs,signals=signal_list,
+                    bkgNames=bkgNameList_logy,signalNames='b* %s GeV'%mass,titles=title_list,
+                    colors=colors_logy,xtitle=self.yVarTitle,logy=True,year=self.year)
 
         # Make comparisons for each background process of pre and post fit projections
         for plotType in ['projx','projy']:
@@ -2025,8 +2122,19 @@ class TwoDAlphabet:
                         thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
                         thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
 
-                        # thisXMapped = (thisXCenter - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
-                        # thisYMapped = (thisYCenter - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
+                        if self.recycleAll:
+                            # Remap to [0,1]
+                            x_center_mapped = (thisXCenter - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
+                            y_center_mapped = (thisYCenter - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
+
+                            # And assign it to a RooConstVar 
+                            x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center if self.rpf.fitType == 'cheb' else x_center_mapped)
+                            y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center if self.rpf.fitType == 'cheb' else y_center_mapped)
+                            
+                            # Now get the Rpf function value for this bin 
+                            self.allVars.append(x_const)
+                            self.allVars.append(y_const)
+                            self.rpf.evalRpf(x_const, y_const,xbin,ybin)
 
                         # Determine the category
                         if thisXCenter > self.newXbins['LOW'][0] and thisXCenter < self.newXbins['LOW'][-1]: # in the LOW category
@@ -2133,13 +2241,28 @@ class TwoDAlphabet:
                 rpf_final.SetBinContent(xbin,ybin,temp_projz.GetMean())
                 rpf_final.SetBinError(xbin,ybin,temp_projz.GetRMS())
 
-        rpf_c = TCanvas('rpf_c','Post-fit R_{P/F}',800,700)
-        rpf_final.Draw('lego')
-        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_lego.png','png')
+        rpf_final.SetTitle('')
+        rpf_final.GetXaxis().SetTitle(self.xVarTitle)
+        rpf_final.GetYaxis().SetTitle(self.yVarTitle)
+        rpf_final.GetZaxis().SetTitle('R_{P/F}' if self.rpfRatio == False else 'R_{Ratio}')
+        rpf_final.GetXaxis().SetTitleSize(0.045)
+        rpf_final.GetYaxis().SetTitleSize(0.045)
+        rpf_final.GetZaxis().SetTitleSize(0.045)
+        rpf_final.GetXaxis().SetTitleOffset(1.2)
+        rpf_final.GetYaxis().SetTitleOffset(1.5)
+        rpf_final.GetZaxis().SetTitleOffset(1.3)
+
+        rpf_c = TCanvas('rpf_c','Post-fit R_{P/F}',1000,700)
+        CMS_lumi.lumiTextSize = 0.75
+        CMS_lumi.cmsTextSize = 0.85
+        CMS_lumi.CMS_lumi(rpf_c, self.year, 11)
+        rpf_c.SetRightMargin(0.2)
+        rpf_final.Draw('colz')
+        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_colz.pdf','pdf')
         rpf_final.Draw('surf')
-        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_surf.png','png')
+        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_surf.pdf','pdf')
         rpf_final.Draw('pe')
-        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_errs.png','png')
+        rpf_c.Print(self.projPath+'plots/fit_'+fittag+'/postfit_rpf_errs.pdf','pdf')
 
         rpf_file = TFile.Open(self.projPath+'/plots/postfit_rpf_fit'+fittag+'.root','RECREATE')
         rpf_file.cd()
@@ -2335,30 +2458,35 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
     # Make a prefit workspace from the data card
     print 'cd '+projDir
     with header.cd(projDir):
-        t2w_cmd = 'text2workspace.py -b '+card_name+' -o limitworkspace.root' 
+        t2w_cmd = 'text2workspace.py -b '+card_name+' -o workspace.root' 
         header.executeCmd(t2w_cmd)
         # header.setSnapshot(os.environ['CMSSW_BASE']+'/src/2DAlphabet/'+postfitWorkspaceDir+'/')
 
     # Morph workspace according to imported fit result
-    prefit_file = TFile(projDir+'/limitworkspace.root','update')
+    prefit_file = TFile(projDir+'/workspace.root')
     postfit_w = prefit_file.Get('w')
     fit_result_file = TFile.Open(postfitWorkspaceDir+'/fitDiagnostics.root')
     fit_result = fit_result_file.Get("fit_b")
-    postfit_vars = fit_result.floatParsFinal()
+    postfit_vars = RooArgSet(fit_result.floatParsFinal())
+    postfit_w.saveSnapshot('initialFit',postfit_vars)
+    print 'Writing '+projDir+'limitworkspace.root'
+    fout = TFile(projDir+'/limitworkspace.root',"recreate")
+    fout.WriteTObject(postfit_w,'w')
+    fout.Close()
 
-    for idx in range(postfit_vars.getSize()):
-        par_name = postfit_vars[idx].GetName()
-        if postfit_w.var(par_name):
-            print 'Setting '+par_name+' to '+str(postfit_vars[idx].getValV())+' +/- '+str(postfit_vars[idx].getError())
-            var = postfit_w.var(par_name)
-            var.setVal(postfit_vars[idx].getValV())
-            var.setError(postfit_vars[idx].getError())
+    #for idx in range(postfit_vars.getSize()):
+    #    par_name = postfit_vars[idx].GetName()
+    #    if postfit_w.var(par_name):
+    #        print 'Setting '+par_name+' to '+str(postfit_vars[idx].getValV())+' +/- '+str(postfit_vars[idx].getError())
+    #        var = postfit_w.var(par_name)
+    #        var.setVal(postfit_vars[idx].getValV())
+    #        var.setError(postfit_vars[idx].getError())
 
     prefit_file.Close()
 
     current_dir = os.getcwd()
 
-    aL_cmd = 'combine -M AsymptoticLimits limitworkspace.root --saveWorkspace' +blind_option + syst_option# + sig_option 
+    aL_cmd = 'combine -M AsymptoticLimits limitworkspace.root --snapshotName initialFit --saveWorkspace' +blind_option + syst_option# + sig_option 
 
     # Run combine if not on condor
     if location == 'local':    
