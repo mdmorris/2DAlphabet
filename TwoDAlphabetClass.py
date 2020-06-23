@@ -33,7 +33,7 @@ class TwoDAlphabet:
         del self.workspace
 
     # Initialization setup to just build workspace. All other steps must be called with methods
-    def __init__ (self,jsonFileName,quicktag='',recycleAll=False,recycle=False,stringSwaps={}): # jsonFileNames is a list
+    def __init__ (self,jsonFileName,quicktag='',recycleAll=False,recycle=False,CLoptions=[],stringSwaps={}): # jsonFileNames is a list
         self.allVars = []    # This is a list of all RooFit objects made. It never gets used for anything but if the
                         # objects never get saved here, then the python memory management will throw them out
                         # because of conflicts with the RooFit memory management. It's a hack.
@@ -42,6 +42,7 @@ class TwoDAlphabet:
         self.jsonFileName = jsonFileName
         self.stringSwaps = stringSwaps
         self.inputConfig = header.openJSON(self.jsonFileName)
+        self.CLoptions = CLoptions
 
         # Setup name
         # NAME - unique to config
@@ -93,6 +94,8 @@ class TwoDAlphabet:
                     raise ValueError('Only "KDEbandwidth" is accepted as a systematic uncertainty for the qcd mc Rpf ratio.')
             else:
                 self.rpfRatioVariations = False
+        else:
+            self.rpfRatioVariations = False
 
         # Check if doing an external import
         importOrgDict = False
@@ -220,6 +223,7 @@ class TwoDAlphabet:
         del self.workspace
         self.orgFile.Close()
         del self.pickleDict
+        # del self.allVars
 
     # FUNCTIONS USED IN INITIALIZATION
     def _configGlobalVarReplacement(self):
@@ -373,6 +377,7 @@ class TwoDAlphabet:
         temp_input_hist = temp_input_file.Get(self.inputConfig['PROCESS']['data_obs']['HISTFAIL'])
         oldXwidth = (temp_input_hist.GetXaxis().GetXmax() - temp_input_hist.GetXaxis().GetXmin())/temp_input_hist.GetNbinsX()
         oldYwidth = (temp_input_hist.GetYaxis().GetXmax() - temp_input_hist.GetYaxis().GetXmin())/temp_input_hist.GetNbinsY()
+        temp_input_file.Close()
 
         for v in ['X','Y']:
             # ONE CATEGORY - VARIABLE
@@ -438,6 +443,8 @@ class TwoDAlphabet:
                         new_bins.append(temp_TH2.GetYaxis().GetBinLowEdge(b))
                     new_bins.append(temp_TH2.GetYaxis().GetXmax())
 
+                temp_file.Close()
+
             if v == 'X':
                 newXbins = new_bins
         
@@ -480,6 +487,13 @@ class TwoDAlphabet:
                 print 'WARNING: '+optionName+' boolean not set explicitly. Default to False.'
                 option_return = False
             
+        # Override anything in CLoptions
+        for o in self.CLoptions:
+            if optionName in o:
+                option_return = o.split('=')[1]
+                if option_return in ["True","False"]: option_return = bool(option_return)
+                
+                print 'WARNING: Overriding %s with command line version (%s).'%(optionName,option_return)
 
         return option_return
 

@@ -553,7 +553,7 @@ if options.biasStudy !='' or options.ftest:
 
             # If the number of bins in the two models doesn't match, specify which to use or quit
             if base_nbins != alt_nbins:
-                error_input = raw_input('ERROR: number of bins in the two models does not match (%i vs %i). Please repeat back which number you would like to calculate for or enter any other string to abort.')
+                error_input = raw_input('ERROR: number of bins in the two models does not match (%i vs %i). Please repeat back which number you would like to calculate for or enter any other string to abort.'%(base_nbins,alt_nbins))
                 if int(error_input) == base_nbins:
                     ftest_nbins = base_nbins
                 elif int(error_input) == alt_nbins:

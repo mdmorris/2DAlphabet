@@ -40,6 +40,10 @@ parser.add_option("--skipPlots", action="store_true",
                 default =   False,
                 dest    =   "skipPlots",
                 help    =   "Skip plotting")
+parser.add_option("--CL", action="store", type='string',
+                default =   '',
+                dest    =   "CL",
+                help    =   "Command-line options to set for all configs")
 
 (options, args) = parser.parse_args()
 inputConfigsAndArgs = args
@@ -71,7 +75,7 @@ twoDinstances = []
 # Instantiate all class instances
 recycle = [r for r in options.recycle.split(',') if r !='']
 for i in inputConfigs:
-    instance = TwoDAlphabet(i,options.quicktag,options.recycleAll,recycle,stringSwaps=stringSwaps)
+    instance = TwoDAlphabet(i,options.quicktag,options.recycleAll,recycle,CLoptions=options.CL.split(','),stringSwaps=stringSwaps)
     twoDinstances.append(instance)
 
 # For each instance, check tags match and if they don't, ask the user for one
