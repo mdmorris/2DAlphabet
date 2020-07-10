@@ -2258,7 +2258,7 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,prerun=False):
                         param_out.write(coeff_final.GetName()+': ' + str(coeff_final.getValV()) + ' +/- ' + str(coeff_final.getError())+'\n')
                         # Re run config
                         for k in rerun_config['FIT'].keys():
-                            if k in coeff_final.GetName():
+                            if 'generic'+k in coeff_final.GetName():
                                 rerun_config['FIT'][k]['ERROR'] = coeff_final.getError()
                                 rerun_config['FIT'][k]['NOMINAL'] = coeff_final.getValV()
                                 rerun_config['FIT'][k]['MIN'] = coeff_final.getValV()-3*coeff_final.getError()
