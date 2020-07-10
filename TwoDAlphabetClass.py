@@ -1826,6 +1826,11 @@ class TwoDAlphabet:
                             hist_dict[process][cat]['postfit_proj'+z+str(i)].SetTitle(process + ', ' + cat+', '+self.name+ ', ' +str(x_edges[i-1]) +'-'+ str(x_edges[i]))
 
         post_file.Close()
+        if 'RunII_' in fittag:
+            runII = True
+            fittag = fittag.replace('RunII_','')
+        else:
+            runII = False
 
         # NOT CURRENTLY WORKING
         # Add together processes that we want to see as one
@@ -1983,11 +1988,14 @@ class TwoDAlphabet:
 
         ##############
         #    Rp/f    #
-        ##############           
+        ##############      
+        # Don't run Rp/f if this is just summed plots 
+        if runII: return 0
+
         # Need to sample the space to get the Rp/f with proper errors (1000 samples)
         rpf_xnbins = len(self.fullXbins)-1
         rpf_ynbins = len(self.newYbins)-1
-        if self.rpfRatio == False: rpf_zbins = [i/1000. for i in range(0,1001)]
+        if self.rpfRatio == False: rpf_zbins = [i/1000000. for i in range(0,1000001)]
         else: rpf_zbins = [i/1000. for i in range(0,5001)]
         rpf_samples = TH3F('rpf_samples','rpf_samples',rpf_xnbins, array.array('d',self.fullXbins), rpf_ynbins, array.array('d',self.newYbins), len(rpf_zbins)-1, array.array('d',rpf_zbins))# TH3 to store samples
         sample_size = 500
