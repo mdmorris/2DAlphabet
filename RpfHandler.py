@@ -7,7 +7,7 @@ class RpfHandler():
     def __init__ (self,fitDict,name,dummy_TH2=None,tag=''):
         self.fitDict = fitDict
         self.projDir = name+'/'+tag
-        self.fitType = self.fitType()
+        self.fitType = 'generic'#self.fitType()
         self.name = name
         self.tag = tag
         self.dummy_TH2 = dummy_TH2
@@ -16,7 +16,7 @@ class RpfHandler():
         self.allVars = []
 
         # Initialize rpfVars according to form of function
-        if self.fitType == 'splitPoly':
+        if False:#self.fitType == 'splitPoly':
             # Do some quick checks to make sure these are formatted correctly
             header.checkFitForm(self.fitDict['XPFORM'],self.fitDict['YPFORM'])
 
@@ -54,7 +54,7 @@ class RpfHandler():
 
                     # self.allVars.append(self.rpfVars[varname])
 
-        elif self.fitType == 'fullPoly':
+        elif False:#self.fitType == 'fullPoly':
             # Polynomial Order
             polXO = 0
             polYO = 0
@@ -121,7 +121,7 @@ class RpfHandler():
                     # self.allVars.append(self.rpfVars[varname])
 
             
-        elif self.fitType == 'cheb':
+        elif False:#self.fitType == 'cheb':
             # Make a dummy TH2 for binning to be used by the chebyshevBasis class
             self.chebBasis = chebyshevBasis(name,'chebBasis',self.fitDict['CHEBYSHEV']['XORDER'],self.fitDict['CHEBYSHEV']['YORDER'],dummy_TH2)
             if os.path.isdir(self.projDir+'/basis_plots'): header.executeCmd('rm -rf %s/basis_plots'%self.projDir)
@@ -151,9 +151,9 @@ class RpfHandler():
             quit()
 
     def getRooFunctionForm(self):
-        if self.fitType == 'splitPoly':
+        if False:#self.fitType == 'splitPoly':
             return '('+self.fitDict['XPFORM'] +')*('+self.fitDict['YPFORM']+')'
-        elif self.fitType == 'fullPoly':
+        elif False:#self.fitType == 'fullPoly':
             return self.fitDict['PFORM']
         elif self.fitType == 'generic':
             params = [int(param) for param in self.fitDict.keys() if param != 'FORM' and param != 'HELP']
@@ -169,7 +169,7 @@ class RpfHandler():
             gFormula = gFormula.replace(' x',' @'+str(nCoeffs)).replace(' y',' @'+str(nCoeffs+1))
             return gFormula
 
-        elif self.fitType == 'cheb':
+        elif False:#self.fitType == 'cheb':
             return False    # No string form for this. Dependencies already built into chebyshevBasis class
 
     def evalRpf(self,xConst,yConst,xbin,ybin):
@@ -178,7 +178,7 @@ class RpfHandler():
 
         full_formula_name = 'formula_'+c+'_bin_'+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
 
-        if self.fitType == 'splitPoly':
+        if False:#self.fitType == 'splitPoly':
             # Make var lists
             x_param_list = RooArgList(xConst)
             y_param_list = RooArgList(yConst)
@@ -197,10 +197,10 @@ class RpfHandler():
             y_formula_var = RooFormulaVar(y_formula_name, y_formula_name, self.fitDict['YPFORM'].replace('y','@0'), y_param_list)
             self.allVars.extend([y_formula_var, y_param_list])
 
-            rpf_val = RooFormulaVar(full_formula_name, full_formula_name, "max(0.000001,@0*@1)", RooArgList(x_formula_var, y_formula_var))
+            rpf_val = RooFormulaVar(full_formula_name, full_formula_name, "max(1e-9,@0*@1)", RooArgList(x_formula_var, y_formula_var))
 
 
-        elif self.fitType == 'fullPoly':
+        elif False:#self.fitType == 'fullPoly':
             x_poly_list = RooArgList()
             for y_coeff in range(self.polYO+1):
                 x_coeff_list = RooArgList()
@@ -230,9 +230,9 @@ class RpfHandler():
             generic_formula = self.getRooFunctionForm()
             formula_list.add(xConst)
             formula_list.add(yConst)
-            rpf_val = RooFormulaVar(full_formula_name,full_formula_name,"max(0.000001,"+generic_formula+")",formula_list)
+            rpf_val = RooFormulaVar(full_formula_name,full_formula_name,"max(1e-9,"+generic_formula+")",formula_list)
 
-        elif self.fitType == 'cheb':
+        elif False:#self.fitType == 'cheb':
             # chebBasis.getBinVal() returns a RooAddition with the proper construction to be the sum of the shapes with floating coefficients
             cheb_val = self.chebBasis.getBinVal(xConst.getValV(), yConst.getValV())
             rpf_val = RooFormulaVar(full_formula_name,full_formula_name,'(1+@0)/2',RooArgList(cheb_val)) # translate the [-1,1] range to [0,1] to guarantee positivity
