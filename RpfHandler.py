@@ -220,7 +220,7 @@ class RpfHandler():
             this_x_polyvar_label = "yPol_y"+str(y_coeff)+'_'+c+"_bin_"+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
             rpf_val_poly = RooPolyVar(this_x_polyvar_label,this_x_polyvar_label,yConst,x_poly_list)
             self.allVars.append(rpf_val_poly)
-            rpf_val = RooFormulaVar(full_formula_name,full_formula_name,"max(0.000001,@0)",RooArgList(rpf_val_poly))
+            rpf_val = RooFormulaVar(full_formula_name,full_formula_name,"max(1e-9,@0)",RooArgList(rpf_val_poly))
 
         elif self.fitType == 'generic':
             formula_list = RooArgList()
