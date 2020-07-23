@@ -30,7 +30,7 @@ def setSnapshot(d=''):
     fr_f = TFile.Open(d+'fitDiagnostics.root')
     fr = fr_f.Get('fit_b')
     myargs = RooArgSet(fr.floatParsFinal())
-    w.saveSnapshot('initialFit',myargs)
+    w.saveSnapshot('initialFit',myargs,True)
     fout = TFile('initialFitWorkspace.root',"recreate")
     fout.WriteTObject(w,'w')
     fout.Close()
