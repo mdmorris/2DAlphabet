@@ -1,4 +1,4 @@
-import sys, os, time, decimal, pickle, tempfile
+import sys, os, time, decimal, pickle
 import header
 import random
 import ROOT
@@ -114,8 +114,6 @@ if (options.biasStudy != '' or options.ftest == 'fitAlt' or options.ftest == 'po
         print altDir +' is not a directory. Quitting...'
         quit()
 
-
-
 # Start with tests that only require the projDir and don't do a comparison
 with header.cd(projDir):
     # Determine if there are channel masks from the fit in the projDir
@@ -198,7 +196,7 @@ with header.cd(projDir):
 
             gof_data_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated '+blind_string+freeze_r_string+' -n gof_data'
             header.executeCmd(gof_data_cmd,options.dryrun)
-            gof_toy_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --saveWorkspace '+blind_string+freeze_r_string+' -t '+str(ntoys)+' -s '+str(seed) +' -n '+run_name
+            gof_toy_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated --toysFrequentist --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --saveWorkspace '+blind_string+freeze_r_string+' -t '+str(ntoys)+' -s '+str(seed) +' -n '+run_name
 
             if options.condor == True:
                 tar_files = ['run_Stats.py',
@@ -218,15 +216,15 @@ with header.cd(projDir):
         if not options.condor:
             if options.post:
                 with header.cd('condor_'+run_name):
-                    tmpdir = tempfile.mkdtemp() 
+                    tmpdir = os.environ['CMSSW_BASE']+'/src/2DAlphabet/'+projDir+'/condor_'+run_name+'/tmp/'
+                    header.executeCmd('mkdir '+tmpdir) 
                     if toyjobs > 1:
-                        header.executeCmd('cat '+run_name+'*.tgz | tar zxvf - -i -C '+tmpdir+'/')
+                        header.executeCmd('cat '+run_name+'*.tgz | tar zxvf - -i -C tmp/')
                         toyLimitTree = TChain('limit')
-                        toyLimitTree.Add(tmpdir+'/higgsCombine*.GoodnessOfFit.mH120.*.root') 
-                        # header.executeCmd('hadd ../fitDiagnostics'+run_name+'.root fitDiagnostics'+run_name+'_*.root')
+                        toyLimitTree.Add(tmpdir+'higgsCombine*.GoodnessOfFit.mH120.*.root') 
                     else:
-                        header.executeCmd('tar xzvf *.tgz -C '+tmpdir+'/')
-                        toyOutput = TFile.Open(tmpdir+'/higgsCombine'+run_name+'.GoodnessOfFit.mH120.'+str(seed)+'.root')
+                        header.executeCmd('tar xzvf *.tgz -C tmp/')
+                        toyOutput = TFile.Open(tmpdir+'higgsCombine'+run_name+'.GoodnessOfFit.mH120.'+str(seed)+'.root')
                         toyLimitTree = toyOutput.Get('limit')
             else:
                 toyOutput = TFile.Open('higgsCombine'+run_name+'.GoodnessOfFit.mH120.'+str(seed)+'.root')
@@ -303,6 +301,9 @@ with header.cd(projDir):
             cout.Print('gof_plot.png','png')
             cout.SaveAs('gof_plot.root','root')
 
+            if options.post:
+                header.executeCmd('rm -r '+tmpdir)
+
     #########################################
     # Toy diagnositics and signal injection #
     #########################################
@@ -311,7 +312,7 @@ with header.cd(projDir):
             ###########################################
             # Now fit toys (send to condor if needed) #
             ###########################################
-            fit_command = 'combine -M FitDiagnostics'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --cminDefaultMinimizerStrategy 0 --skipBOnlyFit -t '+str(ntoys)+ ' --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin '+options.rMin+' --rMax '+options.rMax+' -n '+run_name
+            fit_command = 'combine -M FitDiagnostics'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --toysFrequentist --skipBOnlyFit -t '+str(ntoys)+ ' --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin '+options.rMin+' --rMax '+options.rMax+' -n '+run_name
             if options.condor == True:
                 tar_files = ['run_Stats.py',
                              'TwoDAlphabetClass.py',
@@ -336,14 +337,15 @@ with header.cd(projDir):
             # If need to post-process a condor task
             if options.post:
                 with header.cd('condor_'+run_name):
-                    tmpdir = tempfile.mkdtemp() 
+                    tmpdir = os.environ['CMSSW_BASE']+'/src/2DAlphabet/'+projDir+'/condor_'+run_name+'/tmp/'
+                    header.executeCmd('mkdir '+tmpdir)
                     if toyjobs > 1:
-                        header.executeCmd('cat '+run_name+'*.tgz | tar zxvf - -i -C '+tmpdir+'/')
+                        header.executeCmd('cat '+run_name+'*.tgz | tar zxvf - -i -C tmp/')
                         tree_fit_sb = TChain('tree_fit_sb')
-                        tree_fit_sb.Add(tmpdir+'/fitDiagnostics'+run_name+'_*.root')
+                        tree_fit_sb.Add(tmpdir+'fitDiagnostics'+run_name+'_*.root')
                     else:
-                        header.executeCmd('tar xzvf *.tgz -C '+tmpdir+'/')
-                        post_file = TFile.Open(tmpdir+'/fitDiagnostics'+run_name+'.root')
+                        header.executeCmd('tar xzvf *.tgz -C tmp/')
+                        post_file = TFile.Open(tmpdir+'fitDiagnostics'+run_name+'.root')
                         tree_fit_sb = post_file.Get('tree_fit_sb')
             else:
                 post_file = TFile.Open('fitDiagnostics'+run_name+'.root')
@@ -375,7 +377,8 @@ with header.cd(projDir):
             hsignstrength.Draw('pe')
             result_can.Print(run_name+'_sigstrength.png','png')
 
-            #header.executeCmd('rm condor_'+run_name+'/fitDiagnostics*.root condor_'+run_name+'/higgsCombine*.root')
+            if options.post:
+                header.executeCmd('rm -r '+tmpdir)
  
 # Can run against other models or one model against itself to do a b-only vs s+b comparison
 if options.biasStudy !='' or options.ftest:
@@ -758,4 +761,4 @@ if options.biasStudy !='' or options.ftest:
                 c.SaveAs(projDir+'/ftest_vs_'+alttag+".png")
             if options.condor:
                 header.executeCmd('rm -r '+altDir+'/condor_'+run_name+'/tmp/')
-                header.executeCmd('rm -r '+projDir+'/condor_'+run_name+'/tmp/')    
+                header.executeCmd('rm -r '+projDir+'/condor_'+run_name+'/tmp/')   
