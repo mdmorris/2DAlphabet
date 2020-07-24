@@ -812,12 +812,10 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 # Set y max of all hists to be the same to accommodate the tallest
                 histList = [stacks[hist_index],tot_hists[hist_index],hist]
 
-                yMax = hist.GetMaximum()#histList[0].GetMaximum()
-                # maxHist = histList[0]
-                # for h in range(1,len(histList)):
-                #     if histList[h].GetMaximum() > yMax:
-                #         yMax = histList[h].GetMaximum()
-                #         maxHist = histList[h]
+                yMax = histList[0].GetMaximum()
+                for h in range(1,len(histList)):
+                    if histList[h].GetMaximum() > yMax:
+                        yMax = histList[h].GetMaximum()
                 for h in histList:
                     h.SetMaximum(yMax*(2-legend_topY+0.02))
                     if logy == True:
