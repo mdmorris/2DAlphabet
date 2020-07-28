@@ -1409,9 +1409,9 @@ class TwoDAlphabet:
                         x_center = TH2_data_fail.GetXaxis().GetBinCenter(xbin)
                         y_center = TH2_data_fail.GetYaxis().GetBinCenter(ybin)
 
-                        # Remap to [0,1]
-                        x_center_mapped = (x_center - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
-                        y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
+                        # Remap to [-0.5,0.5]
+                        x_center_mapped = (x_center - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])-0.5
+                        y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])-0.5
 
                         # And assign it to a RooConstVar 
                         x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center if self.rpf.fitType == 'cheb' else x_center_mapped)
@@ -1456,9 +1456,9 @@ class TwoDAlphabet:
                         x_center = TH2_data_fail.GetXaxis().GetBinCenter(xbin)
                         y_center = TH2_data_fail.GetYaxis().GetBinCenter(ybin)
 
-                        # Remap to [0,1]
-                        x_center_mapped = (x_center - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
-                        y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
+                        # Remap to [-0.5,0.5]
+                        x_center_mapped = (x_center - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])-0.5
+                        y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])-0.5
 
                         # Create RooConstVars to store the bin centers
                         x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center if self.rpf.fitType == 'cheb' else x_center_mapped)
@@ -2030,8 +2030,8 @@ class TwoDAlphabet:
                         thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
                         thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
 
-                        # thisXMapped = (thisXCenter - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
-                        # thisYMapped = (thisYCenter - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
+                        # thisXMapped = (thisXCenter - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])-0.5
+                        # thisYMapped = (thisYCenter - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])-0.5
 
                         # Determine the category
                         if thisXCenter > self.newXbins['LOW'][0] and thisXCenter < self.newXbins['LOW'][-1]: # in the LOW category

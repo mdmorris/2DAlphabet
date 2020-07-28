@@ -327,9 +327,9 @@ def splitBins(binList, sigLow, sigHigh):
     return return_bins 
 
 def remapToUnity(hist):
-
-    ybins = array.array('d',[(hist.GetYaxis().GetBinLowEdge(b)-hist.GetYaxis().GetXmin())/(hist.GetYaxis().GetXmax()-hist.GetYaxis().GetXmin()) for b in range(1,hist.GetNbinsY()+1)]+[1])
-    xbins = array.array('d',[(hist.GetXaxis().GetBinLowEdge(b)-hist.GetXaxis().GetXmin())/(hist.GetXaxis().GetXmax()-hist.GetXaxis().GetXmin()) for b in range(1,hist.GetNbinsX()+1)]+[1])
+    # Map to [-0.5,0.5]
+    ybins = array.array('d',[(hist.GetYaxis().GetBinLowEdge(b)-hist.GetYaxis().GetXmin())/(hist.GetYaxis().GetXmax()-hist.GetYaxis().GetXmin())-0.5 for b in range(1,hist.GetNbinsY()+1)]+[1])
+    xbins = array.array('d',[(hist.GetXaxis().GetBinLowEdge(b)-hist.GetXaxis().GetXmin())/(hist.GetXaxis().GetXmax()-hist.GetXaxis().GetXmin())-0.5 for b in range(1,hist.GetNbinsX()+1)]+[1])
 
     remap = TH2F(hist.GetName()+'_unit',hist.GetName()+'_unit',hist.GetNbinsX(),xbins,hist.GetNbinsY(),ybins)
     remap.Sumw2()
