@@ -2210,8 +2210,12 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,prerun=False):
         if blind_option != '': blind_option = blind_option+','+systsToSet
         else: blind_option = '--setParameters '+systsToSet
 
+    # Always set r to start at 1
+    if blind_option != '': blind_option = blind_option+',r=1'
+    else: blind_option = '--setParameters r=1'
+
     # Run Combine
-    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace --setParameters r=1 --cminDefaultMinimizerStrategy 0 ' + sig_option +verbose 
+    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace --cminDefaultMinimizerStrategy 0 ' + sig_option +verbose 
 
     with header.cd(projDir):
         command_saveout = open('FitDiagnostics_command.txt','w')
