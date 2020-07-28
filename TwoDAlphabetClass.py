@@ -2211,7 +2211,7 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,prerun=False):
         else: blind_option = '--setParameters '+systsToSet
 
     # Run Combine
-    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace --cminDefaultMinimizerStrategy 0 ' + sig_option +verbose 
+    FitDiagnostics_command = 'combine -M FitDiagnostics -d '+card_name+' '+blind_option+' --saveWorkspace --setParameters r=1 --cminDefaultMinimizerStrategy 0 ' + sig_option +verbose 
 
     with header.cd(projDir):
         command_saveout = open('FitDiagnostics_command.txt','w')
