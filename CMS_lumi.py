@@ -16,7 +16,7 @@ extraTextFont = 52
 lumiTextSize     = 0.6
 lumiTextOffset   = 0.2
 
-cmsTextSize      = 0.85
+cmsTextSize      = 0.75
 cmsTextOffset    = 0.1
 
 relPosX    = 0.045
@@ -35,7 +35,7 @@ lumi_sqrtS = ""
 
 drawLogo      = False
 
-def CMS_lumi(pad,  iPeriod=4,  iPosX=11 ):
+def CMS_lumi(pad,  iPeriod=4,  iPosX=11, sim=False ):
     outOfFrame    = False
     if(iPosX/10==0 ): outOfFrame = True
 
@@ -75,14 +75,17 @@ def CMS_lumi(pad,  iPeriod=4,  iPosX=11 ):
     if ( iPeriod==1 ):
         lumiText += lumi_13TeV
         lumiText += " (13 TeV)"
-    if ( iPeriod==16 ):
+    elif ( iPeriod==16 ):
         lumiText += lumi_2016_13TeV
         lumiText += " (13 TeV)"
-    if ( iPeriod==17 ):
+    elif ( iPeriod==17 ):
         lumiText += lumi_2017_13TeV
         lumiText += " (13 TeV)"
-    if ( iPeriod==18 ):
+    elif ( iPeriod==18 ):
         lumiText += lumi_2018_13TeV
+        lumiText += " (13 TeV)"
+    elif ( iPeriod==2 ):
+        lumiText += lumi_2016_13TeV+' + '+lumi_2017_13TeV + ' + ' + lumi_2018_13TeV
         lumiText += " (13 TeV)"
     # elif ( iPeriod==7 ):
     #     if( outOfFrame ):lumiText += "#scale[0.85]{"
@@ -157,7 +160,8 @@ def CMS_lumi(pad,  iPeriod=4,  iPosX=11 ):
                 latex.SetTextFont(extraTextFont)
                 latex.SetTextAlign(align_)
                 latex.SetTextSize(extraTextSize*t)
-                latex.DrawLatex(posX_, posY_- relExtraDY*cmsTextSize*t, extraText)
+                if not sim: latex.DrawLatex(posX_, posY_- relExtraDY*cmsTextSize*t, extraText)
+                else: latex.DrawLatex(posX_, posY_- relExtraDY*cmsTextSize*t, extraText + ' simulation')
     elif( writeExtraText ):
         if( iPosX==0):
             posX_ =   l +  relPosX*(1-l-r)
@@ -166,7 +170,8 @@ def CMS_lumi(pad,  iPeriod=4,  iPosX=11 ):
         latex.SetTextFont(extraTextFont)
         latex.SetTextSize(extraTextSize*t)
         latex.SetTextAlign(align_)
-        latex.DrawLatex(posX_, posY_, extraText)      
+        if not sim: latex.DrawLatex(posX_, posY_, extraText)
+        else: latex.DrawLatex(posX_, posY_, extraText + ' simulation')
 
     pad.Update()
 

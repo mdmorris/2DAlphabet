@@ -8,6 +8,7 @@ from ROOT import *
 
 import header
 from header import WaitForJobs, make_smooth_graph, Inter
+import tdrstyle
 
 gStyle.SetOptStat(0)
 gROOT.SetBatch(kTRUE)
@@ -67,6 +68,8 @@ y_mclimitup68 = array('d')
 y_mclimitlow95 = array('d')
 y_mclimitup95 = array('d')
 
+tdrstyle.setTDRStyle()
+
 # For each signal
 for this_index, this_name in enumerate(signal_names):
     # Setup call for one of the signal
@@ -109,8 +112,10 @@ for this_index, this_name in enumerate(signal_names):
 # Make Canvas and TGraphs (mostly stolen from other code that formats well)
 climits = TCanvas("climits", "climits",700, 600)
 climits.SetLogy(True)
-climits.SetLeftMargin(.18)
-climits.SetBottomMargin(.18)  
+climits.SetLeftMargin(.15)
+climits.SetBottomMargin(.15)  
+climits.SetTopMargin(0.05)
+climits.SetRightMargin(0.05)
 
 # NOT GENERIC
 # if options.hand == 'LH':
@@ -257,27 +262,29 @@ g_error.SetLineColor(0)
 if not options.blind:
     g_limit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
     g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) (pb)") # NOT GENERIC
-    g_limit.GetXaxis().SetTitleSize(0.04)
-    g_limit.GetYaxis().SetTitleSize(0.04)
+    g_limit.GetXaxis().SetTitleSize(0.055)
+    g_limit.GetYaxis().SetTitleSize(0.05)
     g_limit.Draw('al')
     g_error95.Draw("lf")
     g_error.Draw("lf")
     g_mclimit.Draw("l")
     g_limit.Draw("l")
     graphWP.Draw("l")
-    g_limit.GetYaxis().SetTitleOffset(1.4)
+    g_limit.GetYaxis().SetTitleOffset(1.5)
+    g_limit.GetXaxis().SetTitleOffset(1.25)
 
 else:
     g_mclimit.GetXaxis().SetTitle("m_{b*_{"+cstr+"}} (GeV)")  # NOT GENERIC
     g_mclimit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) (pb)") # NOT GENERIC
-    g_limit.GetXaxis().SetTitleSize(0.04)
-    g_limit.GetYaxis().SetTitleSize(0.04)
+    g_limit.GetXaxis().SetTitleSize(0.055)
+    g_limit.GetYaxis().SetTitleSize(0.05)
     g_mclimit.Draw("al")
     g_error95.Draw("lf")
     g_error.Draw("lf")
     g_mclimit.Draw("l")
     graphWP.Draw("l")
-    g_mclimit.GetYaxis().SetTitleOffset(1.4)
+    g_mclimit.GetYaxis().SetTitleOffset(1.5)
+    g_mclimit.GetXaxis().SetTitleOffset(1.25)
     
 # graphWP.Draw("l")
 
@@ -285,8 +292,34 @@ else:
 # graphWPup.Draw("l")
 # graphWPdown.Draw("l")
 
+# Finally calculate the intercept
+expectedMassLimit,expectedCrossLimit = Inter(g_mclimit,graphWP) #if len(Inter(g_mclimit,graphWP)) > 0 else -1.0
+upLimit,trash = Inter(g_mcminus,graphWP) if len(Inter(g_mcminus,graphWP)) > 0 else -1.0
+lowLimit,trash = Inter(g_mcplus,graphWP) if len(Inter(g_mcplus,graphWP)) > 0 else -1.0
 
-legend = TLegend(0.55, 0.50, 0.87, 0.80, '')
+expLine = TLine(expectedMassLimit,g_mclimit.GetMinimum(),expectedMassLimit,expectedCrossLimit)
+expLine.SetLineStyle(2)
+expLineLabel = TPaveText(expectedMassLimit-300, expectedCrossLimit*2, expectedMassLimit+300, expectedCrossLimit*15, "NB")
+expLineLabel.SetFillColorAlpha(kWhite,0)
+expLineLabel.AddText(str(int(expectedMassLimit))+' GeV')
+expLine.Draw()
+expLineLabel.Draw()
+
+print 'Expected limit: '+str(expectedMassLimit/1000.) + ' +'+str(upLimit/1000.-expectedMassLimit/1000.) +' -'+str(expectedMassLimit/1000.-lowLimit/1000.) + ' TeV' # NOT GENERIC
+if not options.blind:
+    obsMassLimit,obsCrossLimit = Inter(g_limit,graphWP) if len(Inter(g_limit,graphWP)) > 0 else -1.0
+    print 'Observed limit: '+str(obsMassLimit/1000.) + ' TeV'
+
+    obsLine = TLine(obsMassLimit,g_mclimit.GetMinimum(),obsMassLimit,obsCrossLimit)
+    obsLine.SetLineStyle(2)
+    obsLineLabel = TPaveText(obsMassLimit-300, obsCrossLimit*4, obsMassLimit+300, obsCrossLimit*15,"NB")
+    obsLineLabel.SetFillColorAlpha(kWhite,0)
+    obsLineLabel.AddText(str(int(obsMassLimit))+' GeV')
+    obsLine.Draw()
+    obsLineLabel.Draw()
+
+# Legend and draw
+legend = TLegend(0.60, 0.50, 0.91, 0.87, '')
 if not options.blind:
     legend.AddEntry(g_limit, "Observed", "l")
 legend.AddEntry(g_mclimit, "Expected (95% CL)","l")
@@ -304,18 +337,10 @@ legend.Draw("same")
 text1 = ROOT.TLatex()
 text1.SetNDC()
 text1.SetTextFont(42)
-text1.DrawLatex(0.2,0.84, "#scale[1.0]{CMS, L = "+options.lumi+" fb^{-1} at  #sqrt{s} = 13 TeV}") # NOT GENERIC
+text1.DrawLatex(0.17,0.88, "#scale[1.0]{CMS, L = "+options.lumi+" fb^{-1} at  #sqrt{s} = 13 TeV}") # NOT GENERIC
 
 TPT.Draw()      
 climits.RedrawAxis()
 climits.SaveAs("limits_combine_"+options.lumi.replace('.','p')+"fb_"+options.signals[options.signals.find('/')+1:options.signals.find('.')]+'_'+cstr+".pdf")
 
-# Finally calculate the intercept
-expectedLimit = Inter(g_mclimit,graphWP)[0] if len(Inter(g_mclimit,graphWP)) > 0 else -1.0
-upLimit = Inter(g_mcminus,graphWP)[0] if len(Inter(g_mcminus,graphWP)) > 0 else -1.0
-lowLimit = Inter(g_mcplus,graphWP)[0] if len(Inter(g_mcplus,graphWP)) > 0 else -1.0
 
-print 'Expected limit: '+str(expectedLimit/1000.) + ' +'+str(upLimit/1000.-expectedLimit/1000.) +' -'+str(expectedLimit/1000.-lowLimit/1000.) + ' TeV' # NOT GENERIC
-if not options.blind:
-    obsLimit = Inter(g_limit,graphWP)[0] if len(Inter(g_limit,graphWP)) > 0 else -1.0
-    print 'Observed limit: '+str(obsLimit/1000.) + ' TeV'

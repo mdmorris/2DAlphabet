@@ -7,6 +7,8 @@ from math import sqrt
 import array
 import json
 import CMS_lumi, tdrstyle
+import pprint
+pp = pprint.PrettyPrinter(indent = 2)
 
 def setSnapshot(d=''):
     # header.executeCmd('combine -M MultiDimFit -d '+base_workspace+' --saveWorkspace --freezeParameters r --setParameters r=0,'+mask_string)
@@ -28,7 +30,7 @@ def setSnapshot(d=''):
     fr_f = TFile.Open(d+'fitDiagnostics.root')
     fr = fr_f.Get('fit_b')
     myargs = RooArgSet(fr.floatParsFinal())
-    importPars = w.saveSnapshot('initialFit',myargs)
+    w.saveSnapshot('initialFit',myargs,True)
     fout = TFile('initialFitWorkspace.root',"recreate")
     fout.WriteTObject(w,'w')
     fout.Close()
@@ -327,9 +329,9 @@ def splitBins(binList, sigLow, sigHigh):
     return return_bins 
 
 def remapToUnity(hist):
-    # Map to [-0.5,0.5]
-    ybins = array.array('d',[(hist.GetYaxis().GetBinLowEdge(b)-hist.GetYaxis().GetXmin())/(hist.GetYaxis().GetXmax()-hist.GetYaxis().GetXmin())-0.5 for b in range(1,hist.GetNbinsY()+1)]+[1])
-    xbins = array.array('d',[(hist.GetXaxis().GetBinLowEdge(b)-hist.GetXaxis().GetXmin())/(hist.GetXaxis().GetXmax()-hist.GetXaxis().GetXmin())-0.5 for b in range(1,hist.GetNbinsX()+1)]+[1])
+    # Map to [-1,1]
+    ybins = array.array('d',[(hist.GetYaxis().GetBinLowEdge(b)-hist.GetYaxis().GetXmin())/(hist.GetYaxis().GetXmax()-hist.GetYaxis().GetXmin()) for b in range(1,hist.GetNbinsY()+1)]+[1])
+    xbins = array.array('d',[(hist.GetXaxis().GetBinLowEdge(b)-hist.GetXaxis().GetXmin())/(hist.GetXaxis().GetXmax()-hist.GetXaxis().GetXmin()) for b in range(1,hist.GetNbinsX()+1)]+[1])
 
     remap = TH2F(hist.GetName()+'_unit',hist.GetName()+'_unit',hist.GetNbinsX(),xbins,hist.GetNbinsY(),ybins)
     remap.Sumw2()
@@ -456,10 +458,11 @@ def FStatCalc(filename1,filename2,p1,p2,n):
         if tree1.limit-tree2.limit>0:
             F = (tree1.limit-tree2.limit)/(p2-p1)/(tree2.limit/(n-p2))
             # print 'Entry ',i, ":", tree2.limit, "-", tree1.limit, "=", tree2.limit-tree1.limit, "F =", F
-            if F < 50: diffs.append(F)
+            # if F < 50: 
+            diffs.append(F)
         else:
             print 'WARNING in calculation of F statistic for entry %i. limit1-limit2 <=0 (%f - %f)' %(i,tree1.limit,tree2.limit)
-
+            diffs.append(0)
     # print 'Diffs F stat: ',diffs
     return diffs
 
@@ -546,9 +549,11 @@ def projInfoLookup(projDir,card_tag):
         twoD_names = getTwoDAlphaNames(firstline)
         for n in twoD_names:
             proj_info[n] = pickle.load(open(projDir+'/'+n+'/saveOut.p','r'))
+            proj_info[n]['rpfVarNames'] = proj_info[n]['rpf'].getRpfVarNames()
 
     elif not more_than_one:
         proj_info[card_tag] = pickle.load(open(projDir+'/saveOut.p','r'))
+        proj_info['rpfVarNames'] = proj_info['rpf'].getRpfVarNames()
 
     return proj_info
 
@@ -627,7 +632,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
         padx = 2
         pady = 1
     elif len(histlist) == 3:
-        width = 1600
+        width = 1800
         height = 700
         padx = 3
         pady = 1
@@ -680,6 +685,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
             if logy == True:
                 gPad.SetLogy()
             gPad.SetLeftMargin(0.2)
+            gPad.SetRightMargin(0.1)
             hist.GetXaxis().SetTitle(xtitle)
             hist.GetYaxis().SetTitle(ytitle)
             hist.GetXaxis().SetTitleOffset(1.5)
@@ -691,9 +697,9 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
             if datastyle != 'pe': hist.Draw(datastyle)
             else: hist.Draw('colz')
             if len(bkglist) > 0:
-                print 'ERROR: It seems you are trying to plot backgrounds with data on a 2D plot. This is not supported since there is no good way to view this type of distribution.'
+                raise TypeError('ERROR: It seems you are trying to plot backgrounds with data on a 2D plot. This is not supported since there is no good way to view this type of distribution.')
 
-            CMS_lumi.CMS_lumi(thisPad, year, 11)
+            CMS_lumi.CMS_lumi(thisPad, year, 11, sim=False if 'data' in name.lower() else True)
         
         # Otherwise it's a TH1 hopefully
         else:
@@ -729,8 +735,12 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.1, 1, 1))
                     subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 0, 0))
 
-                if not logy: legends.append(TLegend(0.65,0.81-0.02*(len(bkglist[0])+len(signals)),0.90,0.90))
-                else: legends.append(TLegend(0.2,0.11,0.45,0.2+0.02*(len(bkglist[0])+len(signals))))
+                legend_topY = 0.81-0.02*(len(bkglist[0])+len(signals))
+                legend_bottomY = 0.2+0.02*(len(bkglist[0])+len(signals))
+
+                # if not logy: 
+                legends.append(TLegend(0.65,legend_topY,0.90,0.90))
+                # else: legends.append(TLegend(0.2,0.11,0.45,legend_bottomY))
                 stacks.append(THStack(hist.GetName()+'_stack',hist.GetName()+'_stack'))
                 if totalBkg == None:
                     tot_hist = hist.Clone(hist.GetName()+'_tot')
@@ -757,6 +767,9 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 mains[hist_index].Draw()
                 subs[hist_index].Draw()
 
+                # If logy, put QCD on top
+                # if logy: bkglist[0], bkglist[-1] = bkglist[-1], bkglist[0]
+
                 # Build the stack
                 for bkg_index,bkg in enumerate(bkglist[hist_index]):     # Won't loop if bkglist is empty
                     # bkg.Sumw2()
@@ -771,10 +784,10 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     else:
                         if colors[bkg_index] != None:
                             bkg.SetFillColor(colors[bkg_index])
-                            bkg.SetLineColor(colors[bkg_index])
+                            bkg.SetLineColor(colors[bkg_index] if colors[bkg_index]!=0 else kBlack)
                         else:
                             bkg.SetFillColor(default_colors[bkg_index])
-                            bkg.SetLineColor(default_colors[bkg_index])
+                            bkg.SetLineColor(default_colors[bkg_index] if colors[bkg_index]!=0 else kBlack)
 
                     stacks[hist_index].Add(bkg)
                     if bkgNames == []: this_bkg_name = bkg.GetName().split('_')[0]
@@ -790,15 +803,13 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 histList = [stacks[hist_index],tot_hists[hist_index],hist]
 
                 yMax = histList[0].GetMaximum()
-                maxHist = histList[0]
                 for h in range(1,len(histList)):
                     if histList[h].GetMaximum() > yMax:
                         yMax = histList[h].GetMaximum()
-                        maxHist = histList[h]
                 for h in histList:
-                    h.SetMaximum(yMax*1.25)
+                    h.SetMaximum(yMax*(2-legend_topY+0.02))
                     if logy == True:
-                        h.SetMaximum(yMax*10)
+                        h.SetMaximum(yMax*10**(2-legend_topY+0.1))
 
                 
                 mLS = 0.06
@@ -808,6 +819,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     hist.SetTitle(titles[hist_index])
                 hist.SetTitleOffset(1.1,"xy")
                 hist.GetYaxis().SetTitle('Events')
+                hist.GetYaxis().SetTitleOffset(1.15)
                 hist.GetYaxis().SetLabelSize(mLS)
                 hist.GetYaxis().SetTitleSize(mLS)
                 if logy == True:
@@ -1176,7 +1188,8 @@ def WaitForJobs( listOfJobs ):
 def Inter(g1,g2):
     xaxisrange = g1.GetXaxis().GetXmax()-g1.GetXaxis().GetXmin()
     xaxismin = g1.GetXaxis().GetXmin()
-    inters = []
+    xinters = []
+    yinters = []
     for x in range(0,10000):
         xpoint = xaxismin + (float(x)/1000.0)*xaxisrange
         xpoint1 = xaxismin + (float(x+1)/1000.0)*xaxisrange
@@ -1185,9 +1198,13 @@ def Inter(g1,g2):
         Po1 = g1.Eval(xpoint1)
         Po2 = g2.Eval(xpoint1)
         if (Pr1-Pr2)*(Po1-Po2)<0:
-            inters.append(0.5*(xpoint+xpoint1))
+            xinters.append(0.5*(xpoint+xpoint1))
+            yinters.append(0.5*(Po1+Po2))
         
-    return inters
+    if len(xinters) == 0:
+        xinters = [-1]
+        yinters = [-1]
+    return xinters[0],yinters[0]
 
 # Right after I wrote this I realized it's obsolete... It's cool parentheses parsing though so I'm keeping it
 def separateXandYfromFitString(fitForm):
@@ -1243,6 +1260,7 @@ def separateXandYfromFitString(fitForm):
 
 @contextmanager
 def cd(newdir):
+    print 'cd '+newdir
     prevdir = os.getcwd()
     os.chdir(os.path.expanduser(newdir))
     try:
