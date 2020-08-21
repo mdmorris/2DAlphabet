@@ -652,6 +652,9 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
         return 0
 
     tdrstyle.setTDRStyle()
+    gStyle.SetTitleBorderSize(0)
+    gStyle.SetTitleAlign(33)
+    gStyle.SetTitleX(.77)
 
     myCan = TCanvas(name,name,width,height)
     myCan.Divide(padx,pady)
