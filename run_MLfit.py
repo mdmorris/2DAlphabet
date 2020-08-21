@@ -1,4 +1,5 @@
 from TwoDAlphabetClass import TwoDAlphabet, runMLFit
+from RunIIMaker import RunIIMaker
 import sys, traceback
 from optparse import OptionParser
 import subprocess
@@ -40,6 +41,10 @@ parser.add_option("--skipPlots", action="store_true",
                 default =   False,
                 dest    =   "skipPlots",
                 help    =   "Skip plotting")
+parser.add_option("--fullRun2", action="store_true", 
+                default =   False,
+                dest    =   "fullRun2",
+                help    =   "Plot sum of years 16, 17, 18")
 parser.add_option("--CL", action="store", type='string',
                 default =   '',
                 dest    =   "CL",
@@ -88,7 +93,7 @@ thistag = twoDinstances[0].tag
 # Combine the cards
 print 'cd ' + thistag
 with header.cd(thistag):
-    card_combination_command = 'combineCards.py'
+    card_combination_command = 'combineCards.py --X-no-jmax'
     for i in twoDinstances:
         card_combination_command += ' '+i.name+'/card_'+i.name+'.txt'
     card_combination_command += ' > card_'+thistag+'.txt'
@@ -130,6 +135,28 @@ if not options.skipPlots:
             print traceback.format_exc()
             print exc
             print 'Failed to run s plots for '+t.name
+
+    if options.fullRun2:
+        tags = RunIIMaker(thistag)
+
+        runIIs = {}
+        for cat in tags:
+            for t in twoDinstances:
+                if cat in t.name and '17' in t.name:
+                    runIIs[cat] = t
+                    break
+
+        for cat in runIIs.keys():
+            runII = runIIs[cat]
+            runII.name = cat+'RunII'
+            runII.year = 2
+            runII.projPath = runII._projPath()
+            runII.plotFitResults('RunII_b')
+            runII.plotFitResults('RunII_s')
+
+        # Will steal existing twoDinstances with a slight attribute
+        # modification to get it to work for RunII
+
 
 # for t in twoDinstances:
 #     del t

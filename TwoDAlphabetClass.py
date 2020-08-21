@@ -1818,6 +1818,12 @@ class TwoDAlphabet:
         post_file = TFile.Open(self.tag+'/postfitshapes_'+fittag+'.root')
         fd_file = TFile.Open(self.tag+'/fitDiagnostics.root')
 
+        if 'RunII_' in fittag:
+            runII = True
+            fittag = fittag.replace('RunII_','')
+        else:
+            runII = False
+
         fit_result = fd_file.Get('fit_'+fittag)
 
         x_low = self.newXbins['LOW'][0]
@@ -1929,11 +1935,6 @@ class TwoDAlphabet:
                             hist_dict[process][cat]['postfit_proj'+z+str(i)].SetTitle(process + ', ' + cat+', '+self.name+ ', ' +str(x_edges[i-1]) +'-'+ str(x_edges[i]))
 
         post_file.Close()
-        if 'RunII_' in fittag:
-            runII = True
-            fittag = fittag.replace('RunII_','')
-        else:
-            runII = False
 
         # NOT CURRENTLY WORKING
         # Add together processes that we want to see as one
