@@ -312,7 +312,8 @@ with header.cd(projDir):
             ###########################################
             # Now fit toys (send to condor if needed) #
             ###########################################
-            fit_command = 'combine -M FitDiagnostics'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --toysFrequentist --skipBOnlyFit -t '+str(ntoys)+ ' --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin '+options.rMin+' --rMax '+options.rMax+' -n '+run_name
+            # fit_command = 'combine -M FitDiagnostics'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --toysFrequentist --skipBOnlyFit -t '+str(ntoys)+ ' --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin '+options.rMin+' --rMax '+options.rMax+' -n '+run_name
+            fit_command = 'combine -M FitDiagnostics'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --skipBOnlyFit --cminDefaultMinimizerStrategy 0 -t '+str(ntoys)+ ' --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin '+options.rMin+' --rMax '+options.rMax+' -n '+run_name
             if options.condor == True:
                 tar_files = ['run_Stats.py',
                              'TwoDAlphabetClass.py',

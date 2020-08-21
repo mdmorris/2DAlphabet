@@ -66,7 +66,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
     print 'Making RooArgSet out of fit result parameters'
     postfit_vars = ROOT.RooArgSet(fit_result.floatParsFinal())
     print 'Saving snapshot'
-    postfit_w.saveSnapshot('initialFit',postfit_vars)
+    postfit_w.saveSnapshot('initialFit',postfit_vars,True)
     # print 'Writing '+projDir+'limitworkspace.root'
     # fout = TFile(projDir+'/limitworkspace.root',"recreate")
     print 'Writing'

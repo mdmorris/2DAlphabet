@@ -312,7 +312,7 @@ if not options.blind:
 
     obsLine = TLine(obsMassLimit,g_mclimit.GetMinimum(),obsMassLimit,obsCrossLimit)
     obsLine.SetLineStyle(2)
-    obsLineLabel = TPaveText(obsMassLimit-300, obsCrossLimit*2, obsMassLimit+300, obsCrossLimit*15,"NB")
+    obsLineLabel = TPaveText(obsMassLimit-300, obsCrossLimit*4, obsMassLimit+300, obsCrossLimit*15,"NB")
     obsLineLabel.SetFillColorAlpha(kWhite,0)
     obsLineLabel.AddText(str(int(obsMassLimit))+' GeV')
     obsLine.Draw()
