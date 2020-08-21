@@ -1935,11 +1935,6 @@ class TwoDAlphabet:
                             hist_dict[process][cat]['postfit_proj'+z+str(i)].SetTitle(process + ', ' + cat+', '+self.name+ ', ' +str(x_edges[i-1]) +'-'+ str(x_edges[i]))
 
         post_file.Close()
-        if 'RunII_' in fittag:
-            runII = True
-            fittag = fittag.replace('RunII_','')
-        else:
-            runII = False
 
         # NOT CURRENTLY WORKING
         # Add together processes that we want to see as one
