@@ -1,4 +1,5 @@
 from TwoDAlphabetClass import TwoDAlphabet, runMLFit
+from RunIIMaker import RunIIMaker
 import sys, traceback
 from optparse import OptionParser
 import subprocess
@@ -28,6 +29,10 @@ parser.add_option("--recycleAll", action="store_true",
                 default =   False,
                 dest    =   "recycleAll",
                 help    =   "Recycle everything from the previous run with this tag")
+parser.add_option("--recycle", action="store", type='string', 
+                default =   '',
+                dest    =   "recycle",
+                help    =   "Recycle comma separated list of items")
 parser.add_option("--skipFit", action="store_true", 
                 default =   False,
                 dest    =   "skipFit",
@@ -36,6 +41,14 @@ parser.add_option("--skipPlots", action="store_true",
                 default =   False,
                 dest    =   "skipPlots",
                 help    =   "Skip plotting")
+parser.add_option("--fullRun2", action="store_true", 
+                default =   False,
+                dest    =   "fullRun2",
+                help    =   "Plot sum of years 16, 17, 18")
+parser.add_option("--CL", action="store", type='string',
+                default =   '',
+                dest    =   "CL",
+                help    =   "Command-line options to set for all configs")
 
 (options, args) = parser.parse_args()
 inputConfigsAndArgs = args
@@ -53,6 +66,7 @@ for i,c in enumerate(inputConfigsAndArgs):
 print 'Setting on-fly parameters:'
 print '\ttag\t\t = '+options.quicktag
 print '\trecycleAll\t = '+str(options.recycleAll)
+print '\trecycle\t\t = '+str(options.recycle)
 print '\tskipFit\t\t = '+str(options.skipFit)
 print 'Remaining arguments:'
 for i in inputConfigs:
@@ -64,8 +78,9 @@ twoDinstances = []
 # if len(inputConfigs) > 1:
 ##############
 # Instantiate all class instances
+recycle = [r for r in options.recycle.split(',') if r !='']
 for i in inputConfigs:
-    instance = TwoDAlphabet(i,options.quicktag,options.recycleAll,stringSwaps=stringSwaps)
+    instance = TwoDAlphabet(i,options.quicktag,options.recycleAll,recycle,CLoptions=options.CL.split(','),stringSwaps=stringSwaps)
     twoDinstances.append(instance)
 
 # For each instance, check tags match and if they don't, ask the user for one
@@ -78,7 +93,7 @@ thistag = twoDinstances[0].tag
 # Combine the cards
 print 'cd ' + thistag
 with header.cd(thistag):
-    card_combination_command = 'combineCards.py'
+    card_combination_command = 'combineCards.py --X-no-jmax'
     for i in twoDinstances:
         card_combination_command += ' '+i.name+'/card_'+i.name+'.txt'
     card_combination_command += ' > card_'+thistag+'.txt'
@@ -96,15 +111,16 @@ if not options.skipPlots:
     with header.cd(thistag):
         covMtrx_File = TFile.Open('fitDiagnostics.root')
         fit_result = covMtrx_File.Get("fit_b")
-        corrMtrx = header.reducedCorrMatrixHist(fit_result)
-        corrMtrxCan = TCanvas('c','c',1400,1000)
-        corrMtrxCan.cd()
-        corrMtrxCan.SetBottomMargin(0.22)
-        corrMtrxCan.SetLeftMargin(0.17)
-        corrMtrxCan.SetTopMargin(0.06)
+        if hasattr(fit_result,'correlationMatrix'):
+            corrMtrx = header.reducedCorrMatrixHist(fit_result)
+            corrMtrxCan = TCanvas('c','c',1400,1000)
+            corrMtrxCan.cd()
+            corrMtrxCan.SetBottomMargin(0.22)
+            corrMtrxCan.SetLeftMargin(0.17)
+            corrMtrxCan.SetTopMargin(0.06)
 
-        corrMtrx.Draw('colz')
-        corrMtrxCan.Print('correlation_matrix.png','png')
+            corrMtrx.Draw('colz')
+            corrMtrxCan.Print('correlation_matrix.png','png')
 
     for t in twoDinstances:
         try:
@@ -119,6 +135,28 @@ if not options.skipPlots:
             print traceback.format_exc()
             print exc
             print 'Failed to run s plots for '+t.name
+
+    if options.fullRun2:
+        tags = RunIIMaker(thistag)
+
+        runIIs = {}
+        for cat in tags:
+            for t in twoDinstances:
+                if cat in t.name and '17' in t.name:
+                    runIIs[cat] = t
+                    break
+
+        for cat in runIIs.keys():
+            runII = runIIs[cat]
+            runII.name = cat+'RunII'
+            runII.year = 2
+            runII.projPath = runII._projPath()
+            runII.plotFitResults('RunII_b')
+            runII.plotFitResults('RunII_s')
+
+        # Will steal existing twoDinstances with a slight attribute
+        # modification to get it to work for RunII
+
 
 # for t in twoDinstances:
 #     del t
