@@ -672,13 +672,13 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
     pulls = []
     logString = ''
 
-    bstar_name_match = {
-        'ttbar':'t#bar{t} hadronic',
-        'ttbar-semilep':'t#bar{t} semi-leptonic',
-        'singletop_tW':'single top tW',
-        'singletop_tWB':'single top #bar{t}W',
-        'qcd':'Multijet'
-    }
+    # bstar_name_match = {
+    #     'ttbar':'t#bar{t} hadronic',
+    #     'ttbar-semilep':'t#bar{t} semi-leptonic',
+    #     'singletop_tW':'single top tW',
+    #     'singletop_tWB':'single top #bar{t}W',
+    #     'qcd':'Multijet'
+    # }
 
     # For each hist/data distribution
     for hist_index, hist in enumerate(histlist):
@@ -750,9 +750,10 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 legend_topY = 0.81-0.02*(len(bkglist[0])+len(signals))
                 legend_bottomY = 0.2+0.02*(len(bkglist[0])+len(signals))
 
-                # if not logy: 
                 legends.append(TLegend(0.65,legend_topY,0.90,0.90))
-                # else: legends.append(TLegend(0.2,0.11,0.45,legend_bottomY))
+                legend_duplicates = []
+                if not dataOff: legends[hist_index].AddEntry(hist,dataName,datastyle)
+
                 stacks.append(THStack(hist.GetName()+'_stack',hist.GetName()+'_stack'))
                 if totalBkg == None:
                     tot_hist = hist.Clone(hist.GetName()+'_tot')
@@ -806,8 +807,11 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     elif type(bkgNames[0]) != list: this_bkg_name = bkgNames[bkg_index]
                     else: this_bkg_name = bkgNames[hist_index][bkg_index]
                     
-                    if this_bkg_name in bstar_name_match.keys(): legends[hist_index].AddEntry(bkg,bstar_name_match[this_bkg_name],'f')
-                    else: legends[hist_index].AddEntry(bkg,this_bkg_name,'f')
+                    # if this_bkg_name in bstar_name_match.keys(): legends[hist_index].AddEntry(bkg,bstar_name_match[this_bkg_name],'f')
+                    # else: 
+                    if this_bkg_name not in legend_duplicates:
+                        legends[hist_index].AddEntry(bkg,this_bkg_name,'f')
+                        legend_duplicates.append(this_bkg_name)
                     
                 # Go to main pad, set logy if needed
                 mains[hist_index].cd()
@@ -850,8 +854,8 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     signals[hist_index].SetLineWidth(2)
                     if logy == True:
                         signals[hist_index].SetMinimum(1e-3)
-                    if signalNames == []: this_sig_name = signals[hist_index].GetName().split('_')[0]
-                    elif type(signalNames) == str: this_sig_name = signalNames
+                    # if signalNames == []: this_sig_name = signals[hist_index].GetName().split('_')[0]
+                    if type(signalNames) == str: this_sig_name = signalNames
                     else: this_sig_name = signalNames[hist_index]
 
                     legends[hist_index].AddEntry(signals[hist_index],this_sig_name,'L')
@@ -870,7 +874,6 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 legends[hist_index].Draw()
 
                 if not dataOff:
-                    legends[hist_index].AddEntry(hist,dataName,datastyle)
                     hist.Draw(datastyle+' same')
 
                 gPad.RedrawAxis()

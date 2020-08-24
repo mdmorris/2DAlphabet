@@ -76,7 +76,6 @@ class TwoDAlphabet:
         self.prerun = self._getOption('prerun')
         self.overwrite = self._getOption('overwrite')
         self.recycle = recycle if recycle != False else self._getOption('recycle')
-        self.plotTogether = self._getOption('plotTogether')
         self.rpfRatio = self._getOption('rpfRatio')
         self.year = self._getOption('year')
         self.plotPrefitSigInFitB = self._getOption('plotPrefitSigInFitB')
@@ -513,7 +512,6 @@ class TwoDAlphabet:
         self.pickleDict['sigEnd'] = self.sigEnd
         self.pickleDict['freezeFail'] = self.freezeFail
         self.pickleDict['blindedFit'] = self.blindedFit
-        self.pickleDict['plotTogether'] = self.plotTogether
 
         # # Setup a directory to save
         # self.projPath = self._projPath()
@@ -1935,11 +1933,6 @@ class TwoDAlphabet:
                             hist_dict[process][cat]['postfit_proj'+z+str(i)].SetTitle(process + ', ' + cat+', '+self.name+ ', ' +str(x_edges[i-1]) +'-'+ str(x_edges[i]))
 
         post_file.Close()
-
-        # NOT CURRENTLY WORKING
-        # Add together processes that we want to see as one
-        if False:#self.plotTogether != False:
-            hist_dict = self.plotProcessesTogether(hist_dict)
             
         process_list = hist_dict.keys()
 
@@ -1955,9 +1948,6 @@ class TwoDAlphabet:
 
                     twoDList.append(hist_dict[process][cat][fit+'_2D'])
                     twoDtitles.append(process + ', '+cat+', '+fit)
-
-            if isSignal: # BSTAR SPECIFIC
-                mass = process.split('signal')[1][2:]
 
             if isSignal and fittag != 's':
                 continue
@@ -1997,6 +1987,7 @@ class TwoDAlphabet:
                 for regionNum in range(1,4):    # Column
                     bkg_process_list = []
                     bkg_process_names = []
+                    signal_names = []
                     this_totalbkg = hist_dict['TotalBkg'][cat][plotType+str(regionNum)]
                     totalBkgs.append(this_totalbkg)
                     if 'y' in plotType:
@@ -2010,14 +2001,17 @@ class TwoDAlphabet:
                     for process in process_list:
                         if process != 'data_obs':
                             if (process != 'qcd' and process != 'TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] != 0):
+                                process_name = process if 'TITLE' not in self.inputConfig['PROCESS'][process].keys() else self.inputConfig['PROCESS'][process]['TITLE']
                                 bkg_process_list.append(hist_dict[process][cat][plotType+str(regionNum)])
-                                bkg_process_names.append(process)
+                                bkg_process_names.append(process_name)
                             elif (process != 'qcd' and process != 'TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] == 0):
+                                process_name = process if 'TITLE' not in self.inputConfig['PROCESS'][process].keys() else self.inputConfig['PROCESS'][process]['TITLE']
                                 if self.plotPrefitSigInFitB and fittag == 'b':
                                     signal_list.append(hist_dict[process][cat][plotType.replace("postfit","prefit")+str(regionNum)])
                                 else:
                                     hist_dict[process][cat][plotType+str(regionNum)].Scale(signal_strength)
                                     signal_list.append(hist_dict[process][cat][plotType+str(regionNum)])
+                                signal_names = process_name
                                 
                         else:
                             this_data = hist_dict[process][cat][plotType+str(regionNum)]
@@ -2025,12 +2019,12 @@ class TwoDAlphabet:
 
                     # Put QCD on bottom of stack since it's smooth
                     bkg_process_list = [hist_dict['qcd'][cat][plotType+str(regionNum)]]+bkg_process_list
-                    bkgNameList.append(['qcd']+bkg_process_names)
+                    bkgNameList.append(['Multijet']+bkg_process_names)
                     bkgList.append(bkg_process_list)
 
                     # Put QCD on top of logy
                     bkg_process_list_logy = bkg_process_list[1:]+[hist_dict['qcd'][cat][plotType+str(regionNum)]]
-                    bkgNameList_logy.append(bkg_process_names+['qcd'])
+                    bkgNameList_logy.append(bkg_process_names+['Multijet'])
                     bkgList_logy.append(bkg_process_list_logy)
 
                     title_list.append('Data vs bkg - %s - [%s,%s]'%(cat,low_str,high_str))
@@ -2038,27 +2032,25 @@ class TwoDAlphabet:
                     # Make the "money plot" of just the y projection of the signal region
                     if ('y' in plotType) and (cat == 'pass') and (regionNum == 2): 
                         money_title = 'Data vs Background - '+self.yVarTitle
-                        header.makeCan('plots/fit_'+fittag+'/postfit_signal_region_only',self.projPath,[this_data],[bkg_process_list],totalBkg=[this_totalbkg],signals=signal_list,titles=[money_title],bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,colors=colors,xtitle=self.yVarTitle,year=self.year)
-
-
+                        header.makeCan('plots/fit_'+fittag+'/postfit_signal_region_only',self.projPath,[this_data],[bkg_process_list],totalBkg=[this_totalbkg],signals=signal_list,titles=[money_title],bkgNames=bkgNameList,signalNames=signal_names,colors=colors,xtitle=self.yVarTitle,year=self.year)
 
             if 'x' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
                     dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
+                    bkgNames=bkgNameList,signalNames=signal_names,titles=title_list,
                     colors=colors,xtitle=self.xVarTitle,year=self.year)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
                     dataList,bkglist=bkgList_logy,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList_logy,signalNames='b* %s GeV'%mass,titles=title_list,
+                    bkgNames=bkgNameList_logy,signalNames=signal_names,titles=title_list,
                     colors=colors_logy,xtitle=self.xVarTitle,logy=True,year=self.year)
             elif 'y' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
                     dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList,signalNames='b* %s GeV'%mass,titles=title_list,
+                    bkgNames=bkgNameList,signalNames=signal_names,titles=title_list,
                     colors=colors,xtitle=self.yVarTitle,year=self.year)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
                     dataList,bkglist=bkgList_logy,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList_logy,signalNames='b* %s GeV'%mass,titles=title_list,
+                    bkgNames=bkgNameList_logy,signalNames=signal_names,titles=title_list,
                     colors=colors_logy,xtitle=self.yVarTitle,logy=True,year=self.year)
 
         # Make comparisons for each background process of pre and post fit projections
@@ -2291,31 +2283,6 @@ class TwoDAlphabet:
         rpf_file.cd()
         rpf_final.Write()
         rpf_file.Close()
-
-    def plotProcessesTogether(self,hist_dict):
-        process_list = hist_dict.keys()
-
-        for summation in self.plotTogether.keys():  # For each set we're add together
-            process_list.append(summation)   # add the name to a list so we can keep track
-            hist_dict[summation] = {}
-            first_process = self.plotTogether[summation][0]
-            self.inputConfig["PROCESS"][summation] = {"COLOR":self.inputConfig["PROCESS"][first_process]["COLOR"],
-                                                     "CODE":self.inputConfig["PROCESS"][first_process]["CODE"] }
-
-            for cat in hist_dict[first_process].keys():   # for each pass/fail
-                hist_dict[summation][cat] = {}
-                for reg in hist_dict[first_process][cat].keys():  # and each region
-                    first_hist = hist_dict[first_process][cat][reg].Clone(summation+'_'+cat+'_'+reg)    # Clone the "first" histogram and give it the totalProcName
-                    for proc in self.plotTogether[summation]:   # for each process in the list of ones we're adding together
-                        if proc != first_process: # not the first one since we've cloned that
-                            first_hist.Add(hist_dict[proc][cat][reg])    # add it
-                    hist_dict[summation][cat][reg] = first_hist    # Put it in the hist_dict
-
-
-            for proc in self.plotTogether[summation]:
-                process_list.remove(proc)
-
-        return histDict
 
 # WRAPPER FUNCTIONS
 def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,prerun=False):
