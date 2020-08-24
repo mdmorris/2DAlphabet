@@ -766,9 +766,8 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 tot_hists.append(tot_hist)
                 tot_hists_err.append(tot_hist.Clone())
 
-
                 # Set margins and make these two pads primitives of the division, thisPad
-                mains[hist_index].SetBottomMargin(0.0)
+                mains[hist_index].SetBottomMargin(0.04)
                 mains[hist_index].SetLeftMargin(0.16)
                 mains[hist_index].SetRightMargin(0.05)
                 mains[hist_index].SetTopMargin(0.08)
@@ -841,6 +840,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 hist.GetYaxis().SetTitleOffset(1.15)
                 hist.GetYaxis().SetLabelSize(mLS)
                 hist.GetYaxis().SetTitleSize(mLS)
+                hist.GetXaxis().SetLabelOffset(0.05)
                 if logy == True:
                     hist.SetMinimum(1e-3)
                 hist.Draw(datastyle)
