@@ -79,6 +79,7 @@ class TwoDAlphabet:
         self.rpfRatio = self._getOption('rpfRatio')
         self.year = self._getOption('year')
         self.plotPrefitSigInFitB = self._getOption('plotPrefitSigInFitB')
+        self.plotTitles = self._getOption('plotTitles')
         self.recycleAll = recycleAll
 
         # Setup a directory to save
@@ -467,7 +468,7 @@ class TwoDAlphabet:
         if optionName in self.inputConfig['OPTIONS'].keys():
             option_return = self.inputConfig['OPTIONS'][optionName]
         # Default to true
-        elif optionName in ['blindedPlots','blindedFit']:
+        elif optionName in ['blindedPlots','blindedFit','plotTitles']:
             print 'WARNING: '+optionName+' boolean not set explicitly. Default to True.'
             option_return = True
         # Default to false
@@ -1539,7 +1540,7 @@ class TwoDAlphabet:
             rpf_ratio = data_rpf.Clone()
             rpf_ratio.Divide(mc_rpf)
             rpf_ratio.SetMaximum(2.5)
-            rpf_ratio.GetZaxis().SetLabelSize(0.08)
+            # rpf_ratio.GetZaxis().SetLabelSize(0.04)
 
             header.makeCan('rpf_ratio',self.projPath,[data_rpf,mc_rpf,rpf_ratio],
                 titles=["Data Ratio;%s;%s;R_{P/F}"%(self.xVarTitle,self.yVarTitle),"MC Ratio;%s;%s;R_{P/F}"%(self.xVarTitle,self.yVarTitle),"Ratio of ratios;%s;%s;R_{Ratio}"%(self.xVarTitle,self.yVarTitle)],
@@ -1849,6 +1850,11 @@ class TwoDAlphabet:
         y_turnon_endVal = str(y_turnon_endVal)
         y_tail_beginningVal = str(int(post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetYaxis().GetBinLowEdge(y_tail_beginningBin)))
      
+        # Save out slice edges in case they aren't plotted in title (don't do for x since those are defined by user in config)
+        y_slices = open(self.projPath+'/y_slices.txt','w')
+        y_slices.write('Bin edge values:  %i %s %s %i\n'%(y_low, y_turnon_endVal, y_tail_beginningVal, y_high))
+        y_slices.write('Bin edge numbers: %i %i %i %i'%(1,     y_turnon_endBin, y_tail_beginningBin, len(self.newYbins)-1))
+        y_slices.close()
 
         # Final fit signal strength
         if fittag == 's':
@@ -2027,12 +2033,13 @@ class TwoDAlphabet:
                     bkgNameList_logy.append(bkg_process_names+['Multijet'])
                     bkgList_logy.append(bkg_process_list_logy)
 
-                    title_list.append('Data vs bkg - %s - [%s,%s]'%(cat,low_str,high_str))
+                    if self.plotTitles: title_list.append('Data vs bkg - %s - [%s,%s]'%(cat,low_str,high_str))
+                    else: title_list.append('')
 
                     # Make the "money plot" of just the y projection of the signal region
-                    if ('y' in plotType) and (cat == 'pass') and (regionNum == 2): 
-                        money_title = 'Data vs Background - '+self.yVarTitle
-                        header.makeCan('plots/fit_'+fittag+'/postfit_signal_region_only',self.projPath,[this_data],[bkg_process_list],totalBkg=[this_totalbkg],signals=signal_list,titles=[money_title],bkgNames=bkgNameList,signalNames=signal_names,colors=colors,xtitle=self.yVarTitle,year=self.year)
+                    # if ('y' in plotType) and (cat == 'pass') and (regionNum == 2): 
+                    #     money_title = 'Data vs Background - '+self.yVarTitle
+                    #     header.makeCan('plots/fit_'+fittag+'/postfit_signal_region_only',self.projPath,[this_data],[bkg_process_list],totalBkg=[this_totalbkg],signals=signal_list,titles=[money_title],bkgNames=bkgNameList,signalNames=signal_names,colors=colors,xtitle=self.yVarTitle,year=self.year)
 
             if 'x' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,

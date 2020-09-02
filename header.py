@@ -633,7 +633,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
         pady = 1
     elif len(histlist) == 3:
         width = 1800
-        height = 700
+        height = 600
         padx = 3
         pady = 1
     elif len(histlist) == 4:
@@ -692,8 +692,8 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
         if hist.ClassName().find('TH2') != -1:
             if logy == True:
                 gPad.SetLogy()
-            gPad.SetLeftMargin(0.2)
-            gPad.SetRightMargin(0.1)
+            gPad.SetLeftMargin(0.1)
+            gPad.SetRightMargin(0.2)
             hist.GetXaxis().SetTitle(xtitle)
             hist.GetYaxis().SetTitle(ytitle)
             hist.GetXaxis().SetTitleOffset(1.5)
@@ -728,11 +728,11 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 hist.SetMaximum(1.13*hist.GetMaximum())
                 hist.GetXaxis().SetTitle(xtitle)
                 hist.GetYaxis().SetTitle(ytitle)
-                # if len(titles) > 0:
-                    # hist.SetTitle(titles[hist_index])
+                if len(titles) > 0:
+                    hist.SetTitle(titles[hist_index])
                 hist.SetTitleOffset(1.1)
                 # Bstar specific
-                hist.SetTitle('')
+                # hist.SetTitle('')
                 hist.Draw(datastyle)
                 CMS_lumi.CMS_lumi(thisPad, year, 11)
             
@@ -831,10 +831,10 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 mLS = 0.06
                 # Now draw the main pad
                 data_leg_title = hist.GetTitle()
-                # if len(titles) > 0:
-                #     hist.SetTitle(titles[hist_index])
+                if len(titles) > 0:
+                    hist.SetTitle(titles[hist_index])
                 # Bstar specific
-                hist.SetTitle('')
+                # hist.SetTitle('')
                 hist.SetTitleOffset(1.1,"xy")
                 hist.GetYaxis().SetTitle('Events')
                 hist.GetYaxis().SetTitleOffset(1.15)
