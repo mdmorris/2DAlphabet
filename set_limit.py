@@ -8,7 +8,7 @@ from ROOT import *
 
 import header
 from header import WaitForJobs, make_smooth_graph, Inter
-import tdrstyle
+import tdrstyle, CMS_lumi
 
 gStyle.SetOptStat(0)
 gROOT.SetBatch(kTRUE)
@@ -31,6 +31,10 @@ parser.add_option('--unblind', action="store_false",
                 default   =   True,
                 dest      =   'blind',
                 help      =   'Only plot observed limit if false')
+parser.add_option('--drawIntersection', action="store_true",
+                default   =   False,
+                dest      =   'drawIntersection',
+                help      =   'Draw intersection values')
 parser.add_option('-l', '--lumi', metavar='F', type='string', action='store',
                 default       =       '137.44',
                 dest          =       'lumi',
@@ -128,7 +132,7 @@ climits.SetRightMargin(0.05)
 #     cstr = ''
 cstr = options.mod
 
-
+gStyle.SetTextFont(42)
 TPT = ROOT.TPaveText(.20, .22, .5, .27,"NDC")
 TPT.AddText("All-Hadronic Channel") # NOT GENERIC
 TPT.SetFillColor(0)
@@ -150,11 +154,11 @@ if not options.blind:
     print 'Not blinded'
     g_limit = TGraph(len(x_mass), x_mass, y_limit)
     g_limit.SetTitle("")
-    g_limit.SetMarkerStyle(0)
+    g_limit.SetMarkerStyle(7)
     g_limit.SetMarkerColor(1)
     g_limit.SetLineColor(1)
-    g_limit.SetLineWidth(3)
-    g_limit.SetMarkerSize(0.5) #0.5
+    g_limit.SetLineWidth(2)
+    g_limit.SetMarkerSize(1) #0.5
     g_limit.GetYaxis().SetRangeUser(0., 80.)
     g_limit.GetXaxis().SetRangeUser(1, 3.2)
     g_limit.SetMinimum(0.3e-3) #0.005
@@ -264,11 +268,11 @@ if not options.blind:
     g_limit.GetYaxis().SetTitle("Upper Limit #sigma_{b*_{"+cstr+"}} #times B(b*_{"+cstr+"}#rightarrowtW) (pb)") # NOT GENERIC
     g_limit.GetXaxis().SetTitleSize(0.055)
     g_limit.GetYaxis().SetTitleSize(0.05)
-    g_limit.Draw('al')
+    g_limit.Draw('ap')
     g_error95.Draw("lf")
     g_error.Draw("lf")
     g_mclimit.Draw("l")
-    g_limit.Draw("l")
+    g_limit.Draw("lp")
     graphWP.Draw("l")
     g_limit.GetYaxis().SetTitleOffset(1.5)
     g_limit.GetXaxis().SetTitleOffset(1.25)
@@ -299,11 +303,13 @@ lowLimit,trash = Inter(g_mcplus,graphWP) if len(Inter(g_mcplus,graphWP)) > 0 els
 
 expLine = TLine(expectedMassLimit,g_mclimit.GetMinimum(),expectedMassLimit,expectedCrossLimit)
 expLine.SetLineStyle(2)
-expLineLabel = TPaveText(expectedMassLimit-300, expectedCrossLimit*2, expectedMassLimit+300, expectedCrossLimit*15, "NB")
-expLineLabel.SetFillColorAlpha(kWhite,0)
-expLineLabel.AddText(str(int(expectedMassLimit))+' GeV')
 expLine.Draw()
-expLineLabel.Draw()
+
+if options.drawIntersection:
+    expLineLabel = TPaveText(expectedMassLimit-300, expectedCrossLimit*2, expectedMassLimit+300, expectedCrossLimit*15, "NB")
+    expLineLabel.SetFillColorAlpha(kWhite,0)
+    expLineLabel.AddText(str(int(expectedMassLimit))+' GeV')
+    expLineLabel.Draw()
 
 print 'Expected limit: '+str(expectedMassLimit/1000.) + ' +'+str(upLimit/1000.-expectedMassLimit/1000.) +' -'+str(expectedMassLimit/1000.-lowLimit/1000.) + ' TeV' # NOT GENERIC
 if not options.blind:
@@ -312,19 +318,23 @@ if not options.blind:
 
     obsLine = TLine(obsMassLimit,g_mclimit.GetMinimum(),obsMassLimit,obsCrossLimit)
     obsLine.SetLineStyle(2)
-    obsLineLabel = TPaveText(obsMassLimit-300, obsCrossLimit*4, obsMassLimit+300, obsCrossLimit*15,"NB")
-    obsLineLabel.SetFillColorAlpha(kWhite,0)
-    obsLineLabel.AddText(str(int(obsMassLimit))+' GeV')
     obsLine.Draw()
-    obsLineLabel.Draw()
+
+    if options.drawIntersection:
+        obsLineLabel = TPaveText(obsMassLimit-300, obsCrossLimit*3, obsMassLimit+300, obsCrossLimit*12,"NB")
+        obsLineLabel.SetFillColorAlpha(kWhite,0)
+        obsLineLabel.AddText(str(int(obsMassLimit))+' GeV')
+        obsLineLabel.Draw()
 
 # Legend and draw
+gStyle.SetLegendFont(42)
 legend = TLegend(0.60, 0.50, 0.91, 0.87, '')
+legend.SetHeader("95% CL upper limits")
 if not options.blind:
     legend.AddEntry(g_limit, "Observed", "l")
-legend.AddEntry(g_mclimit, "Expected (95% CL)","l")
-legend.AddEntry(g_error, "#pm 1 #sigma Expected", "f")
-legend.AddEntry(g_error95, "#pm 2 #sigma Expected", "f")
+legend.AddEntry(g_mclimit, "Median expected","l")
+legend.AddEntry(g_error, "68% expected", "f")
+legend.AddEntry(g_error95, "95% expected", "f")
 legend.AddEntry(graphWP, "Theory b*_{"+cstr+"}", "l")   # NOT GENERIC
 # legend.AddEntry(graphWPup, "Theory b*_{"+cstr+"} 1 #sigma uncertainty", "l")
 
@@ -334,13 +344,16 @@ legend.SetLineColor(0)
 
 legend.Draw("same")
 
-text1 = ROOT.TLatex()
-text1.SetNDC()
-text1.SetTextFont(42)
-text1.DrawLatex(0.17,0.88, "#scale[1.0]{CMS, L = "+options.lumi+" fb^{-1} at  #sqrt{s} = 13 TeV}") # NOT GENERIC
+# text1 = ROOT.TLatex()
+# text1.SetNDC()
+# text1.SetTextFont(42)
+# text1.DrawLatex(0.17,0.88, "#scale[1.0]{CMS, L = "+options.lumi+" fb^{-1} at  #sqrt{s} = 13 TeV}") # NOT GENERIC
 
 TPT.Draw()      
 climits.RedrawAxis()
+
+CMS_lumi.CMS_lumi(climits, 1, 11)
+
 climits.SaveAs("limits_combine_"+options.lumi.replace('.','p')+"fb_"+options.signals[options.signals.find('/')+1:options.signals.find('.')]+'_'+cstr+".pdf")
 
 
