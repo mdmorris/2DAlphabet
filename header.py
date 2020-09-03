@@ -612,7 +612,7 @@ def dictToLatexTable(dict2convert,outfilename,roworder=[],columnorder=[]):
     latexout.close()
 
 
-def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],titles=[],dataName='data',bkgNames=[],signalNames=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False,datastyle='pe',year=1):  
+def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],titles=[],dataName='data',bkgNames=[],signalNames=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False,datastyle='pe',year=1, addSignals=True):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -671,6 +671,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
     subs = []
     pulls = []
     logString = ''
+    tot_sigs = []
 
     # bstar_name_match = {
     #     'ttbar':'t#bar{t} hadronic',
@@ -747,8 +748,14 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.1, 1, 1))
                     subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 0, 0))
 
-                legend_topY = 0.81-0.02*(len(bkglist[0])+len(signals))
-                legend_bottomY = 0.2+0.02*(len(bkglist[0])+len(signals))
+                if len(signals) == 0:
+                    nsignals = 0
+                elif addSignals:
+                    nsignals = 1
+                else:
+                    nsignals = len(signals[0])
+                legend_topY = 0.81-0.02*(len(bkglist[0])+nsignals)
+                legend_bottomY = 0.2+0.02*(len(bkglist[0])+nsignals)
 
                 legends.append(TLegend(0.65,legend_topY,0.90,0.90))
                 legend_duplicates = []
@@ -849,17 +856,36 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 stacks[hist_index].Draw('same hist')
 
                 # Do the signals
+                sigs_to_plot = []
                 if len(signals) > 0: 
-                    signals[hist_index].SetLineColor(kBlue)
-                    signals[hist_index].SetLineWidth(2)
-                    if logy == True:
-                        signals[hist_index].SetMinimum(1e-3)
-                    # if signalNames == []: this_sig_name = signals[hist_index].GetName().split('_')[0]
-                    if type(signalNames) == str: this_sig_name = signalNames
-                    else: this_sig_name = signalNames[hist_index]
+                    # Can add together for total signal
+                    if addSignals:
+                        totsig = signals[hist_index][0].Clone()
+                        print hist.GetName()
+                        print 'Setting totsig: '+ totsig.GetName()
+                        for isig in range(1,len(signals[hist_index])):
+                            print 'Adding: '+signals[hist_index][isig].GetName()
+                            totsig.Add(signals[hist_index][isig])
+                        sigs_to_plot = [totsig]
+                    # or treat separately
+                    else:
+                        for sig in signals[hist_index]:
+                            sigs_to_plot.append(sig)
 
-                    legends[hist_index].AddEntry(signals[hist_index],this_sig_name,'L')
-                    signals[hist_index].Draw('hist same')
+                    # Plot either way
+                    tot_sigs.append(sigs_to_plot)
+                    for isig,sig in enumerate(sigs_to_plot):
+                        sig.SetLineColor(kBlue)
+                        sig.SetLineWidth(2)
+                        if logy == True:
+                            sig.SetMinimum(1e-3)
+                        # if signalNames == []: this_sig_name = sig.GetName().split('_')[0]
+                        if type(signalNames) == str: this_sig_name = signalNames
+                        else: this_sig_name = signalNames[isig]
+
+                        legends[hist_index].AddEntry(sig,this_sig_name,'L')
+                        print 'Drawing: '+sig.GetName()
+                        sig.Draw('hist same')
 
                 if logy: 
                     tot_hists[hist_index].SetMinimum(1e-3)

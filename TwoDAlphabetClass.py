@@ -80,6 +80,7 @@ class TwoDAlphabet:
         self.year = self._getOption('year')
         self.plotPrefitSigInFitB = self._getOption('plotPrefitSigInFitB')
         self.plotTitles = self._getOption('plotTitles')
+        self.addSignals = self._getOption('addSignals')
         self.recycleAll = recycleAll
 
         # Setup a directory to save
@@ -468,7 +469,7 @@ class TwoDAlphabet:
         if optionName in self.inputConfig['OPTIONS'].keys():
             option_return = self.inputConfig['OPTIONS'][optionName]
         # Default to true
-        elif optionName in ['blindedPlots','blindedFit','plotTitles']:
+        elif optionName in ['blindedPlots','blindedFit','plotTitles','addSignals']:
             print 'WARNING: '+optionName+' boolean not set explicitly. Default to True.'
             option_return = True
         # Default to false
@@ -1986,13 +1987,14 @@ class TwoDAlphabet:
             bkgList_logy = []
             bkgNameList_logy = []
             dataList = []
-            signal_list = []
-            title_list = []
+            signalList = []
+            titleList = []
             totalBkgs = []
             for cat in ['fail','pass']: # Row 
                 for regionNum in range(1,4):    # Column
                     bkg_process_list = []
                     bkg_process_names = []
+                    signal_process_list = []
                     signal_names = []
                     this_totalbkg = hist_dict['TotalBkg'][cat][plotType+str(regionNum)]
                     totalBkgs.append(this_totalbkg)
@@ -2013,11 +2015,11 @@ class TwoDAlphabet:
                             elif (process != 'qcd' and process != 'TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] == 0):
                                 process_name = process if 'TITLE' not in self.inputConfig['PROCESS'][process].keys() else self.inputConfig['PROCESS'][process]['TITLE']
                                 if self.plotPrefitSigInFitB and fittag == 'b':
-                                    signal_list.append(hist_dict[process][cat][plotType.replace("postfit","prefit")+str(regionNum)])
+                                    signal_process_list.append(hist_dict[process][cat][plotType.replace("postfit","prefit")+str(regionNum)])
                                 else:
                                     hist_dict[process][cat][plotType+str(regionNum)].Scale(signal_strength)
-                                    signal_list.append(hist_dict[process][cat][plotType+str(regionNum)])
-                                signal_names = process_name
+                                    signal_process_list.append(hist_dict[process][cat][plotType+str(regionNum)])
+                                signal_names.append(process_name)
                                 
                         else:
                             this_data = hist_dict[process][cat][plotType+str(regionNum)]
@@ -2033,32 +2035,35 @@ class TwoDAlphabet:
                     bkgNameList_logy.append(bkg_process_names+['Multijet'])
                     bkgList_logy.append(bkg_process_list_logy)
 
-                    if self.plotTitles: title_list.append('Data vs bkg - %s - [%s,%s]'%(cat,low_str,high_str))
-                    else: title_list.append('')
+                    # Do same for signal
+                    signalList.append(signal_process_list)
+
+                    if self.plotTitles: titleList.append('Data vs bkg - %s - [%s,%s]'%(cat,low_str,high_str))
+                    else: titleList.append('')
 
                     # Make the "money plot" of just the y projection of the signal region
                     # if ('y' in plotType) and (cat == 'pass') and (regionNum == 2): 
                     #     money_title = 'Data vs Background - '+self.yVarTitle
-                    #     header.makeCan('plots/fit_'+fittag+'/postfit_signal_region_only',self.projPath,[this_data],[bkg_process_list],totalBkg=[this_totalbkg],signals=signal_list,titles=[money_title],bkgNames=bkgNameList,signalNames=signal_names,colors=colors,xtitle=self.yVarTitle,year=self.year)
+                    #     header.makeCan('plots/fit_'+fittag+'/postfit_signal_region_only',self.projPath,[this_data],[bkg_process_list],totalBkg=[this_totalbkg],signals=signalList,titles=[money_title],bkgNames=bkgNameList,signalNames=signal_names,colors=colors,xtitle=self.yVarTitle,year=self.year)
 
             if 'x' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
-                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList,signalNames=signal_names,titles=title_list,
-                    colors=colors,xtitle=self.xVarTitle,year=self.year)
+                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signalList,
+                    bkgNames=bkgNameList,signalNames=signal_names,titles=titleList,
+                    colors=colors,xtitle=self.xVarTitle,year=self.year,addSignals=self.addSignals)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
-                    dataList,bkglist=bkgList_logy,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList_logy,signalNames=signal_names,titles=title_list,
-                    colors=colors_logy,xtitle=self.xVarTitle,logy=True,year=self.year)
+                    dataList,bkglist=bkgList_logy,totalBkg=totalBkgs,signals=signalList,
+                    bkgNames=bkgNameList_logy,signalNames=signal_names,titles=titleList,
+                    colors=colors_logy,xtitle=self.xVarTitle,logy=True,year=self.year,addSignals=self.addSignals)
             elif 'y' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
-                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList,signalNames=signal_names,titles=title_list,
-                    colors=colors,xtitle=self.yVarTitle,year=self.year)
+                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signalList,
+                    bkgNames=bkgNameList,signalNames=signal_names,titles=titleList,
+                    colors=colors,xtitle=self.yVarTitle,year=self.year,addSignals=self.addSignals)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
-                    dataList,bkglist=bkgList_logy,totalBkg=totalBkgs,signals=signal_list,
-                    bkgNames=bkgNameList_logy,signalNames=signal_names,titles=title_list,
-                    colors=colors_logy,xtitle=self.yVarTitle,logy=True,year=self.year)
+                    dataList,bkglist=bkgList_logy,totalBkg=totalBkgs,signals=signalList,
+                    bkgNames=bkgNameList_logy,signalNames=signal_names,titles=titleList,
+                    colors=colors_logy,xtitle=self.yVarTitle,logy=True,year=self.year,addSignals=self.addSignals)
 
         # Make comparisons for each background process of pre and post fit projections
         for plotType in ['projx','projy']:
@@ -2066,7 +2071,7 @@ class TwoDAlphabet:
                 if process != 'data_obs' and process != 'TotalBkg':
                     pre_list = []
                     post_list = []
-                    title_list = []
+                    titleList = []
                     for cat in ['fail','pass']: # Row 
                         for regionNum in range(1,4):    # Column
                             if 'y' in plotType:
@@ -2088,15 +2093,15 @@ class TwoDAlphabet:
                             else:
                                 prepostcolors = [kYellow]
 
-                            title_list.append('Pre vs Postfit - %s - %s - [%s,%s]'%(process,cat,low_str,high_str))
+                            titleList.append('Pre vs Postfit - %s - %s - [%s,%s]'%(process,cat,low_str,high_str))
 
                     if 'x' in plotType: header.makeCan('plots/fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,
                         post_list,bkglist=pre_list,totalBkg=[b[0] for b in pre_list],
-                        titles=title_list,bkgNames=['Prefit, '+process],dataName='        Postfit, '+process,
+                        titles=titleList,bkgNames=['Prefit, '+process],dataName='        Postfit, '+process,
                         colors=prepostcolors,xtitle=self.xVarTitle,datastyle='histpe',year=self.year)
                     if 'y' in plotType: header.makeCan('plots/fit_'+fittag+'/'+process+'_'+plotType+'_fit'+fittag,self.projPath,
                         post_list,bkglist=pre_list,totalBkg=[b[0] for b in pre_list],
-                        titles=title_list,bkgNames=['Prefit, '+process],dataName='        Postfit, '+process,
+                        titles=titleList,bkgNames=['Prefit, '+process],dataName='        Postfit, '+process,
                         colors=prepostcolors,xtitle=self.yVarTitle,datastyle='histpe',year=self.year)
 
 
