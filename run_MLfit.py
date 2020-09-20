@@ -149,7 +149,7 @@ if not options.skipPlots:
         for cat in runIIs.keys():
             runII = runIIs[cat]
             runII.name = cat+'RunII'
-            runII.year = 2
+            runII.year = 1
             runII.projPath = runII._projPath()
             runII.plotFitResults('RunII_b')
             runII.plotFitResults('RunII_s')
