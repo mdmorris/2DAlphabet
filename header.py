@@ -2,7 +2,7 @@ import ROOT
 from ROOT import *
 from contextlib import contextmanager
 import os, pickle, subprocess, time,random
-import math
+import math, collections
 from math import sqrt
 import array
 import json
@@ -611,8 +611,22 @@ def dictToLatexTable(dict2convert,outfilename,roworder=[],columnorder=[]):
     latexout.write('\\end{table}')
     latexout.close()
 
+def reorderHists(histlist):
+    if len(histlist) != 6:
+        print Exception('reorderHists() only built to rearrange list of six hists from 2x3 to 3x2')
+        return histlist
 
-def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],titles=[],dataName='data',bkgNames=[],signalNames=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False,datastyle='pe',year=1, addSignals=True):  
+    outlist = []
+    outlist.append(histlist[0])
+    outlist.append(histlist[3])
+    outlist.append(histlist[1])
+    outlist.append(histlist[4])
+    outlist.append(histlist[2])
+    outlist.append(histlist[5])
+
+    return outlist
+
+def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],titles=[],dataName='Data',bkgNames=[],signalNames=[],logy=False,rootfile=False,xtitle='',ytitle='',ztitle='',dataOff=False,datastyle='pe',year=1, addSignals=True):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -642,20 +656,26 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
         padx = 2
         pady = 2
     elif len(histlist) == 6 or len(histlist) == 5:
-        width = 1600
-        height = 1000
-        padx = 3
-        pady = 2
+        height = 1600
+        width = 1200
+        padx = 2
+        pady = 3
+        histlist = reorderHists(histlist)
+        if bkglist != []: bkglist = reorderHists(bkglist)
+        if signals != []: signals = reorderHists(signals)
+        if totalBkg != None: totalBkg = reorderHists(totalBkg)
+        if titles != []: titles = reorderHists(titles)
     else:
         print 'histlist of size ' + str(len(histlist)) + ' not currently supported'
         print histlist
         return 0
 
     tdrstyle.setTDRStyle()
+    gStyle.SetLegendFont(42)
     gStyle.SetTitleBorderSize(0)
     gStyle.SetTitleAlign(33)
     gStyle.SetTitleX(.77)
-
+        
     myCan = TCanvas(name,name,width,height)
     myCan.Divide(padx,pady)
 
@@ -861,10 +881,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     # Can add together for total signal
                     if addSignals:
                         totsig = signals[hist_index][0].Clone()
-                        print hist.GetName()
-                        print 'Setting totsig: '+ totsig.GetName()
                         for isig in range(1,len(signals[hist_index])):
-                            print 'Adding: '+signals[hist_index][isig].GetName()
                             totsig.Add(signals[hist_index][isig])
                         sigs_to_plot = [totsig]
                     # or treat separately
