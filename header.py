@@ -708,6 +708,9 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
         # if len(histlist) > 1:
         thisPad = myCan.GetPrimitive(name+'_'+str(hist_index+1))
         thisPad.cd()        
+        thisPad.SetRightMargin(0.0)
+        thisPad.SetTopMargin(0.0)
+        thisPad.SetBottomMargin(0.0)
 
         # If this is a TH2, just draw the lego
         if hist.ClassName().find('TH2') != -1:
@@ -717,9 +720,11 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
             gPad.SetRightMargin(0.2)
             hist.GetXaxis().SetTitle(xtitle)
             hist.GetYaxis().SetTitle(ytitle)
+            hist.GetZaxis().SetTitle(ztitle)
             hist.GetXaxis().SetTitleOffset(1.5)
-            hist.GetYaxis().SetTitleOffset(2.3)
+            hist.GetYaxis().SetTitleOffset(2.0)
             hist.GetZaxis().SetTitleOffset(1.8)
+            if 'lego' in datastyle.lower(): hist.GetZaxis().SetTitleOffset(1.4)
             if len(titles) > 0:
                 hist.SetTitle(titles[hist_index])
             # Bstar specific
@@ -734,6 +739,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
         
         # Otherwise it's a TH1 hopefully
         else:
+            titleSize = 0.09
             alpha = 1
             if dataOff:
                 alpha = 0
@@ -761,8 +767,8 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
             else:
                 # Create some subpads, a legend, a stack, and a total bkg hist that we'll use for the error bars
                 if not dataOff:
-                    mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.3, 1, 1))
-                    subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 1, 0.3))
+                    mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.35, 1, 1))
+                    subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 1, 0.35))
 
                 else:
                     mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.1, 1, 1))
@@ -774,10 +780,10 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     nsignals = 1
                 else:
                     nsignals = len(signals[0])
-                legend_topY = 0.81-0.02*(len(bkglist[0])+nsignals)
-                legend_bottomY = 0.2+0.02*(len(bkglist[0])+nsignals)
+                legend_topY = 0.73-0.03*(len(bkglist[0])+nsignals+1)
+                # legend_bottomY = 0.2+0.02*(len(bkglist[0])+nsignals+1)
 
-                legends.append(TLegend(0.65,legend_topY,0.90,0.90))
+                legends.append(TLegend(0.65,legend_topY,0.90,0.88))
                 legend_duplicates = []
                 if not dataOff: legends[hist_index].AddEntry(hist,dataName,datastyle)
 
@@ -792,17 +798,18 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 tot_hist.SetMarkerStyle(0)
                 tot_hists.append(tot_hist)
                 tot_hists_err.append(tot_hist.Clone())
+                legends[hist_index].AddEntry(tot_hists_err[hist_index],'Total bkg unc.','F')
 
                 # Set margins and make these two pads primitives of the division, thisPad
                 mains[hist_index].SetBottomMargin(0.04)
-                mains[hist_index].SetLeftMargin(0.16)
+                mains[hist_index].SetLeftMargin(0.17)
                 mains[hist_index].SetRightMargin(0.05)
-                mains[hist_index].SetTopMargin(0.08)
+                mains[hist_index].SetTopMargin(0.09)
 
-                subs[hist_index].SetLeftMargin(0.16)
+                subs[hist_index].SetLeftMargin(0.17)
                 subs[hist_index].SetRightMargin(0.05)
                 subs[hist_index].SetTopMargin(0)
-                subs[hist_index].SetBottomMargin(0.3)
+                subs[hist_index].SetBottomMargin(0.35)
                 mains[hist_index].Draw()
                 subs[hist_index].Draw()
 
@@ -810,6 +817,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 # if logy: bkglist[0], bkglist[-1] = bkglist[-1], bkglist[0]
 
                 # Build the stack
+                legend_info = collections.OrderedDict()
                 for bkg_index,bkg in enumerate(bkglist[hist_index]):     # Won't loop if bkglist is empty
                     # bkg.Sumw2()
                     if totalBkg == None: tot_hists[hist_index].Add(bkg)
@@ -850,27 +858,34 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     if histList[h].GetMaximum() > yMax:
                         yMax = histList[h].GetMaximum()
                 for h in histList:
-                    h.SetMaximum(yMax*(2-legend_topY+0.02))
+                    h.SetMaximum(yMax*(2.5-legend_topY+0.03))
                     if logy == True:
-                        h.SetMaximum(yMax*10**(2-legend_topY+0.1))
+                        h.SetMaximum(yMax*10**(2.5-legend_topY+0.1))
 
                 
-                mLS = 0.06
+                mLS = 0.08
                 # Now draw the main pad
                 data_leg_title = hist.GetTitle()
                 if len(titles) > 0:
                     hist.SetTitle(titles[hist_index])
                 # Bstar specific
                 # hist.SetTitle('')
-                hist.SetTitleOffset(1.1,"xy")
-                hist.GetYaxis().SetTitle('Events')
-                hist.GetYaxis().SetTitleOffset(1.15)
-                hist.GetYaxis().SetLabelSize(mLS)
-                hist.GetYaxis().SetTitleSize(mLS)
+                hist.SetTitleOffset(1.15,"xy")
+                if 'projx' not in name:
+                    hist.GetYaxis().SetTitle('Events / bin')
+                else:
+                    hist.GetYaxis().SetTitle('Events / 20 GeV')
+                hist.GetYaxis().SetTitleOffset(1.04)
+                hist.GetYaxis().SetLabelSize(0.07)
+                hist.GetYaxis().SetTitleSize(titleSize)
+                hist.GetXaxis().SetLabelSize(0.07)
+                hist.GetXaxis().SetTitleSize(titleSize)
                 hist.GetXaxis().SetLabelOffset(0.05)
                 if logy == True:
                     hist.SetMinimum(1e-3)
-                hist.Draw(datastyle)
+                #gStyle.SetErrorX(0)
+                hist.Draw(datastyle+' X0')
+                #gStyle.SetErrorX(0.5)
 
                 if logy == True:stacks[hist_index].SetMinimum(1e-3) 
                 stacks[hist_index].Draw('same hist')
@@ -892,7 +907,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     # Plot either way
                     tot_sigs.append(sigs_to_plot)
                     for isig,sig in enumerate(sigs_to_plot):
-                        sig.SetLineColor(kBlue)
+                        sig.SetLineColor(kBlack)
                         sig.SetLineWidth(2)
                         if logy == True:
                             sig.SetMinimum(1e-3)
@@ -901,9 +916,9 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                         else: this_sig_name = signalNames[isig]
 
                         legends[hist_index].AddEntry(sig,this_sig_name,'L')
-                        print 'Drawing: '+sig.GetName()
                         sig.Draw('hist same')
 
+                # Draw total hist and error
                 if logy: 
                     tot_hists[hist_index].SetMinimum(1e-3)
                     tot_hists_err[hist_index].SetMinimum(1e-3)
@@ -917,7 +932,9 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 legends[hist_index].Draw()
 
                 if not dataOff:
-                    hist.Draw(datastyle+' same')
+                    #gStyle.SetErrorX(0)
+                    hist.Draw(datastyle+' X0 same')
+                    #gStyle.SetErrorX(0.5)
 
                 gPad.RedrawAxis()
 
@@ -929,17 +946,17 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 pulls[hist_index].SetTitle(";"+hist.GetXaxis().GetTitle()+";(Data-Bkg)/#sigma")
                 pulls[hist_index].SetStats(0)
 
-                LS = .13
+                LS = .16
 
                 pulls[hist_index].GetYaxis().SetRangeUser(-2.9,2.9)
                 pulls[hist_index].GetYaxis().SetTitleOffset(0.4)
                 # pulls[hist_index].GetXaxis().SetTitleOffset(0.9)
                              
-                pulls[hist_index].GetYaxis().SetLabelSize(LS)
-                pulls[hist_index].GetYaxis().SetTitleSize(LS)
+                pulls[hist_index].GetYaxis().SetLabelSize(0.13)
+                pulls[hist_index].GetYaxis().SetTitleSize(0.12)
                 pulls[hist_index].GetYaxis().SetNdivisions(306)
-                pulls[hist_index].GetXaxis().SetLabelSize(LS)
-                pulls[hist_index].GetXaxis().SetTitleSize(LS)
+                pulls[hist_index].GetXaxis().SetLabelSize(0.13)
+                pulls[hist_index].GetXaxis().SetTitleSize(0.15)
 
                 pulls[hist_index].GetXaxis().SetTitle(xtitle)
                 pulls[hist_index].GetYaxis().SetTitle("(Data-Bkg)/#sigma")
@@ -948,7 +965,12 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 if logy == True:
                     mains[hist_index].SetLogy()
 
-                CMS_lumi.CMS_lumi(thisPad, year, 11)
+                CMS_lumi.extraText = ''
+                CMS_lumi.cmsTextSize = 0.9
+                CMS_lumi.cmsTextOffset = 2
+                CMS_lumi.lumiTextSize = 0.9
+                
+                CMS_lumi.CMS_lumi(mains[hist_index], year, 11)
 
     # CMS_lumi.CMS_lumi(myCan, year, 11)
 

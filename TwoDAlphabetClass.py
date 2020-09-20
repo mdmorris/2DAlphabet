@@ -2282,6 +2282,7 @@ class TwoDAlphabet:
         rpf_c = TCanvas('rpf_c','Post-fit R_{P/F}',1000,700)
         CMS_lumi.lumiTextSize = 0.75
         CMS_lumi.cmsTextSize = 0.85
+        CMS_lumi.extraText = ''
         CMS_lumi.CMS_lumi(rpf_c, self.year, 11)
         rpf_c.SetRightMargin(0.2)
         rpf_final.Draw('colz')
