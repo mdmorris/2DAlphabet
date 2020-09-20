@@ -109,11 +109,11 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
 
 parser = OptionParser()
 
-parser.add_option('-q', '--tag', metavar='F', type='string', action='store',
+parser.add_option('-q', '--tag', metavar='<tag>', type='string', action='store',
                 default =   '',
                 dest    =   'quicktag',
                 help    =   'Assigns a tag for this run')
-parser.add_option('-d', '--projDir', metavar='F', type='string', action='store',
+parser.add_option('-d', '--projDir', metavar='<dir>', type='string', action='store',
                 default =   '',
                 dest    =   'projDir',
                 help    =   'Points to the directory where the b-only fit result is located')
@@ -124,7 +124,7 @@ parser.add_option("--unblindData", action="store_true",
 parser.add_option("--recycleAll", action="store_true", 
                 default =   False,
                 dest    =   "recycleAll",
-                help    =   "Recycle everything from the previous run with this tag")
+                help    =   "Recycle everything from the previous run with this tag. Note that this does not allow for string substitution.")
 
 
 (options, args) = parser.parse_args()

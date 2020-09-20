@@ -2,7 +2,6 @@
 layout: default
 title: Installation
 nav_order: 2
-usemathjax: true
 ---
 
 2D Alphabet can only be used in a CMSSW environment. The Higgs Analysis
@@ -11,7 +10,9 @@ checkout a 2D Alphabet-friendly version of Combine. These instructions are
 based off of the [Combine documentation](http://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/) 
 for 102X setup. Please cross-check the instructions here with the official
 instructions. The only difference should be in the cloned repository and lack
-of branch change.
+of branch change. Note also that the CMSSW release is different from the
+release recommended by the Combine tool documentation in order to maintain
+compatibility with Fermilab's LPC changing to SL7 by September 1st, 2020.
 
 For `csh`:
 ```sh
