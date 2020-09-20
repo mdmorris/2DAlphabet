@@ -634,7 +634,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
     # For example you could have:
     #   histlist = [data1, data2]
     #   bkglist = [[bkg1_1,bkg2_1],[bkg1_2,bkg2_2]]
-
+    
     if len(histlist) == 1:
         width = 800
         height = 700
@@ -671,11 +671,12 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
         return 0
 
     tdrstyle.setTDRStyle()
+
     gStyle.SetLegendFont(42)
     gStyle.SetTitleBorderSize(0)
     gStyle.SetTitleAlign(33)
     gStyle.SetTitleX(.77)
-        
+
     myCan = TCanvas(name,name,width,height)
     myCan.Divide(padx,pady)
 
