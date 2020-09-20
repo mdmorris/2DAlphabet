@@ -2,7 +2,7 @@ import ROOT
 from ROOT import *
 from contextlib import contextmanager
 import os, pickle, subprocess, time,random
-import math
+import math, collections
 from math import sqrt
 import array
 import json
@@ -611,8 +611,22 @@ def dictToLatexTable(dict2convert,outfilename,roworder=[],columnorder=[]):
     latexout.write('\\end{table}')
     latexout.close()
 
+def reorderHists(histlist):
+    if len(histlist) != 6:
+        print Exception('reorderHists() only built to rearrange list of six hists from 2x3 to 3x2')
+        return histlist
 
-def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],titles=[],dataName='data',bkgNames=[],signalNames=[],logy=False,rootfile=False,xtitle='',ytitle='',dataOff=False,datastyle='pe',year=1):  
+    outlist = []
+    outlist.append(histlist[0])
+    outlist.append(histlist[3])
+    outlist.append(histlist[1])
+    outlist.append(histlist[4])
+    outlist.append(histlist[2])
+    outlist.append(histlist[5])
+
+    return outlist
+
+def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],titles=[],dataName='Data',bkgNames=[],signalNames=[],logy=False,rootfile=False,xtitle='',ytitle='',ztitle='',dataOff=False,datastyle='pe',year=1, addSignals=True):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -633,7 +647,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
         pady = 1
     elif len(histlist) == 3:
         width = 1800
-        height = 700
+        height = 600
         padx = 3
         pady = 1
     elif len(histlist) == 4:
@@ -642,17 +656,26 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
         padx = 2
         pady = 2
     elif len(histlist) == 6 or len(histlist) == 5:
-        width = 1600
-        height = 1000
-        padx = 3
-        pady = 2
+        height = 1600
+        width = 1200
+        padx = 2
+        pady = 3
+        histlist = reorderHists(histlist)
+        if bkglist != []: bkglist = reorderHists(bkglist)
+        if signals != []: signals = reorderHists(signals)
+        if totalBkg != None: totalBkg = reorderHists(totalBkg)
+        if titles != []: titles = reorderHists(titles)
     else:
         print 'histlist of size ' + str(len(histlist)) + ' not currently supported'
         print histlist
         return 0
 
     tdrstyle.setTDRStyle()
-
+    gStyle.SetLegendFont(42)
+    gStyle.SetTitleBorderSize(0)
+    gStyle.SetTitleAlign(33)
+    gStyle.SetTitleX(.77)
+        
     myCan = TCanvas(name,name,width,height)
     myCan.Divide(padx,pady)
 
@@ -668,6 +691,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
     subs = []
     pulls = []
     logString = ''
+    tot_sigs = []
 
     # For each hist/data distribution
     for hist_index, hist in enumerate(histlist):
@@ -676,18 +700,23 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
         # if len(histlist) > 1:
         thisPad = myCan.GetPrimitive(name+'_'+str(hist_index+1))
         thisPad.cd()        
+        thisPad.SetRightMargin(0.0)
+        thisPad.SetTopMargin(0.0)
+        thisPad.SetBottomMargin(0.0)
 
         # If this is a TH2, just draw the lego
         if hist.ClassName().find('TH2') != -1:
             if logy == True:
                 gPad.SetLogy()
-            gPad.SetLeftMargin(0.2)
-            gPad.SetRightMargin(0.1)
+            gPad.SetLeftMargin(0.1)
+            gPad.SetRightMargin(0.2)
             hist.GetXaxis().SetTitle(xtitle)
             hist.GetYaxis().SetTitle(ytitle)
+            hist.GetZaxis().SetTitle(ztitle)
             hist.GetXaxis().SetTitleOffset(1.5)
-            hist.GetYaxis().SetTitleOffset(2.3)
+            hist.GetYaxis().SetTitleOffset(2.0)
             hist.GetZaxis().SetTitleOffset(1.8)
+            if 'lego' in datastyle.lower(): hist.GetZaxis().SetTitleOffset(1.4)
             if len(titles) > 0:
                 hist.SetTitle(titles[hist_index])
 
@@ -700,6 +729,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
         
         # Otherwise it's a TH1 hopefully
         else:
+            titleSize = 0.09
             alpha = 1
             if dataOff:
                 alpha = 0
@@ -725,19 +755,26 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
             else:
                 # Create some subpads, a legend, a stack, and a total bkg hist that we'll use for the error bars
                 if not dataOff:
-                    mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.3, 1, 1))
-                    subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 1, 0.3))
+                    mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.35, 1, 1))
+                    subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 1, 0.35))
 
                 else:
                     mains.append(TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.1, 1, 1))
                     subs.append(TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 0, 0))
 
-                legend_topY = 0.81-0.02*(len(bkglist[0])+len(signals))
-                legend_bottomY = 0.2+0.02*(len(bkglist[0])+len(signals))
+                if len(signals) == 0:
+                    nsignals = 0
+                elif addSignals:
+                    nsignals = 1
+                else:
+                    nsignals = len(signals[0])
+                legend_topY = 0.73-0.03*(len(bkglist[0])+nsignals+1)
+                # legend_bottomY = 0.2+0.02*(len(bkglist[0])+nsignals+1)
 
-                # if not logy: 
-                legends.append(TLegend(0.65,legend_topY,0.90,0.90))
-                # else: legends.append(TLegend(0.2,0.11,0.45,legend_bottomY))
+                legends.append(TLegend(0.65,legend_topY,0.90,0.88))
+                legend_duplicates = []
+                if not dataOff: legends[hist_index].AddEntry(hist,dataName,datastyle)
+
                 stacks.append(THStack(hist.GetName()+'_stack',hist.GetName()+'_stack'))
                 if totalBkg == None:
                     tot_hist = hist.Clone(hist.GetName()+'_tot')
@@ -749,18 +786,18 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 tot_hist.SetMarkerStyle(0)
                 tot_hists.append(tot_hist)
                 tot_hists_err.append(tot_hist.Clone())
-
+                legends[hist_index].AddEntry(tot_hists_err[hist_index],'Total bkg unc.','F')
 
                 # Set margins and make these two pads primitives of the division, thisPad
-                mains[hist_index].SetBottomMargin(0.0)
-                mains[hist_index].SetLeftMargin(0.16)
+                mains[hist_index].SetBottomMargin(0.04)
+                mains[hist_index].SetLeftMargin(0.17)
                 mains[hist_index].SetRightMargin(0.05)
-                mains[hist_index].SetTopMargin(0.08)
+                mains[hist_index].SetTopMargin(0.09)
 
-                subs[hist_index].SetLeftMargin(0.16)
+                subs[hist_index].SetLeftMargin(0.17)
                 subs[hist_index].SetRightMargin(0.05)
                 subs[hist_index].SetTopMargin(0)
-                subs[hist_index].SetBottomMargin(0.3)
+                subs[hist_index].SetBottomMargin(0.35)
                 mains[hist_index].Draw()
                 subs[hist_index].Draw()
 
@@ -768,6 +805,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 # if logy: bkglist[0], bkglist[-1] = bkglist[-1], bkglist[0]
 
                 # Build the stack
+                legend_info = collections.OrderedDict()
                 for bkg_index,bkg in enumerate(bkglist[hist_index]):     # Won't loop if bkglist is empty
                     # bkg.Sumw2()
                     if totalBkg == None: tot_hists[hist_index].Add(bkg)
@@ -791,7 +829,13 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     elif type(bkgNames[0]) != list: this_bkg_name = bkgNames[bkg_index]
                     else: this_bkg_name = bkgNames[hist_index][bkg_index]
                     
-                    legends[hist_index].AddEntry(bkg,this_bkg_name,'f')
+                    legend_info[this_bkg_name] = bkg
+
+                # Deal with legend which needs ordering reversed from stack build
+                for bname in reversed(legend_info.keys()):
+                    if bname not in legend_duplicates:
+                        legends[hist_index].AddEntry(legend_info[bname],bname,'f')
+                        legend_duplicates.append(bname)
                     
                 # Go to main pad, set logy if needed
                 mains[hist_index].cd()
@@ -804,41 +848,60 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     if histList[h].GetMaximum() > yMax:
                         yMax = histList[h].GetMaximum()
                 for h in histList:
-                    h.SetMaximum(yMax*(2-legend_topY+0.02))
+                    h.SetMaximum(yMax*(2.5-legend_topY+0.03))
                     if logy == True:
-                        h.SetMaximum(yMax*10**(2-legend_topY+0.1))
+                        h.SetMaximum(yMax*10**(2.5-legend_topY+0.1))
 
                 
-                mLS = 0.06
+                mLS = 0.08
                 # Now draw the main pad
                 data_leg_title = hist.GetTitle()
                 if len(titles) > 0:
                     hist.SetTitle(titles[hist_index])
-                hist.SetTitleOffset(1.1,"xy")
-                hist.GetYaxis().SetTitle('Events')
-                hist.GetYaxis().SetTitleOffset(1.15)
-                hist.GetYaxis().SetLabelSize(mLS)
-                hist.GetYaxis().SetTitleSize(mLS)
+                hist.SetTitleOffset(1.15,"xy")
+                hist.GetYaxis().SetTitle('Events / bin')
+                hist.GetYaxis().SetTitleOffset(1.04)
+                hist.GetYaxis().SetLabelSize(0.07)
+                hist.GetYaxis().SetTitleSize(titleSize)
+                hist.GetXaxis().SetLabelSize(0.07)
+                hist.GetXaxis().SetTitleSize(titleSize)
+                hist.GetXaxis().SetLabelOffset(0.05)
                 if logy == True:
                     hist.SetMinimum(1e-3)
-                hist.Draw(datastyle)
+                hist.Draw(datastyle+' X0')
 
                 if logy == True:stacks[hist_index].SetMinimum(1e-3) 
                 stacks[hist_index].Draw('same hist')
 
                 # Do the signals
+                sigs_to_plot = []
                 if len(signals) > 0: 
-                    signals[hist_index].SetLineColor(kBlue)
-                    signals[hist_index].SetLineWidth(2)
-                    if logy == True:
-                        signals[hist_index].SetMinimum(1e-3)
-                    if signalNames == []: this_sig_name = signals[hist_index].GetName().split('_')[0]
-                    elif type(signalNames) == str: this_sig_name = signalNames
-                    else: this_sig_name = signalNames[hist_index]
+                    # Can add together for total signal
+                    if addSignals:
+                        totsig = signals[hist_index][0].Clone()
+                        for isig in range(1,len(signals[hist_index])):
+                            totsig.Add(signals[hist_index][isig])
+                        sigs_to_plot = [totsig]
+                    # or treat separately
+                    else:
+                        for sig in signals[hist_index]:
+                            sigs_to_plot.append(sig)
 
-                    legends[hist_index].AddEntry(signals[hist_index],this_sig_name,'L')
-                    signals[hist_index].Draw('hist same')
+                    # Plot either way
+                    tot_sigs.append(sigs_to_plot)
+                    for isig,sig in enumerate(sigs_to_plot):
+                        sig.SetLineColor(kBlack)
+                        sig.SetLineWidth(2)
+                        if logy == True:
+                            sig.SetMinimum(1e-3)
+                        # if signalNames == []: this_sig_name = sig.GetName().split('_')[0]
+                        if type(signalNames) == str: this_sig_name = signalNames
+                        else: this_sig_name = signalNames[isig]
 
+                        legends[hist_index].AddEntry(sig,this_sig_name,'L')
+                        sig.Draw('hist same')
+
+                # Draw total hist and error
                 if logy: 
                     tot_hists[hist_index].SetMinimum(1e-3)
                     tot_hists_err[hist_index].SetMinimum(1e-3)
@@ -852,8 +915,9 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 legends[hist_index].Draw()
 
                 if not dataOff:
-                    legends[hist_index].AddEntry(hist,dataName,datastyle)
-                    hist.Draw(datastyle+' same')
+                    #gStyle.SetErrorX(0)
+                    hist.Draw(datastyle+' X0 same')
+                    #gStyle.SetErrorX(0.5)
 
                 gPad.RedrawAxis()
 
@@ -865,17 +929,17 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 pulls[hist_index].SetTitle(";"+hist.GetXaxis().GetTitle()+";(Data-Bkg)/#sigma")
                 pulls[hist_index].SetStats(0)
 
-                LS = .13
+                LS = .16
 
                 pulls[hist_index].GetYaxis().SetRangeUser(-2.9,2.9)
                 pulls[hist_index].GetYaxis().SetTitleOffset(0.4)
                 # pulls[hist_index].GetXaxis().SetTitleOffset(0.9)
                              
-                pulls[hist_index].GetYaxis().SetLabelSize(LS)
-                pulls[hist_index].GetYaxis().SetTitleSize(LS)
+                pulls[hist_index].GetYaxis().SetLabelSize(0.13)
+                pulls[hist_index].GetYaxis().SetTitleSize(0.12)
                 pulls[hist_index].GetYaxis().SetNdivisions(306)
-                pulls[hist_index].GetXaxis().SetLabelSize(LS)
-                pulls[hist_index].GetXaxis().SetTitleSize(LS)
+                pulls[hist_index].GetXaxis().SetLabelSize(0.13)
+                pulls[hist_index].GetXaxis().SetTitleSize(0.15)
 
                 pulls[hist_index].GetXaxis().SetTitle(xtitle)
                 pulls[hist_index].GetYaxis().SetTitle("(Data-Bkg)/#sigma")
@@ -884,7 +948,12 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 if logy == True:
                     mains[hist_index].SetLogy()
 
-                CMS_lumi.CMS_lumi(thisPad, year, 11)
+                CMS_lumi.extraText = ''
+                CMS_lumi.cmsTextSize = 0.9
+                CMS_lumi.cmsTextOffset = 2
+                CMS_lumi.lumiTextSize = 0.9
+                
+                CMS_lumi.CMS_lumi(mains[hist_index], year, 11)
 
     # CMS_lumi.CMS_lumi(myCan, year, 11)
 
