@@ -841,11 +841,13 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                     elif type(bkgNames[0]) != list: this_bkg_name = bkgNames[bkg_index]
                     else: this_bkg_name = bkgNames[hist_index][bkg_index]
                     
-                    # if this_bkg_name in bstar_name_match.keys(): legends[hist_index].AddEntry(bkg,bstar_name_match[this_bkg_name],'f')
-                    # else: 
-                    if this_bkg_name not in legend_duplicates:
-                        legends[hist_index].AddEntry(bkg,this_bkg_name,'f')
-                        legend_duplicates.append(this_bkg_name)
+                    legend_info[this_bkg_name] = bkg
+
+                # Deal with legend which needs ordering reversed from stack build
+                for bname in reversed(legend_info.keys()):
+                    if bname not in legend_duplicates:
+                        legends[hist_index].AddEntry(legend_info[bname],bname,'f')
+                        legend_duplicates.append(bname)
                     
                 # Go to main pad, set logy if needed
                 mains[hist_index].cd()
