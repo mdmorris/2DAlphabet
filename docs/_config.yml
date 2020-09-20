@@ -22,19 +22,10 @@ title: 2D Alphabet
 email: corcodilos.lucas@gmail.com
 description: >- # this means to ignore newlines until "baseurl:"
   Documentation for the 2D Alphabet background estimation tool.
-baseurl: "" # the subpath of your site, e.g. /blog
-url: "" # the base hostname & protocol for your site, e.g. http://example.com
 github_username:  lcorcodilos
 
 # Build settings
-remote_theme: pmarsceill/just-the-docs
-color_scheme: dark
-compress_html:
-  blanklines: false
-mathjax: 
-  source: https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS_CHTML
-  config: 'MathJax.Hub.Config({ TeX: { equationNumbers: { autoNumber: "AMS" } } })'
-
+remote_theme: tomjoht/documentation-theme-jekyll 
 
 # Exclude from processing.
 # The following items will not be processed, by default.
