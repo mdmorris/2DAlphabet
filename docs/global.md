@@ -22,5 +22,5 @@ Note that it does not work for booleans or integers/floats.
 
 The user must be careful they don't accidentally use strings in the JSON
 that are identical to keys in `GLOBAL` so accidental substitutions don't happen.
-This means keys in \verb"GLOBAL" should be at least partially descriptive 
+This means keys in `GLOBAL` should be at least partially descriptive 
 (single character keys would be a bad idea). 

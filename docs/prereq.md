@@ -4,6 +4,8 @@ title: Installation
 nav_order: 2
 ---
 
+# Installation
+
 2D Alphabet can only be used in a CMSSW environment. The Higgs Analysis
 Combine Tool must be installed. Please follow the instructions below to
 checkout a 2D Alphabet-friendly version of Combine. These instructions are

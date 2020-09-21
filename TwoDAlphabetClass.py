@@ -514,6 +514,7 @@ class TwoDAlphabet:
         self.pickleDict['sigEnd'] = self.sigEnd
         self.pickleDict['freezeFail'] = self.freezeFail
         self.pickleDict['blindedFit'] = self.blindedFit
+        self.pickleDict['blindedPlots'] = self.blindedPlots
 
         # # Setup a directory to save
         # self.projPath = self._projPath()
@@ -857,7 +858,7 @@ class TwoDAlphabet:
         # Determine fit function from the inputConfig #
         ###############################################
         if self.fitGuesses != False:
-            if 'XPFORM' in self.inputConfig['FIT'].keys() and 'YPFORM' in self.inputConfig['FIT'].keys():
+            if False:#'XPFORM' in self.inputConfig['FIT'].keys() and 'YPFORM' in self.inputConfig['FIT'].keys():
                 # Do some quick checks to make sure these are formatted correctly
                 header.checkFitForm(self.inputConfig['FIT']['XPFORM'],self.inputConfig['FIT']['YPFORM'])
                 # Determine number of params in each direction
@@ -878,7 +879,7 @@ class TwoDAlphabet:
                 funcString = funcString[:-1]
 
 
-            elif 'PFORM' in self.inputConfig['FIT'].keys():
+            elif False:#'PFORM' in self.inputConfig['FIT'].keys():
                 funcString = self.inputConfig['FIT']['PFORM']
                 # Reconstruct x
                 xFuncString = ''
@@ -908,7 +909,7 @@ class TwoDAlphabet:
                 yFuncString = '[0]' # since all y dependence will be absorbed by the funcString, there should be no y dependence on each of the parameters and thus we should fit each with a constant
                 nxparams = max([int(param) for param in self.inputConfig['FIT'].keys() if param != 'FORM' and param != 'HELP']) +1
 
-            elif 'XFORM' in self.inputConfig['FIT'].keys() and 'YFORM' in self.inputConfig['FIT'].keys():
+            elif False:#'XFORM' in self.inputConfig['FIT'].keys() and 'YFORM' in self.inputConfig['FIT'].keys():
                 xFuncString = self.inputConfig['FIT']['XFORM']
                 yFuncString = self.inputConfig['FIT']['YFORM']
                 funcString = '('+header.RFVform2TF1(self.inputConfig['FIT']['XFORM'],0)+')*('+header.RFVform2TF1(self.inputConfig['FIT']['YFORM'],0).replace('x','y')+')'
