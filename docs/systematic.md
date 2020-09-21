@@ -17,7 +17,7 @@ The self-explanatory codes are 1 and 2 which are log-normal uncertainties on the
 Less obvious are codes 2 and 3 which are for shape based uncertainties (and thus have
 corresponding histograms) and are either in the same file as the process's nominal histogram
 (code 2) or in a separate file (code 3). Additionally, they have a scale value which allows
-the user to change the gaussian constraint on the shape. For no change in the constraint, use 1.0.
+the user to change the Gaussian constraint on the shape. For no change in the constraint, use 1.0.
 If you have templates representing a 2 $$\sigma$$ shift, use 0.5 to properly constrain
 the associated nuisance parameter during the shape interpolation with Combine.
 

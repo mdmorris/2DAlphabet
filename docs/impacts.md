@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Nuisance parameter impacts - `run_Impacts.py`
+title: Nuisance parameter impacts - run_Impacts.py
 nav_order: 4
 has_children: false
 parent: How to run

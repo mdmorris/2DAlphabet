@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Asymptotic Limit - `run_Limit.py`
+title: Asymptotic Limit - run_Limit.py
 nav_order: 2
 has_children: false
 parent: How to run

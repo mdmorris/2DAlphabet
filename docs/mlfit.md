@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Likelihood fit - `run_MLfit.py`
+title: Likelihood fit - run_MLfit.py
 nav_order: 1
 has_children: false
 parent: How to run
@@ -48,8 +48,7 @@ signal strength (r) in the fit. They default to 0 and 5, respectively.
 It may be useful to loosen or tighten the bounds if the fit is failing
 near one of the boundaries.
 - **`--recycleAll`** Recycles everything generated in the previous run
-using the given tag (either by the --tag option or within the configuration
-file(s)). This means the construction of the workspace, fit guesses, and
+using the given tag. This means the construction of the workspace, rebinned histograms, and
 other steps previous to the fit are skipped and the previous run versions
 are loaded instead. Use this if you haven't changed your configuration
 file and would like to speed things up.

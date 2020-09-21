@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Statistical tests - `run_Stats.py`
+title: Statistical tests - run_Stats.py
 nav_order: 3
 has_children: false
 parent: How to run
