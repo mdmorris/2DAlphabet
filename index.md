@@ -56,7 +56,7 @@ This means that the contribution of $$Bkg_A$$ can change and therefore, the
 amount subtracted from data to form the initial QCD estimate in the $$x$$
 sidebands can change! Thus, QCD and $$Bkg_A$$ are fit simultaneously to derive
 a total background estimate. The details of accounting for systematic
-uncertainties are explained in the [systematics section](systematics).
+uncertainties are explained in the [Configuration files](/docs/config) section.
 
 A useful feature of the 2D Alphabet setup is that multiple pairs of pass and
 fail distributions (called "Alphabet pairs") can be fit simultaneously. For
