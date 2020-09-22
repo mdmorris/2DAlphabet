@@ -29,10 +29,10 @@ parser.add_option("--recycleAll", action="store_true",
                 default =   False,
                 dest    =   "recycleAll",
                 help    =   "Recycle everything from the previous run with this tag")
-# parser.add_option("--recycle", action="store", type='string', 
-#                 default =   '',
-#                 dest    =   "recycle",
-#                 help    =   "Recycle comma separated list of items")
+parser.add_option("--recycle", action="store", type='string', 
+                default =   '',
+                dest    =   "recycle",
+                help    =   "Recycle comma separated list of items")
 parser.add_option("--skipFit", action="store_true", 
                 default =   False,
                 dest    =   "skipFit",
