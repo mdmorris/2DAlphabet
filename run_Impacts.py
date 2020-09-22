@@ -1,7 +1,6 @@
 import sys, os
 import subprocess
 import header
-import CombineHarvester.CombineTools.ch as ch
 
 def SystematicParser(cardname):
     systs = []
@@ -16,7 +15,7 @@ def SystematicParser(cardname):
 from optparse import OptionParser
 
 parser = OptionParser()
-parser.add_option("-d", "--projDir", dest="projDir",
+parser.add_option("-d", "--projDir", metavar='<dir>', dest="projDir",
                   help="Home of the project - has the cards, fit results, etc")
 parser.add_option("--condor",
                   action="store_true", dest="condor", default=False,
@@ -39,6 +38,8 @@ if taskName == '':
     raise NameError('ERROR in project directory name (where your workspace and data card lives). Did you accidentally provide a leading slash? (ie /projDir/) Quitting...')
 if options.condor:
     print 'Condor task name = '+taskName
+    print 'Condor submission not currently working'
+    quit()
 
 if not os.path.isdir(projDir): 
     raise TypeError(projDir +' is not a directory. Quitting...')

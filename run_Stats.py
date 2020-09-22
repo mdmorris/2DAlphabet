@@ -30,25 +30,25 @@ def getMasks(filename):
 from optparse import OptionParser
 
 parser = OptionParser()
-parser.add_option("-d", "--projDir", dest="projDir",default='',
+parser.add_option("-d", "--projDir", metavar='<dir>', dest="projDir",default='',
                 help="Home of the project - has the cards, fit results, etc")
-parser.add_option("-a", "--altDir", dest="altDir",default='',
+parser.add_option("-a", "--altDir", metavar='<dir>', dest="altDir",default='',
                 help="Home of the alternative model that you'd like to compare against the one in projDir")
-parser.add_option("-t", "--toys", dest="toys",default='100',
+parser.add_option("-t", "--toys", metavar='<N>', dest="toys",default='100',
                 help="Number of toys to generate - fed to combine")
-parser.add_option("--toyJobs", dest="toyjobs",default='1',
+parser.add_option("--toyJobs", metavar='<N>', dest="toyjobs",default='1',
                 help="Number of jobs to split toy fitting into - fed to condor job building")
-parser.add_option("--seed", dest="seed",default='',
+parser.add_option("--seed", metavar='<N>', dest="seed",default='',
                 help="Seed - fed to combine")
-parser.add_option('--rMin', metavar='F', type='string', action='store',
+parser.add_option('--rMin', metavar='<rMin>', type='string', action='store',
                 default =   '-5',
                 dest    =   'rMin',
                 help    =   'Minimum bound on r (signal strength)')
-parser.add_option('--rMax', metavar='F', type='string', action='store',
+parser.add_option('--rMax', metavar='<rMax>', type='string', action='store',
                 default =   '5',
                 dest    =   'rMax',
                 help    =   'Minimum bound on r (signal strength)')
-parser.add_option('-w', metavar='F', type='string', action='store',
+parser.add_option('-w', metavar='<name>', type='string', action='store',
                 default =   '',
                 dest    =   'workspace',
                 help    =   'Model workspace (from text2workspace)')
@@ -65,13 +65,13 @@ parser.add_option("--gof",
                 action="store_true", dest="gof", default=False,
                 help="Perform goodness of fit test")
 parser.add_option("--signalInjection", 
-                action="store", dest="signalInjection", default='',
+                action="store", metavar='<r>', dest="signalInjection", default='',
                 help="Perform signal injection test")
 parser.add_option("--biasStudy", 
                 action="store", dest="biasStudy", default='',
                 help="Perform bias study")
 parser.add_option("--ftest", 
-                action="store", dest="ftest", default=False,
+                action="store", metavar='<option>', dest="ftest", default=False,
                 help="Perform F test. Options are 'generate', 'fitAlt', 'fitMain', 'post', 'pvalue'")
 # parser.add_option("--diagnosticsWithToys", 
 #                 action="store_true", dest="diagnosticsWithToys", default=False,
