@@ -1342,16 +1342,6 @@ class TwoDAlphabet:
             for cat in ['pass','fail']:
                 for c in ['LOW','SIG','HIGH']:
                     for dist in self.organizedDict[process][cat+'_'+c].keys():
-                        if dist != 'nominal':
-                            this_syst_dict = ['_'.join(dist.split('_')[:-1])]
-                            if 'DROP' in this_syst_dict.keys():
-                                if 'Up' in dist and self.inputConfig['SYSTMATICS'][dist.replace('Up','')]['DROP'] == 'up': 
-                                    raw_input('Dropping '+dist)
-                                    continue
-                                elif 'Down' in dist and self.inputConfig['SYSTMATICS'][dist.replace('Down','')]['DROP'] == 'down': 
-                                    raw_input('Dropping '+dist)
-                                    continue
-
                         # For each category
                         Roo_dict[process][cat+'_'+c][dist] = {}
                         var_list = var_lists[c]
