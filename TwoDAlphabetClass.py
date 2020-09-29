@@ -492,9 +492,9 @@ class TwoDAlphabet:
         for o in self.CLoptions:
             if optionName in o:
                 option_return = o.split('=')[1]
-                if option_return in ["True","False"]: option_return = bool(option_return)
-                
-                print 'WARNING: Overriding %s with command line version (%s).'%(optionName,option_return)
+                if option_return in ["True","False"]: 
+                    option_return = bool(option_return)
+                    print 'WARNING: Overriding %s with command line version (%s).'%(optionName,option_return)
 
         return option_return
 
