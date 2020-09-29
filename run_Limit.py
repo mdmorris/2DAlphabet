@@ -6,7 +6,7 @@ from optparse import OptionParser
 import subprocess
 import header
 
-def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
+def runLimit(twoDs,postfitWorkspaceDir,blindData=True,freezeFail=False,location=''):
     # Set verbosity - chosen from first of configs
     verbose = ''
     if twoDs[0].verbosity != False:
@@ -64,9 +64,16 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
     print 'Getting b only fit result'
     fit_result = fit_result_file.Get("fit_b")
     print 'Making RooArgSet out of fit result parameters'
-    postfit_vars = ROOT.RooArgSet(fit_result.floatParsFinal())
+    postfit_vars_list = fit_result.floatParsFinal()
+    if freezeFail:
+        for ix in range(postfit_vars_list.getSize()):
+            item = postfit_vars_list[ix]
+            if 'Fail_' in item.GetName():
+                item.setVal(item.getValV())
+                item.setConstant(True)
+                postfit_vars_list[ix] = item
     print 'Saving snapshot'
-    postfit_w.saveSnapshot('initialFit',postfit_vars,True)
+    postfit_w.saveSnapshot('initialFit',ROOT.RooArgSet(postfit_vars_list),True)
     # print 'Writing '+projDir+'limitworkspace.root'
     # fout = TFile(projDir+'/limitworkspace.root',"recreate")
     print 'Writing'
@@ -87,7 +94,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,location=''):
     print 'Getting current dir'
     current_dir = os.getcwd()
 
-    aL_cmd = 'combine -M AsymptoticLimits workspace.root --snapshotName initialFit --saveWorkspace' +blind_option + syst_option# + sig_option 
+    aL_cmd = 'combine -M AsymptoticLimits workspace.root --snapshotName initialFit --saveWorkspace' +blind_option + syst_option # + sig_option 
 
     # Run combine if not on condor
     if location == 'local':    
@@ -125,9 +132,15 @@ parser.add_option("--recycleAll", action="store_true",
                 default =   False,
                 dest    =   "recycleAll",
                 help    =   "Recycle everything from the previous run with this tag")
+parser.add_option("--freezeFail", action="store_true", 
+                default =   False,
+                dest    =   "freezeFail",
+                help    =   "Freeze failing bins. May speed up limit calculation.")
 
 
 (options, args) = parser.parse_args()
+import time
+start = time.time()
 
 inputConfigsAndArgs = args
 
@@ -192,11 +205,13 @@ if len(inputConfigs) > 1:
         for num in range(1,len(twoDinstances)+1):
             subprocess.call(["sed -i 's/ch"+str(num)+"_//g' card_"+thistag+".txt"],shell=True)
 
-    if 'condor' in os.getcwd(): runLimit(twoDinstances,postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='condor')
-    else: runLimit(twoDinstances,postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local')
+    if 'condor' in os.getcwd(): runLimit(twoDinstances,postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='condor',freezeFail=options.freezeFail)
+    else: runLimit(twoDinstances,postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local',freezeFail=options.freezeFail)
 
 # If single fit
 else:
     instance = TwoDAlphabet(inputConfigs[0],options.quicktag,options.recycleAll,stringSwaps=stringSwaps)
-    if 'condor' in os.getcwd(): runLimit([instance],postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='condor')
-    else: runLimit([instance],postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local')
+    if 'condor' in os.getcwd(): runLimit([instance],postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='condor',freezeFail=options.freezeFail)
+    else: runLimit([instance],postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local',freezeFail=options.freezeFail)
+
+print 'Total time: %s min'%((time.time()-start)/60.)
