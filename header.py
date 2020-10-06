@@ -36,13 +36,16 @@ def setSnapshot(d=''):
     fout.Close()
 
 # Function stolen from https://stackoverflow.com/questions/9590382/forcing-python-json-module-to-work-with-ascii
-def openJSON(f):
+def openJSON(f,twoDconfig=True):
     with open(f) as fInput_config:
         input_config = json.load(fInput_config, object_hook=ascii_encode_dict)  # Converts most of the unicode to ascii
 
-        for process in [proc for proc in input_config['PROCESS'].keys() if proc != 'HELP']:
-            for index,item in enumerate(input_config['PROCESS'][process]['SYSTEMATICS']):           # There's one list that also
+        if twoDconfig:
+            for process in [proc for proc in input_config['PROCESS'].keys() if proc != 'HELP']:
+                for index,item in enumerate(input_config['PROCESS'][process]['SYSTEMATICS']):           # There's one list that also
+                    input_config['PROCESS'][process]['SYSTEMATICS'][index] = item.encode('ascii')  
                 input_config['PROCESS'][process]['SYSTEMATICS'][index] = item.encode('ascii')  
+                    input_config['PROCESS'][process]['SYSTEMATICS'][index] = item.encode('ascii')  
 
     return input_config
 
