@@ -7,7 +7,7 @@ def SystematicParser(cardname):
     systs = []
     f = open(cardname,'r')
     for l in f.readlines():
-        if 'lnN' in l or 'shape' in l:
+        if 'lnN' in l or 'shape' in l or 'rpf' in l:
             syst_name = l.split(' ')[0]
             if syst_name != 'shapes': systs.append(syst_name.rstrip())
 
