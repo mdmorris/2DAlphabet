@@ -885,11 +885,19 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 hist.GetXaxis().SetLabelOffset(0.05)
                 if logy == True:
                     hist.SetMinimum(1e-3)
-                #gStyle.SetErrorX(0)
+                
+                hist.GetYaxis().SetNdivisions(508)
+
                 hist.Draw(datastyle+' X0')
                 #gStyle.SetErrorX(0.5)
 
                 if logy == True:stacks[hist_index].SetMinimum(1e-3) 
+                
+                stacks[hist_index].Draw('same hist') # need to draw twice because the axis doesn't exist for modification until drawing
+                try:
+                    stacks[hist_index].GetYaxis().SetNdivisions(508)
+                except:
+                    stacks[hist_index].GetYaxis().SetNdivisions(8,5,0)
                 stacks[hist_index].Draw('same hist')
 
                 # Do the signals
