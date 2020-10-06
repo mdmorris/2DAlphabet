@@ -77,6 +77,7 @@ class TwoDAlphabet:
         self.overwrite = self._getOption('overwrite')
         self.recycle = recycle if recycle != False else self._getOption('recycle')
         self.rpfRatio = self._getOption('rpfRatio')
+        self.parametricFail = self._getOption('parametricFail')
         self.year = self._getOption('year')
         self.plotPrefitSigInFitB = self._getOption('plotPrefitSigInFitB')
         self.plotTitles = self._getOption('plotTitles')
@@ -159,6 +160,12 @@ class TwoDAlphabet:
         else:
             self.rpf = self._readIn('rpf')
 
+        # Initialize parametericFail 
+        if self.parametricFail != False:
+            self.fail_func = RpfHandler.BinnedParametricFunc(self.inputConfig['OPTIONS']['parametricFail'],self.name,self._dummyTH2(),'failShape')
+        else:
+            self.fail_func = False
+
         # Organize everything for workspace building
         if importOrgDict or self.recycleAll:
             if importExternalTemplates != False:
@@ -202,16 +209,13 @@ class TwoDAlphabet:
                 else:
                     prerun_result = False
                 if prerun_result != False:
-                    for v in self.rpf.rpfVars.keys():
+                    for v in self.rpf.funcVars.keys():
                         prerun_coeff = prerun_result.find(v)
-                        self.rpf.rpfVars[v].setVal(prerun_coeff.getValV())
-                        self.rpf.rpfVars[v].setError(prerun_coeff.getValV()*0.5)
-                        # self.rpf.rpfVars[v].setMin(max(self.rpf.rpfVars[v].getMin(), prerun_coeff.getValV()-2*prerun_coeff.getError()))
-                        # self.rpf.rpfVars[v].setMax(min(self.rpf.rpfVars[v].getMax(), prerun_coeff.getValV()+2*prerun_coeff.getError()))
+                        self.rpf.funcVars[v].setVal(prerun_coeff.getValV())
+                        self.rpf.funcVars[v].setError(prerun_coeff.getValV()*0.5)
                         self.workspace.var(v).setVal(prerun_coeff.getValV())
                         self.workspace.var(v).setError(prerun_coeff.getValV()*0.5)
-                        # self.workspace.var(v).setMin(max(self.rpf.rpfVars[v].getMin(), prerun_coeff.getValV()-2*prerun_coeff.getError()))
-                        # self.workspace.var(v).setMax(min(self.rpf.rpfVars[v].getMax(), prerun_coeff.getValV()+2*prerun_coeff.getError()))
+
             else:
                 raw_input('WARNING: Pre-run for '+self.tag+' '+self.name+'failed. Using original Rp/f parameters. Press any key to continue.')
 
@@ -473,7 +477,7 @@ class TwoDAlphabet:
             print 'WARNING: '+optionName+' boolean not set explicitly. Default to True.'
             option_return = True
         # Default to false
-        elif optionName in ['freezeFail','fitGuesses','plotUncerts','prerun','rpfRatio','plotPrefitSigInFitB']:
+        elif optionName in ['freezeFail','fitGuesses','plotUncerts','prerun','rpfRatio','plotPrefitSigInFitB','parametricFail']:
             print 'WARNING: '+optionName+' boolean not set explicitly. Default to False.'
             option_return = False
         elif optionName == 'verbosity':
@@ -525,7 +529,6 @@ class TwoDAlphabet:
 
         # rpf - Don't do this - takes up +5 GB
         self.pickleDict['rpf'] = self.rpf.getReducedCopy()
-        # self.pickleDict['rpfVarNames'] = self.rpf.getRpfVarNames()
 
         # organizedDict
         self.pickleDict['organizedDict'] = self.organizedDict
@@ -857,225 +860,38 @@ class TwoDAlphabet:
         # Determine fit function from the inputConfig #
         ###############################################
         if self.fitGuesses != False:
-            if 'XPFORM' in self.inputConfig['FIT'].keys() and 'YPFORM' in self.inputConfig['FIT'].keys():
-                # Do some quick checks to make sure these are formatted correctly
-                header.checkFitForm(self.inputConfig['FIT']['XPFORM'],self.inputConfig['FIT']['YPFORM'])
-                # Determine number of params in each direction
-                nxparams = max([int(param[1:]) for param in self.inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XPFORM'])
-                nyparams = max([int(param[1:]) for param in self.inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YPFORM'])
-                # Get the strings
-                xFuncString = header.RFVform2TF1(self.inputConfig['FIT']['XPFORM'],-1)
-                yFuncString = header.RFVform2TF1(self.inputConfig['FIT']['YPFORM'],-1)
-                yFuncString = yFuncString.replace('y','x')
-
-                # Make the fixed form of the formula
-                funcString = ''
-                paramIndex = 0
-                for xparam in range(nxparams):
-                    for yparam in range(nyparams):
-                        funcString += '['+str(paramIndex)+']*x**'+str(xparam)+'*y**'+str(yparam)+'+'
-                        paramIndex += 1
-                funcString = funcString[:-1]
-
-
-            elif 'PFORM' in self.inputConfig['FIT'].keys():
-                funcString = self.inputConfig['FIT']['PFORM']
-                # Reconstruct x
-                xFuncString = ''
-                nxparams = 0
-                for xparam in self.inputConfig['FIT'].keys():
-                    if 'X' in xparam:                                           # For each X*Y0
-                        if 'Y0' in xparam:
-                            powerIndex = xparam[xparam.find('X')+1]
-                            xFuncString += '['+str(powerIndex)+']*x**'+str(powerIndex)+'+'
-                            nxparams += 1
-                xFuncString = xFuncString[:-1]
-
-                # Reconstruct y
-                yFuncString = ''
-                nyparams = 0
-                for yparam in self.inputConfig['FIT'].keys():
-                    if 'X0Y' in yparam:                                           # For each X0Y*
-                        powerIndex = yparam[yparam.find('Y')+1]
-                        yFuncString += '['+str(powerIndex)+']*x**'+str(powerIndex)+'+'
-                        nyparams += 1
-                yFuncString = yFuncString[:-1]
-
-
-            elif 'FORM' in self.inputConfig['FIT'].keys():
-                # Need to take a 2D function and freeze it in one dimension for each y slice
-                funcString = header.RFVform2TF1(self.inputConfig['FIT']['FORM'],0)
-                yFuncString = '[0]' # since all y dependence will be absorbed by the funcString, there should be no y dependence on each of the parameters and thus we should fit each with a constant
-                nxparams = max([int(param) for param in self.inputConfig['FIT'].keys() if param != 'FORM' and param != 'HELP']) +1
-
-            elif 'XFORM' in self.inputConfig['FIT'].keys() and 'YFORM' in self.inputConfig['FIT'].keys():
-                xFuncString = self.inputConfig['FIT']['XFORM']
-                yFuncString = self.inputConfig['FIT']['YFORM']
-                funcString = '('+header.RFVform2TF1(self.inputConfig['FIT']['XFORM'],0)+')*('+header.RFVform2TF1(self.inputConfig['FIT']['YFORM'],0).replace('x','y')+')'
-                nxparams = max([int(param[1:]) for param in self.inputConfig['FIT'].keys() if param.find('X') != -1 and param != 'XFORM'])
-                nyparams = max([int(param[1:]) for param in self.inputConfig['FIT'].keys() if param.find('Y') != -1 and param != 'YFORM'])
-
-            else:
-                print 'Fit form not supported in get_fit_guesses.py. Quitting...'
-                quit()
+            # Need to take a 2D function and freeze it in one dimension for each y slice
+            funcString = header.RFVform2TF1(self.inputConfig['FIT']['FORM'],0)
+            yFuncString = '[0]' # since all y dependence will be absorbed by the funcString, there should be no y dependence on each of the parameters and thus we should fit each with a constant
+            nxparams = max([int(param) for param in self.inputConfig['FIT'].keys() if param != 'FORM' and param != 'HELP']) +1
 
             pseudo2D_results = TFile.Open(self.projPath+'/pseudo2D_results.root','RECREATE')
             pseudo2D_results.cd()
 
-            if 'FORM' in self.inputConfig['FIT'].keys():# or ('XFORM' in self.inputConfig['FIT'].keys() and 'YFORM' in self.inputConfig['FIT'].keys()):
-                pseudo2D_Rpf = TF2('pseudo2D_Rpf',funcString,0,1,0,1)
+            pseudo2D_Rpf = TF2('pseudo2D_Rpf',funcString,0,1,0,1)
 
-                for p in range(nxparams):
-                    pseudo2D_Rpf.SetParameter(p,self.inputConfig['FIT'][str(p)]['NOMINAL'])
-                    pseudo2D_Rpf.SetParLimits(p,self.inputConfig['FIT'][str(p)]['MIN'],self.inputConfig['FIT'][str(p)]['MAX'])
+            for p in range(nxparams):
+                pseudo2D_Rpf.SetParameter(p,self.inputConfig['FIT'][str(p)]['NOMINAL'])
+                pseudo2D_Rpf.SetParLimits(p,self.inputConfig['FIT'][str(p)]['MIN'],self.inputConfig['FIT'][str(p)]['MAX'])
 
-                Rpf.Fit(pseudo2D_Rpf)
-                
-                print 'Resetting fit parameters in input config'
-                self.inputConfig['FIT']['FORM'] = funcString
-                for ix in range(nxparams):
-                    # for iy in range(nyparams):
-                        param = str(ix)
-                        pseudo2D_Rpf.SetParameter(ix,pseudo2D_Rpf.GetParameter(ix))
-                        pseudo2D_Rpf.SetParError(ix,pseudo2D_Rpf.GetParError(ix))
-                        if self.fitGuesses != False:
-                            # self.inputConfig['FIT'][param] = {'NOMINAL':None,'MIN':None,'MAX':None}
-                            self.inputConfig['FIT'][param]['NOMINAL'] = pseudo2D_Rpf.GetParameter(ix)
-                            self.inputConfig['FIT'][param]['MAX'] = min(self.inputConfig['FIT'][param]['MAX'],pseudo2D_Rpf.GetParameter(ix)+sigma*pseudo2D_Rpf.GetParError(ix))
-                            self.inputConfig['FIT'][param]['MIN'] = max(self.inputConfig['FIT'][param]['MIN'],pseudo2D_Rpf.GetParameter(ix)-sigma*pseudo2D_Rpf.GetParError(ix))
-                            self.inputConfig['FIT'][param]['ERROR'] = pseudo2D_Rpf.GetParError(ix)
+            Rpf.Fit(pseudo2D_Rpf)
+            
+            print 'Resetting fit parameters in input config'
+            self.inputConfig['FIT']['FORM'] = funcString
+            for ix in range(nxparams):
+                # for iy in range(nyparams):
+                    param = str(ix)
+                    pseudo2D_Rpf.SetParameter(ix,pseudo2D_Rpf.GetParameter(ix))
+                    pseudo2D_Rpf.SetParError(ix,pseudo2D_Rpf.GetParError(ix))
+                    if self.fitGuesses != False:
+                        # self.inputConfig['FIT'][param] = {'NOMINAL':None,'MIN':None,'MAX':None}
+                        self.inputConfig['FIT'][param]['NOMINAL'] = pseudo2D_Rpf.GetParameter(ix)
+                        self.inputConfig['FIT'][param]['MAX'] = min(self.inputConfig['FIT'][param]['MAX'],pseudo2D_Rpf.GetParameter(ix)+sigma*pseudo2D_Rpf.GetParError(ix))
+                        self.inputConfig['FIT'][param]['MIN'] = max(self.inputConfig['FIT'][param]['MIN'],pseudo2D_Rpf.GetParameter(ix)-sigma*pseudo2D_Rpf.GetParError(ix))
+                        self.inputConfig['FIT'][param]['ERROR'] = pseudo2D_Rpf.GetParError(ix)
 
-                pp.pprint(self.inputConfig['FIT'])
+            pp.pprint(self.inputConfig['FIT'])
                             
-            else:
-                ##################################
-                # Now do the fit in the y slices #
-                ##################################
-                fitResults = {}
-
-                # Book TGraphs to store the fit results as a function of y bins
-                unitYbins = array.array('d',[Rpf.GetYaxis().GetBinLowEdge(b) for b in range(1,Rpf.GetNbinsY()+1)]+[1])
-                for xparam in range(nxparams):
-                    fitResults['xparam_'+str(xparam)+'_vs_y'] = TH1F('xparam_'+str(xparam)+'_vs_y','xparam_'+str(xparam)+'_vs_y',Rpf.GetNbinsY(),unitYbins)
-
-                # Project each y-axis bin and fit along x - save out coefficients to booked tgraph
-                projXs = []
-                for ybin in range(1,Rpf.GetNbinsY()+1):
-                    # If doing FORM, define xFuncString here with y bin center plugged in
-                    if 'FORM' in self.inputConfig['FIT'].keys():
-                        thisYBinCenter = Rpf.GetYaxis().GetBinCenter(ybin)
-                        xFuncString = funcString.replace('y',str(thisYBinCenter))
-
-                    fitResults['fitSlice_'+str(ybin)] = TF1('fitSlice_'+str(ybin),xFuncString,0,1)
-
-                    if 'FORM' in self.inputConfig['FIT'].keys():
-                        for p in range(nxparams):
-                            fitResults['fitSlice_'+str(ybin)].SetParameter(p,self.inputConfig['FIT'][str(p)]['NOMINAL'])
-                            fitResults['fitSlice_'+str(ybin)].SetParLimits(p,self.inputConfig['FIT'][str(p)]['MIN'],self.inputConfig['FIT'][str(p)]['MAX'])
-
-                    projX = Rpf.ProjectionX('rebinnedRpf_sliceX_'+str(ybin),ybin,ybin,'e o')
-                    # projX.Draw('p e')
-                    projX.Write()
-                    projX.Fit(fitResults['fitSlice_'+str(ybin)],'EM')
-                    
-                    # projX.Draw('p e')
-                    projX.SetMaximum(1.1)
-                    projX.SetMinimum(0.0)
-                    projX.SetTitle('fitSlice_'+str(ybin))
-
-                    projXs.append(projX)
-
-                    for ix in range(nxparams):
-                        fitResults['xparam_'+str(ix)+'_vs_y'].SetBinContent(ybin,fitResults['fitSlice_'+str(ybin)].GetParameter(ix))
-                        fitResults['xparam_'+str(ix)+'_vs_y'].SetBinError(ybin,fitResults['fitSlice_'+str(ybin)].GetParError(ix))
-             
-                if len(projXs) <= 6:
-                    header.makeCan('fitSlices_0-6',self.projPath,projXs,xtitle=self.xVarName)
-
-                else:
-                    chunkedProjX = [projXs[i:i + 6] for i in xrange(0, len(projXs), 6)]
-                    for i,chunk in enumerate(chunkedProjX):
-                        header.makeCan('fitSlices_'+str(i*6)+'-'+str(6*(i+1)),self.projPath,chunk,xtitle=self.xVarName)
-
-                ########################################################
-                # And now fit these parameters as a function of y axis #
-                ########################################################
-
-                # Build fit for each parameter distribution along y-axis
-                drawList = []
-                for xparam in range(nxparams):
-                    fitResults['fitParam_'+str(xparam)] = TF1('yFunc_'+str(xparam),yFuncString,0,1)
-                    # Do the fit
-                    fitResults['xparam_'+str(xparam)+'_vs_y'].Fit(fitResults['fitParam_'+str(xparam)],"EM")
-                    drawList.append(fitResults['xparam_'+str(xparam)+'_vs_y'])
-                    # Get and store parameters found
-                    for iy in range(fitResults['fitParam_'+str(xparam)].GetNpar()):
-                        fitResults['X'+str(xparam)+'Y'+str(iy)] = fitResults['fitParam_'+str(xparam)].GetParameter(iy)
-                        fitResults['X'+str(xparam)+'Y'+str(iy)+'err'] = fitResults['fitParam_'+str(xparam)].GetParError(iy)
-
-                if len(drawList) <= 6:
-                    header.makeCan('xparam_v_y',self.projPath,drawList,xtitle=self.yVarName)
-                else:
-                    chunkedDrawList = [drawList[i:i + 6] for i in xrange(0, len(drawList), 6)]
-                    for i,chunk in enumerate(chunkedDrawList):
-                        header.makeCan('xparam_v_y_'+str(i),self.projPath,chunk,xtitle=self.yVarName)
-
-
-                # Remove old fit values and store new ones in inputConfig if PFORM else just make the pseudo2D_Rpf for plotting
-                pseudo2D_Rpf = TF2('pseudo2D_Rpf',funcString,0,1,0,1)
-                paramIndex = 0
-
-                if 'FORM' in self.inputConfig['FIT'].keys():
-                    # self.inputConfig['FIT'] = {'FORM':funcString}
-                    for p in range(nxparams):
-                        param = 'X'+str(p)+'Y0'
-                        pseudo2D_Rpf.SetParameter(paramIndex,fitResults[param])
-                        pseudo2D_Rpf.SetParError(paramIndex,fitResults[param+'err'])
-                        # self.inputConfig['FIT'][str(p)] = {'NOMINAL':None,'MIN':None,'MAX':None}
-                        # self.inputConfig['FIT'][str(p)]['NOMINAL'] = fitResults[param]
-                        # self.inputConfig['FIT'][str(p)]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
-                        # self.inputConfig['FIT'][str(p)]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
-                        # self.inputConfig['FIT'][str(p)]['ERROR'] = fitResults[param+'err']
-
-                        paramIndex+=1
-
-                elif 'PFORM' in self.inputConfig['FIT'].keys() or ('XPFORM' in self.inputConfig['FIT'].keys() and 'YPFORM' in self.inputConfig['FIT'].keys()):
-                    print 'Resetting fit parameters in input config'
-                    self.inputConfig['FIT'] = {'PFORM':funcString}
-                    for ix in range(nxparams):
-                        for iy in range(nyparams):
-                            param = 'X'+str(ix)+'Y'+str(iy)
-                            pseudo2D_Rpf.SetParameter(paramIndex,fitResults[param])
-                            pseudo2D_Rpf.SetParError(paramIndex,fitResults[param+'err'])
-                            if self.fitGuesses != False:
-                                self.inputConfig['FIT'][param] = {'NOMINAL':None,'MIN':None,'MAX':None}
-                                self.inputConfig['FIT'][param]['NOMINAL'] = fitResults[param]
-                                self.inputConfig['FIT'][param]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
-                                self.inputConfig['FIT'][param]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
-                                self.inputConfig['FIT'][param]['ERROR'] = fitResults[param+'err']
-
-                            paramIndex+=1               
-                elif 'XFORM' in self.inputConfig['FIT'].keys() and 'YFORM' in self.inputConfig['FIT'].keys():
-                    print 'Resetting fit parameters in input config'
-                    self.inputConfig['FIT'] = {'FORM':funcString}
-                    for ix in range(nxparams):
-                        for iy in range(nyparams):
-                            param = 'X'+str(ix)+'Y'+str(iy)
-                            pseudo2D_Rpf.SetParameter(paramIndex,fitResults[param])
-                            pseudo2D_Rpf.SetParError(paramIndex,fitResults[param+'err'])
-                            if self.fitGuesses != False:
-                                self.inputConfig['FIT'][param] = {'NOMINAL':None,'MIN':None,'MAX':None}
-                                self.inputConfig['FIT'][param]['NOMINAL'] = fitResults[param]
-                                self.inputConfig['FIT'][param]['MAX'] = fitResults[param]+sigma*fitResults[param+'err']
-                                self.inputConfig['FIT'][param]['MIN'] = fitResults[param]-sigma*fitResults[param+'err']
-                                self.inputConfig['FIT'][param]['ERROR'] = fitResults[param+'err']
-
-                            paramIndex+=1
-
-                else:
-                    print 'Output fit type not supported for fitGuesses. Quittting...'
-                    quit()
-
             # Finally draw the surface
             pseudo2D_results.Close()
             header.makeCan('pseudo2D_Rpf',self.projPath,[pseudo2D_Rpf],xtitle=self.xVarName,ytitle=self.yVarName)
@@ -1133,10 +949,6 @@ class TwoDAlphabet:
                 if process != 'qcdmc':
                     hist_pass.Smooth(1,"k5a") #= header.smoothHist2D('smooth_'+process+'_pass',hist_pass,renormalize=False,iterate = 1 if process != 'qcdmc' else 1)
                     hist_fail.Smooth(1,"k5a") #= header.smoothHist2D('smooth_'+process+'_fail',hist_fail,renormalize=False,iterate = 1 if process != 'qcdmc' else 1)
-                else:
-                    for i in range(3):
-                        hist_pass.Smooth(1,"k5a")
-                        hist_fail.Smooth(1,"k5a")
 
             dict_hists[process]['file'] = file_nominal
             dict_hists[process]['pass']['nominal'] = hist_pass
@@ -1369,8 +1181,6 @@ class TwoDAlphabet:
 
             TH2_qcdmc_ratios['FULL'] = TH2_qcdmc_pass.Clone('qcdmc_rpf_full')
             TH2_qcdmc_ratios['FULL'].Divide(TH2_qcdmc_fail)
-            if self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']:
-                TH2_qcdmc_ratios['FULL'].Smooth(1,"k5a") #= header.smoothHist2D('qcdmc_rpf_full_smooth',TH2_qcdmc_ratios['FULL'],renormalize=False,skipEdges=True)
             for c in ['LOW','SIG','HIGH']:
                 TH2_qcdmc_ratios[c] = header.copyHistWithNewXbins(TH2_qcdmc_ratios['FULL'],self.newXbins[c],'qcdmc_rpf_'+c+'_smooth')
         
@@ -1412,110 +1222,27 @@ class TwoDAlphabet:
                     this_full_xbin = self._getFullXbin(xbin,c)
                     # Now that we're in a specific bin, we need to process it
 
-                    # First check if we have an empty pass bin
-                    # this_pass_bin_zero = True if TH2_data_pass.GetBinContent(xbin,ybin) <= 0 else False 
-                    
-                    # Now that we know we aren't in the blinded region, make a name for the bin RRV
-                    fail_bin_name = 'Fail_'+c+'_bin_'+str(xbin)+'-'+str(ybin)+'_'+self.name
-                    pass_bin_name = 'Pass_'+c+'_bin_'+str(xbin)+'-'+str(ybin)+'_'+self.name
+                    # Make a name for the bin RRV
+                    fail_bin_name = 'Fail_bin_'+str(this_full_xbin)+'-'+str(ybin)+'_'+self.name
+                    pass_bin_name = 'Pass_bin_'+str(this_full_xbin)+'-'+str(ybin)+'_'+self.name
 
                     # Initialize contents
-                    bin_content    = TH2_data_fail.GetBinContent(xbin,ybin)
-                    bin_range_up   = bin_content*3 
-                    bin_range_down = 1e-9
-                    bin_err_up     = TH2_data_fail.GetBinErrorUp(xbin,ybin)
-                    bin_err_down   = TH2_data_fail.GetBinErrorLow(xbin,ybin)
-
-                    # Now subtract away the MC
-                    for process in self.organizedDict.keys():
-                        this_TH2 = self.orgFile.Get(self.organizedDict[process]['fail_'+c]['nominal'])
-
-                        # Check the code and change bin content and errors accordingly
-                        if process == 'qcdmc': continue
-                        elif self.inputConfig['PROCESS'][process]['CODE'] == 0: continue # signal
-                        elif self.inputConfig['PROCESS'][process]['CODE'] == 1: continue # data
-                        elif self.inputConfig['PROCESS'][process]['CODE'] == 2: # MC
-                            bin_content    = bin_content     - this_TH2.GetBinContent(xbin,ybin)
-                            bin_err_up     = bin_err_up      + this_TH2.GetBinErrorUp(xbin,ybin) #- this_TH2.GetBinContent(xbin,ybin)             # Just propagate errors normally
-                            bin_err_down   = bin_err_down    - this_TH2.GetBinErrorLow(xbin,ybin) #- this_TH2.GetBinContent(xbin,ybin)
-
-                    # If fail bin content is <= 0, treat this bin as a RooConstVar at value close to 0
-                    if (bin_content <= 0):# or (this_pass_bin_zero == True):
-                        binRRV = RooConstVar(fail_bin_name, fail_bin_name, max(1e-9,bin_content))
-                        bin_list_fail.add(binRRV)
-                        self.allVars.append(binRRV)
-
-                        # Then get bin center 
-                        x_center = TH2_data_fail.GetXaxis().GetBinCenter(xbin)
-                        y_center = TH2_data_fail.GetYaxis().GetBinCenter(ybin)
-
-                        # Remap to [-1,1]
-                        x_center_mapped = (x_center - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
-                        y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
-
-                        # And assign it to a RooConstVar 
-                        x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center if self.rpf.fitType == 'cheb' else x_center_mapped)
-                        y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center if self.rpf.fitType == 'cheb' else y_center_mapped)
-                        
-                        # Now get the Rpf function value for this bin 
-                        self.allVars.append(x_const)
-                        self.allVars.append(y_const)
-                        self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin) # store rpf for this bin but dont need return
-
-                        this_bin_pass = RooConstVar(pass_bin_name, pass_bin_name, 1e-9)
-                        bin_list_pass.add(this_bin_pass)
-                        self.allVars.append(this_bin_pass)
-
-                    else:
-                        # Create the fail bin
-                        if self.freezeFail:
-                            binRRV = RooConstVar(fail_bin_name, fail_bin_name, bin_content)
-
-                        else:
-                            if bin_content < 1: # Give larger floating to range to bins with fewer events
-                                binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,0.1), 1e-9, 10)
-                                print fail_bin_name + ' < 1'
-
-                            elif bin_content < 10: # Give larger floating to range to bins with fewer events
-                                binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,1), 1e-9, 50)
-                                print fail_bin_name + ' < 10'
-                            else:
-                                binRRV = RooRealVar(fail_bin_name, fail_bin_name, bin_content, max(1e-9,bin_range_down), bin_range_up)
-
-                            if bin_content - bin_err_down < 0.0001:
-                                bin_err_down = bin_content - 0.0001 # For the edge case when bin error is larger than the content
-                            
-                            binRRV.setAsymError(bin_err_down,bin_err_up)
-                            self.floatingBins.append(fail_bin_name)
-
+                     # First check if we want a parametric fail
+                    if self.parametricFail != False and (self.newYbins[ybin-1] > self.parametricFail['START']):
+                        binRRV = self.fail_func.Eval(this_full_xbin,ybin,fail_bin_name)
                         # Store the bin
                         bin_list_fail.add(binRRV)
                         self.allVars.append(binRRV)
 
-                        # Then get bin center
-                        x_center = TH2_data_fail.GetXaxis().GetBinCenter(xbin)
-                        y_center = TH2_data_fail.GetYaxis().GetBinCenter(ybin)
-
-                        # Remap to [-1,1]
-                        x_center_mapped = (x_center - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
-                        y_center_mapped = (y_center - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
-
-                        # Create RooConstVars to store the bin centers
-                        x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center if self.rpf.fitType == 'cheb' else x_center_mapped)
-                        y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center if self.rpf.fitType == 'cheb' else y_center_mapped)
-
-                        self.allVars.append(x_const)
-                        self.allVars.append(y_const)
-
                         # And now get the Rpf function value for this bin 
-                        this_rpf = self.rpf.evalRpf(x_const, y_const,this_full_xbin,ybin)
+                        this_rpf = self.rpf.Eval(this_full_xbin,ybin)
 
                         if self.rpfRatio == False:
                             formula_arg_list = RooArgList(binRRV,this_rpf)
                             this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1",formula_arg_list)
                             
                         else:
-                            mc_ratio_var = RooConstVar("mc_ratio_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, "mc_ratio_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, TH2_qcdmc_ratios[c].GetBinContent(xbin,ybin))
+                            mc_ratio_var = RooConstVar("mc_ratio_x_"+str(this_full_xbin)+'-'+str(ybin)+'_'+self.name, "mc_ratio_x_"+str(this_full_xbin)+'-'+str(ybin)+'_'+self.name, TH2_qcdmc_ratios[c].GetBinContent(xbin,ybin))
                             formula_arg_list = RooArgList(binRRV,this_rpf,mc_ratio_var)
                             this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1*@2",formula_arg_list)
                             self.allVars.append(mc_ratio_var)
@@ -1524,6 +1251,83 @@ class TwoDAlphabet:
                         self.allVars.append(formula_arg_list)
                         self.allVars.append(this_bin_pass)
                         self.allVars.append(this_rpf)
+
+                    else:
+                        bin_content    = TH2_data_fail.GetBinContent(xbin,ybin)
+                        bin_range_up   = bin_content*3 
+                        bin_range_down = 1e-9
+                        bin_err_up     = TH2_data_fail.GetBinErrorUp(xbin,ybin)
+                        bin_err_down   = TH2_data_fail.GetBinErrorLow(xbin,ybin)
+
+                        # Now subtract away the MC
+                        for process in self.organizedDict.keys():
+                            this_TH2 = self.orgFile.Get(self.organizedDict[process]['fail_'+c]['nominal'])
+
+                            # Check the code and change bin content and errors accordingly
+                            if process == 'qcdmc': continue
+                            elif self.inputConfig['PROCESS'][process]['CODE'] == 0: continue # signal
+                            elif self.inputConfig['PROCESS'][process]['CODE'] == 1: continue # data
+                            elif self.inputConfig['PROCESS'][process]['CODE'] == 2: # MC
+                                bin_content    = bin_content     - this_TH2.GetBinContent(xbin,ybin)
+                                bin_err_up     = bin_err_up      + this_TH2.GetBinErrorUp(xbin,ybin) #- this_TH2.GetBinContent(xbin,ybin)             # Just propagate errors normally
+                                bin_err_down   = bin_err_down    - this_TH2.GetBinErrorLow(xbin,ybin) #- this_TH2.GetBinContent(xbin,ybin)
+
+                        # If fail bin content is <= 0, treat this bin as a RooConstVar at value close to 0
+                        if (bin_content <= 0):# or (this_pass_bin_zero == True):
+                            binRRV = RooConstVar(fail_bin_name, fail_bin_name, max(1e-9,bin_content))
+                            bin_list_fail.add(binRRV)
+                            self.allVars.append(binRRV)
+
+                            # Now get the Rpf function value for this bin 
+                            self.rpf.Eval(this_full_xbin,ybin) # store rpf for this bin but dont need return
+
+                            this_bin_pass = RooConstVar(pass_bin_name, pass_bin_name, 1e-9)
+                            bin_list_pass.add(this_bin_pass)
+                            self.allVars.append(this_bin_pass)
+
+                        else:
+                            # Create the fail bin
+                            if self.freezeFail:
+                                binRRV = RooConstVar(fail_bin_name, fail_bin_name, bin_content)
+
+                            else:
+                                if bin_content < 1: # Give larger floating to range to bins with fewer events
+                                    binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,0.1), 1e-9, 10)
+                                    print fail_bin_name + ' < 1'
+
+                                elif bin_content < 10: # Give larger floating to range to bins with fewer events
+                                    binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,1), 1e-9, 50)
+                                    print fail_bin_name + ' < 10'
+                                else:
+                                    binRRV = RooRealVar(fail_bin_name, fail_bin_name, bin_content, max(1e-9,bin_range_down), bin_range_up)
+
+                                if bin_content - bin_err_down < 0.0001:
+                                    bin_err_down = bin_content - 0.0001 # For the edge case when bin error is larger than the content
+                                
+                                binRRV.setAsymError(bin_err_down,bin_err_up)
+                                self.floatingBins.append(fail_bin_name)
+
+                            # Store the bin
+                            bin_list_fail.add(binRRV)
+                            self.allVars.append(binRRV)
+
+                            # And now get the Rpf function value for this bin 
+                            this_rpf = self.rpf.Eval(this_full_xbin,ybin)
+
+                            if self.rpfRatio == False:
+                                formula_arg_list = RooArgList(binRRV,this_rpf)
+                                this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1",formula_arg_list)
+                                
+                            else:
+                                mc_ratio_var = RooConstVar("mc_ratio_x_"+str(this_full_xbin)+'-'+str(ybin)+'_'+self.name, "mc_ratio_x_"+str(this_full_xbin)+'-'+str(ybin)+'_'+self.name, TH2_qcdmc_ratios[c].GetBinContent(xbin,ybin))
+                                formula_arg_list = RooArgList(binRRV,this_rpf,mc_ratio_var)
+                                this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1*@2",formula_arg_list)
+                                self.allVars.append(mc_ratio_var)
+
+                            bin_list_pass.add(this_bin_pass)
+                            self.allVars.append(formula_arg_list)
+                            self.allVars.append(this_bin_pass)
+                            self.allVars.append(this_rpf)
 
 
             print "Making RPH2Ds"
@@ -1571,8 +1375,8 @@ class TwoDAlphabet:
                         for xbin in range(1,len(self.newXbins[c])):
                             this_full_xbin = self._getFullXbin(xbin,c)
                             # Now that we're in a specific bin, we need to process it
-                            fail_bin_name = 'Fail_'+c+'_bin_'+str(xbin)+'-'+str(ybin)+'_'+self.name
-                            pass_bin_name = 'Pass_'+c+'_bin_'+str(xbin)+'-'+str(ybin)+'_'+self.name+'_'+v
+                            fail_bin_name = 'Fail_bin_'+str(this_full_xbin)+'-'+str(ybin)+'_'+self.name
+                            pass_bin_name = 'Pass_bin_'+str(this_full_xbin)+'-'+str(ybin)+'_'+self.name+'_'+v
 
                             binRRV = bin_list_fail.find(fail_bin_name)
                             bin_content = binRRV.getValV()
@@ -1584,9 +1388,9 @@ class TwoDAlphabet:
 
                             else:
                                 # And now get the Rpf function value for this bin 
-                                this_rpf = self.rpf.getRpfBinRRV(c,this_full_xbin,ybin)
-                                mc_ratio_var = RooConstVar("mc_ratio_"+v+"_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, 
-                                                           "mc_ratio_"+v+"_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name, 
+                                this_rpf = self.rpf.getFuncBinRRV(c,this_full_xbin,ybin)
+                                mc_ratio_var = RooConstVar("mc_ratio_"+v+"_x_"+str(this_full_xbin)+'-'+str(ybin)+'_'+self.name, 
+                                                           "mc_ratio_"+v+"_x_"+str(this_full_xbin)+'-'+str(ybin)+'_'+self.name, 
                                                            TH2_qcdmc_ratios[c+'_'+v].GetBinContent(xbin,ybin))
                                 formula_arg_list = RooArgList(binRRV,this_rpf,mc_ratio_var)
                                 this_bin_pass = RooFormulaVar(pass_bin_name, pass_bin_name, "@0*@1*@2",formula_arg_list)
@@ -1795,8 +1599,12 @@ class TwoDAlphabet:
         # Mark floating values as flatParams                 # 
         # We float just the rpf params and the failing bins. #
         ######################################################
-        for p in self.rpf.rpfVars.keys():
-            card_new.write(header.colliMate(self.rpf.rpfVars[p].GetName()+' flatParam\n',22))
+        for p in self.rpf.getFuncVarNames():
+            card_new.write(header.colliMate(self.rpf.funcVars[p].GetName()+' flatParam\n',22))
+
+        if self.fail_func != False:
+            for p in self.fail_func.getFuncVarNames():
+                card_new.write(header.colliMate(self.fail_func.funcVars[p].GetName()+' flatParam\n',22))
 
         for b in self.floatingBins:
             card_new.write(header.colliMate(b+' flatParam\n',22))
@@ -2122,141 +1930,57 @@ class TwoDAlphabet:
         # Collect all final parameter values
         param_final = fit_result.floatParsFinal()
         coeffs_final = RooArgSet()
-        for v in self.rpf.rpfVars.keys():
+        for v in self.rpf.funcVars.keys():
             coeffs_final.add(param_final.find(v))
 
-        if self.rpf.fitType != 'cheb':
-            # Now sample to generate the Rpf distribution
-            for i in range(sample_size):
-                sys.stdout.write('\rSampling '+str(100*float(i)/float(sample_size)) + '%')
-                sys.stdout.flush()
-                param_sample = fit_result.randomizePars()
+        # Now sample to generate the Rpf distribution
+        for i in range(sample_size):
+            sys.stdout.write('\rSampling '+str(100*float(i)/float(sample_size)) + '%')
+            sys.stdout.flush()
+            param_sample = fit_result.randomizePars()
 
-                # Set params of the Rpf object
-                coeffIter_sample = param_sample.createIterator()
+            # Set params of the Rpf object
+            coeffIter_sample = param_sample.createIterator()
+            coeff_sample = coeffIter_sample.Next()
+            while coeff_sample:
+                # Set the rpf parameter to the sample value
+                if coeff_sample.GetName() in self.rpf.funcVars.keys():
+                    self.rpf.setFuncParam(coeff_sample.GetName(), coeff_sample.getValV())
                 coeff_sample = coeffIter_sample.Next()
-                while coeff_sample:
-                    # Set the rpf parameter to the sample value
-                    if coeff_sample.GetName() in self.rpf.rpfVars.keys():
-                        self.rpf.setRpfParam(coeff_sample.GetName(), coeff_sample.getValV())
-                    coeff_sample = coeffIter_sample.Next()
 
-                # Loop over bins and fill
-                for xbin in range(1,rpf_xnbins+1):
-                    for ybin in range(1,rpf_ynbins+1):
-                        bin_val = 0
+            # Loop over bins and fill
+            for xbin in range(1,rpf_xnbins+1):
+                for ybin in range(1,rpf_ynbins+1):
+                    bin_val = 0
 
-                        thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
-                        thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
+                    thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
+                    thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
 
-                        if self.recycleAll:
-                            # Remap to [-1,1]
-                            x_center_mapped = (thisXCenter - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
-                            y_center_mapped = (thisYCenter - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
+                    if self.recycleAll:
+                        # Remap to [-1,1]
+                        x_center_mapped = (thisXCenter - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
+                        y_center_mapped = (thisYCenter - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
 
-                            # And assign it to a RooConstVar 
-                            x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center if self.rpf.fitType == 'cheb' else x_center_mapped)
-                            y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center if self.rpf.fitType == 'cheb' else y_center_mapped)
-                            
-                            # Now get the Rpf function value for this bin 
-                            self.allVars.append(x_const)
-                            self.allVars.append(y_const)
-                            self.rpf.evalRpf(x_const, y_const,xbin,ybin)
+                        # And assign it to a RooConstVar 
+                        x_const = RooConstVar("ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center_mapped)
+                        y_const = RooConstVar("ConstVar_y_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+c+'_'+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center_mapped)
+                        
+                        # Now get the Rpf function value for this bin 
+                        self.allVars.append(x_const)
+                        self.allVars.append(y_const)
+                        self.rpf.evalRpf(x_const, y_const,xbin,ybin)
 
-                        # Determine the category
-                        if thisXCenter > self.newXbins['LOW'][0] and thisXCenter < self.newXbins['LOW'][-1]: # in the LOW category
-                            thisxcat = 'LOW'
-                        elif thisXCenter > self.newXbins['SIG'][0] and thisXCenter < self.newXbins['SIG'][-1]: # in the SIG category
-                            thisxcat = 'SIG'
-                        elif thisXCenter > self.newXbins['HIGH'][0] and thisXCenter < self.newXbins['HIGH'][-1]: # in the HIGH category
-                            thisxcat = 'HIGH'
+                    # Determine the category
+                    if thisXCenter > self.newXbins['LOW'][0] and thisXCenter < self.newXbins['LOW'][-1]: # in the LOW category
+                        thisxcat = 'LOW'
+                    elif thisXCenter > self.newXbins['SIG'][0] and thisXCenter < self.newXbins['SIG'][-1]: # in the SIG category
+                        thisxcat = 'SIG'
+                    elif thisXCenter > self.newXbins['HIGH'][0] and thisXCenter < self.newXbins['HIGH'][-1]: # in the HIGH category
+                        thisxcat = 'HIGH'
 
-                        bin_val = self.rpf.getRpfBinVal(thisxcat,xbin,ybin)
+                    bin_val = self.rpf.getFuncBinVal(thisxcat,xbin,ybin)
 
-                        rpf_samples.Fill(thisXCenter,thisYCenter,bin_val)
-
-        elif self.rpf.fitType == 'cheb':
-            # Import the basis shapes
-            cheb_shapes = TFile.Open(self.projPath+'basis_plots/basis_shapes.root')
-            first_shape_name = cheb_shapes.GetListOfKeys().First().GetName()
-            first_shape = cheb_shapes.Get(first_shape_name) # just used to grab binning and such
-            cheb_xnbins = first_shape.GetNbinsX()
-            cheb_xmin = first_shape.GetXaxis().GetXmin()
-            cheb_xmax = first_shape.GetXaxis().GetXmax()
-            cheb_ynbins = first_shape.GetNbinsY()
-            cheb_ymin = first_shape.GetYaxis().GetXmin()
-            cheb_ymax = first_shape.GetYaxis().GetXmax()
-
-            # Loop over samples
-            for i in range(sample_size):
-                sys.stdout.write('\rSampling '+str(100*float(i)/float(sample_size)) + '%')
-                sys.stdout.flush()
-
-                # Randomize the parameters
-                param_sample = fit_result.randomizePars()
-
-                # Set params of the Rpf object
-                coeffIter_sample = param_sample.createIterator()
-                coeff_sample = coeffIter_sample.Next()
-                while coeff_sample:
-                    # Set the rpf parameter to the sample value
-                    if coeff_sample.GetName() in self.rpf.rpfVars.keys():
-                        self.rpf.setRpfParam(coeff_sample.GetName(), coeff_sample.getValV())
-                    coeff_sample = coeffIter_sample.Next()
-
-                # Loop over bins and fill
-                for xbin in range(1,rpf_xnbins+1):
-                    for ybin in range(1,rpf_ynbins+1):
-                        bin_val = 0
-
-                        thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
-                        thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
-
-                        thisXMapped = (thisXCenter - self.newXbins['LOW'][0])/(self.newXbins['HIGH'][-1] - self.newXbins['LOW'][0])
-                        thisYMapped = (thisYCenter - self.newYbins[0])/(self.newYbins[-1] - self.newYbins[0])
-
-                        # Determine the category
-                        if thisXCenter > self.newXbins['LOW'][0] and thisXCenter < self.newXbins['LOW'][-1]: # in the LOW category
-                            thisxcat = 'LOW'
-                        elif thisXCenter > self.newXbins['SIG'][0] and thisXCenter < self.newXbins['SIG'][-1]: # in the SIG category
-                            thisxcat = 'SIG'
-                        elif thisXCenter > self.newXbins['HIGH'][0] and thisXCenter < self.newXbins['HIGH'][-1]: # in the HIGH category
-                            thisxcat = 'HIGH'
-
-                        bin_val = self.rpf.getRpfBinVal(thisxcat,xbin,ybin)
-
-                        rpf_samples.Fill(thisXCenter,thisYCenter,bin_val)
-
-
-                # # Make TH2 for this sample
-                # chebSum = TH2F('chebSum','chebSum',cheb_xnbins,cheb_xmin,cheb_xmax,cheb_ynbins,cheb_ymin,cheb_ymax)
-
-                # # Grab relevant coefficients and loop over them to sum over the shapes
-                # chebCoeffs = param_sample.selectByName('ChebCoeff_*x*y*'+self.name)        # Another trick here - if suffix='', this will grab everything including those
-                
-                # # Looping...
-                # chebIter = chebCoeffs.createIterator()
-                # chebCoeff = chebIter.Next()
-                # while chebCoeff:
-                #     chebName = chebCoeff.GetName()
-                #     xLabel = chebName[len('ChebCoeff_'):len('ChebCoeff_')+2] 
-                #     yLabel = chebName[len('ChebCoeff_'+xLabel):len('hebCoeff_'+xLabel)+2]
-
-                #     # Grab and scale the basis shape
-                #     tempScaled = cheb_shapes.Get('cheb_Tx'+xLabel[-1]+'_Ty'+yLabel[-1]).Clone()
-                #     tempScaled.Scale(chebCoeffs.find(chebName).getValV())
-
-                #     # Add to the sum
-                #     chebSum.Add(tempScaled)
-                #     chebCoeff = chebIter.Next()
-
-                # for xbin in range(1,chebSum.GetNbinsX()+1):
-                #     for ybin in range(1,chebSum.GetNbinsY()+1):
-                #         thisXCenter = rpf_samples.GetXaxis().GetBinCenter(xbin)
-                #         thisYCenter = rpf_samples.GetYaxis().GetBinCenter(ybin)
-                #         rpf_samples.Fill(thisXCenter,thisYCenter,chebSum.GetBinContent(xbin,ybin))
-
-                # del chebSum
+                    rpf_samples.Fill(thisXCenter,thisYCenter,bin_val)
 
         print '\n'
         rpf_final = TH2F('rpf_final','rpf_final',rpf_xnbins, array.array('d',self.fullXbins), rpf_ynbins, array.array('d',self.newYbins))
@@ -2378,7 +2102,7 @@ def runMLFit(twoDs,rMin,rMax,systsToSet,skipPlots=False,prerun=False):
                 coeffIter_final = coeffs_final.createIterator()
                 coeff_final = coeffIter_final.Next()
                 while coeff_final:
-                    if coeff_final.GetName() in twoD.rpf.rpfVars.keys():
+                    if coeff_final.GetName() in twoD.rpf.funcVars.keys():
                         # Text file
                         param_out.write(coeff_final.GetName()+': ' + str(coeff_final.getValV()) + ' +/- ' + str(coeff_final.getError())+'\n')
                         # Re run config
