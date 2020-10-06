@@ -44,8 +44,6 @@ def openJSON(f,twoDconfig=True):
             for process in [proc for proc in input_config['PROCESS'].keys() if proc != 'HELP']:
                 for index,item in enumerate(input_config['PROCESS'][process]['SYSTEMATICS']):           # There's one list that also
                     input_config['PROCESS'][process]['SYSTEMATICS'][index] = item.encode('ascii')  
-                input_config['PROCESS'][process]['SYSTEMATICS'][index] = item.encode('ascii')  
-                    input_config['PROCESS'][process]['SYSTEMATICS'][index] = item.encode('ascii')  
 
     return input_config
 
