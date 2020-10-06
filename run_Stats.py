@@ -79,6 +79,9 @@ parser.add_option("--ftest",
 parser.add_option("--post", 
                 action="store_true", dest="post", default=False,
                 help="Run in conjunction with diagnosticsWithToys or signalInjection and condor jobs to process output files")
+parser.add_option("--freezeFail", 
+                action="store_true", dest="freezeFail", default=False,
+                help="Run in conjunction with diagnosticsWithToys or signalInjection and condor jobs to process output files")
 parser.add_option("--condor", 
                 action="store_true", dest="condor", default=False,
                 help="Submit a condor job (only for signal injection and diagnosticsWithToys currently")
@@ -133,6 +136,10 @@ with header.cd(projDir):
     	freeze_r_string = " --fixedSignalStrength 0"
     else: freeze_r_string = ''
 
+    if options.freezeFail:
+        freeze_string = ' --freezeParameters "var{Fail_.*}"'
+    else: freeze_string = ''
+
     # Make a prefit workspace from the data card
     if options.workspace == '' and not options.post:
         workspace_name = 'stats_workspace.root'
@@ -175,7 +182,7 @@ with header.cd(projDir):
         'toys_per_job':toys_per_job,
         'seed':seed
     }
-    gen_command = 'combine -M GenerateOnly'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --toysFrequentist --bypassFrequentistFit -t '+str(ntoys)+' --saveToys -s '+str(seed)+' --expectSignal '+expectSignal+' -n '+gen_name
+    gen_command = 'combine -M GenerateOnly'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --toysFrequentist --bypassFrequentistFit -t '+str(ntoys)+' --saveToys -s '+str(seed)+' --expectSignal '+expectSignal+' -n '+gen_name+freeze_string
 
     if not options.post and not options.plotOnly and not options.skipSnapshot: header.setSnapshot()
 
@@ -194,9 +201,9 @@ with header.cd(projDir):
             #     print 'ERROR: '+projDir+'/fitDiagnostics.root does not exist. Please check that run_MLfit.py finished correctly. Quitting...'
             #     quit()
 
-            gof_data_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated '+blind_string+freeze_r_string+' -n gof_data'
+            gof_data_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated '+blind_string+freeze_string+freeze_r_string+' -n gof_data'
             header.executeCmd(gof_data_cmd,options.dryrun)
-            gof_toy_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated --toysFrequentist --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --saveWorkspace '+blind_string+freeze_r_string+' -t '+str(ntoys)+' -s '+str(seed) +' -n '+run_name
+            gof_toy_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated --toysFrequentist --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --saveWorkspace '+blind_string+freeze_string+freeze_r_string+' -t '+str(ntoys)+' -s '+str(seed) +' -n '+run_name
 
             if options.condor == True:
                 tar_files = ['run_Stats.py',
@@ -313,7 +320,7 @@ with header.cd(projDir):
             # Now fit toys (send to condor if needed) #
             ###########################################
             # fit_command = 'combine -M FitDiagnostics'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --toysFrequentist --skipBOnlyFit -t '+str(ntoys)+ ' --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin '+options.rMin+' --rMax '+options.rMax+' -n '+run_name
-            fit_command = 'combine -M FitDiagnostics'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --skipBOnlyFit --cminDefaultMinimizerStrategy 0 -t '+str(ntoys)+ ' --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin '+options.rMin+' --rMax '+options.rMax+' -n '+run_name
+            fit_command = 'combine -M FitDiagnostics'+mask_string.replace('=1','=0')+' -d initialFitWorkspace.root --snapshotName initialFit --skipBOnlyFit --cminDefaultMinimizerStrategy 0 -t '+str(ntoys)+ ' --toysFile higgsCombine'+gen_name+'.GenerateOnly.mH120.'+str(seed)+'.root --rMin '+options.rMin+' --rMax '+options.rMax+' -n '+run_name+freeze_string
             if options.condor == True:
                 tar_files = ['run_Stats.py',
                              'TwoDAlphabetClass.py',
@@ -479,8 +486,8 @@ if options.biasStudy !='' or options.ftest:
         # 2) Run frequentist toy generation (from data) from base model
         # 3) Run GOF for both models over toys
         # 4) Compare results from steps 1 and 3
-        base_fit_cmd = 'combine -d '+workspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_r_string
-        if options.ftest == 'pvalue' or options.ftest == 'fitAlt': alt_fit_cmd = 'combine -d '+altworkspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_r_string
+        base_fit_cmd = 'combine -d '+workspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_string+freeze_r_string
+        if options.ftest == 'pvalue' or options.ftest == 'fitAlt': alt_fit_cmd = 'combine -d '+altworkspace_name+' -M GoodnessOfFit --algo saturated --rMax 10.0 --rMin -10.0 -n FTest '+blind_string+freeze_string+freeze_r_string
 
         if options.ftest == 'generate':#not options.plotOnly and options.ftest != 'post':
             # Base
@@ -497,7 +504,7 @@ if options.biasStudy !='' or options.ftest:
             with header.cd(projDir):
                 header.executeCmd(base_fit_cmd) 
                 # Base fit to toys
-                base_toy_fit_cmd = 'combine -d '+workspace_name+' -M GoodnessOfFit --rMax 10.0 --rMin -10.0 --algo saturated '+blind_string+freeze_r_string+' -t '+str(ntoys)+' --toysFile higgsCombineFTest.GenerateOnly.mH120.'+ftestseed+'.root -n FTestToyFits -s '+str(ftestseed)
+                base_toy_fit_cmd = 'combine -d '+workspace_name+' -M GoodnessOfFit --rMax 10.0 --rMin -10.0 --algo saturated '+blind_string+freeze_string+freeze_r_string+' -t '+str(ntoys)+' --toysFile higgsCombineFTest.GenerateOnly.mH120.'+ftestseed+'.root -n FTestToyFits -s '+str(ftestseed)
 
                 if options.condor:
                     base_toy_fit_cmd = base_toy_fit_cmd.replace('-d '+workspace_name,'-d '+projDir+'/'+workspace_name).replace('--toysFile higgs','--toysFile '+projDir+'/higgs')
@@ -518,7 +525,7 @@ if options.biasStudy !='' or options.ftest:
             with header.cd(altDir):
                 header.executeCmd(alt_fit_cmd)
                 # Alt fit to toys
-                alt_toy_fit_cmd = 'combine -d '+altworkspace_name+' -M GoodnessOfFit --rMax 10.0 --rMin -10.0 --algo saturated '+blind_string+freeze_r_string+' -t '+str(ntoys)+' --toysFile '+altDir_depth+projDir+'/higgsCombineFTest.GenerateOnly.mH120.'+ftestseed+'.root -n '+run_name+' -s '+str(ftestseed)
+                alt_toy_fit_cmd = 'combine -d '+altworkspace_name+' -M GoodnessOfFit --rMax 10.0 --rMin -10.0 --algo saturated '+blind_string+freeze_string+freeze_r_string+' -t '+str(ntoys)+' --toysFile '+altDir_depth+projDir+'/higgsCombineFTest.GenerateOnly.mH120.'+ftestseed+'.root -n '+run_name+' -s '+str(ftestseed)
 
                 if options.condor:
                     alt_toy_fit_cmd = alt_toy_fit_cmd.replace('-d '+workspace_name,'-d '+altDir+'/'+workspace_name).replace('--toysFile '+altDir_depth+projDir+'/higgs','--toysFile '+projDir+'/higgs')
