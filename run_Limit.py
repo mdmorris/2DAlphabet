@@ -50,7 +50,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,freezeFail=False,location=
     # Make a prefit workspace from the data card
     print 'cd '+projDir
     with header.cd(projDir):
-        t2w_cmd = 'text2workspace.py -b '+card_name+' -o workspace.root' 
+        t2w_cmd = 'text2workspace.py -b '+card_name+' -o workspace.root --X-no-jmax' 
         header.executeCmd(t2w_cmd)
         # header.setSnapshot(os.environ['CMSSW_BASE']+'/src/2DAlphabet/'+postfitWorkspaceDir+'/')
 
@@ -94,7 +94,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,freezeFail=False,location=
     print 'Getting current dir'
     current_dir = os.getcwd()
 
-    aL_cmd = 'combine -M AsymptoticLimits workspace.root --snapshotName initialFit --saveWorkspace' +blind_option + syst_option # + sig_option 
+    aL_cmd = 'combine -M AsymptoticLimits workspace.root --cminDefaultMinimizerStrategy 0 --snapshotName initialFit --saveWorkspace' +blind_option + syst_option # + sig_option 
 
     # Run combine if not on condor
     if location == 'local':    
