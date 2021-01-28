@@ -1768,13 +1768,19 @@ class TwoDAlphabet:
                                 thisVal = str(self.inputConfig['SYSTEMATIC'][base_syst_line_key]['VALDOWN']) + '/' + str(self.inputConfig['SYSTEMATIC'][base_syst_line_key]['VALUP'])
                             # If shape...
                             else:
-                                thisVal = str(self.inputConfig['SYSTEMATIC'][base_syst_line_key]['SCALE'])
+                                if 'SCALE' not in self.inputConfig['SYSTEMATIC'][base_syst_line_key]:
+                                    thisVal = '1.0'
+                                else:
+                                    thisVal = str(self.inputConfig['SYSTEMATIC'][base_syst_line_key]['SCALE'])
                         # Otherwise place a '-'
                         else:
                             thisVal = '-'  
 
                     elif syst_line_key == 'KDEbandwidth' and proc == 'qcd' and 'pass' in chan:
-                        thisVal = '1.0'
+                        if 'SCALE' not in self.inputConfig['SYSTEMATIC'][syst_line_key]:
+                            thisVal = '1.0'
+                        else:
+                            thisVal = self.inputConfig['SYSTEMATIC'][syst_line_key]['SCALE']
                     else:
                         thisVal = '-'
 
