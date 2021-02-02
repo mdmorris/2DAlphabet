@@ -1,16 +1,16 @@
 #!/bin/bash
 source /cvmfs/cms.cern.ch/cmsset_default.sh
 xrdcp root://cmseos.fnal.gov//store/user/lcorcodi/10XwithNano.tgz ./
-export SCRAM_ARCH=slc6_amd64_gcc700
-scramv1 project CMSSW CMSSW_10_2_13
+export SCRAM_ARCH=slc7_amd64_gcc700
+scramv1 project CMSSW CMSSW_10_6_14
 tar -xzf 10XwithNano.tgz
 rm 10XwithNano.tgz
 
 echo TEMPTAR
 mkdir tardir; cp TEMPTAR tardir/; cd tardir
 tar -xzvf TEMPTAR
-cp -r * ../CMSSW_10_2_13/src/2DAlphabet/
-cd ../CMSSW_10_2_13/src/2DAlphabet/
+cp -r * ../CMSSW_10_6_14/src/2DAlphabet/
+cd ../CMSSW_10_6_14/src/2DAlphabet/
 eval `scramv1 runtime -sh`
 #scramv1 b clean; scramv1 b
 
