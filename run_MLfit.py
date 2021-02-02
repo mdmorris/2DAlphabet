@@ -9,19 +9,19 @@ from ROOT import *
 
 parser = OptionParser()
 
-parser.add_option('-q', '--tag', metavar='F', type='string', action='store',
+parser.add_option('-q', '--tag', metavar='<tag>', type='string', action='store',
                 default =   '',
                 dest    =   'quicktag',
                 help    =   'Assigns a tag for this run')
-parser.add_option('-s', '--setParameter', metavar='F', type='string', action='store',
+parser.add_option('-s', '--setParameter', metavar='<param1=1.0,param2=1.0...>', type='string', action='store',
                 default =   '',
                 dest    =   'setParameter',
                 help    =   'String of parameters to set pre-fit. Uses same comma separated format as Combine (V1=1.0,V2=1.0...)')
-parser.add_option('--rMin', metavar='F', type='string', action='store',
+parser.add_option('--rMin', metavar='<rMin>', type='string', action='store',
                 default =   '0',
                 dest    =   'rMin',
                 help    =   'Minimum bound on r (signal strength)')
-parser.add_option('--rMax', metavar='F', type='string', action='store',
+parser.add_option('--rMax', metavar='<rMax>', type='string', action='store',
                 default =   '5',
                 dest    =   'rMax',
                 help    =   'Minimum bound on r (signal strength)')
@@ -44,7 +44,7 @@ parser.add_option("--skipPlots", action="store_true",
 parser.add_option("--fullRun2", action="store_true", 
                 default =   False,
                 dest    =   "fullRun2",
-                help    =   "Plot sum of years 16, 17, 18")
+                help    =   "Plot sum of years 16, 17, 18. Requires a naming scheme that denotes these years clearly. Still fits years individually.")
 parser.add_option("--CL", action="store", type='string',
                 default =   '',
                 dest    =   "CL",

@@ -50,7 +50,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,freezeFail=False,location=
     # Make a prefit workspace from the data card
     print 'cd '+projDir
     with header.cd(projDir):
-        t2w_cmd = 'text2workspace.py -b '+card_name+' -o workspace.root' 
+        t2w_cmd = 'text2workspace.py -b '+card_name+' -o workspace.root --X-no-jmax' 
         header.executeCmd(t2w_cmd)
         # header.setSnapshot(os.environ['CMSSW_BASE']+'/src/2DAlphabet/'+postfitWorkspaceDir+'/')
 
@@ -116,11 +116,11 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,freezeFail=False,location=
 
 parser = OptionParser()
 
-parser.add_option('-q', '--tag', metavar='F', type='string', action='store',
+parser.add_option('-q', '--tag', metavar='<tag>', type='string', action='store',
                 default =   '',
                 dest    =   'quicktag',
                 help    =   'Assigns a tag for this run')
-parser.add_option('-d', '--projDir', metavar='F', type='string', action='store',
+parser.add_option('-d', '--projDir', metavar='<dir>', type='string', action='store',
                 default =   '',
                 dest    =   'projDir',
                 help    =   'Points to the directory where the b-only fit result is located')
@@ -131,7 +131,7 @@ parser.add_option("--unblindData", action="store_true",
 parser.add_option("--recycleAll", action="store_true", 
                 default =   False,
                 dest    =   "recycleAll",
-                help    =   "Recycle everything from the previous run with this tag")
+                help    =   "Recycle everything from the previous run with this tag. Note that this does not allow for string substitution.")
 parser.add_option("--freezeFail", action="store_true", 
                 default =   False,
                 dest    =   "freezeFail",

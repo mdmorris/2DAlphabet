@@ -921,7 +921,6 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],
                 data_leg_title = hist.GetTitle()
                 if len(titles) > 0:
                     hist.SetTitle(titles[hist_index])
-
                 hist.SetTitleOffset(1.15,"xy")
                 hist.GetYaxis().SetTitleOffset(1.04)
                 hist.GetYaxis().SetLabelSize(0.07)
@@ -1027,6 +1026,15 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],
                 CMS_lumi.lumiTextSize = 0.9
                 
                 CMS_lumi.CMS_lumi(mains[hist_index], year, 11)
+                # mains[hist_index].cd()
+                # latex = TLatex()
+                # latex.SetNDC()
+                # latex.SetTextAngle(0)
+                # latex.SetTextColor(kBlack)
+                # latex.SetTextFont(42)
+                # latex.SetTextAlign(31) 
+                # latex.SetTextSize(0.7*0.1)
+                # latex.DrawLatex(1-0.05,1-0.1+0.2*0.1,"137 fb^{-1} (13 TeV)")
 
     # CMS_lumi.CMS_lumi(myCan, year, 11)
 
