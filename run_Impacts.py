@@ -64,9 +64,9 @@ with header.cd(projDir):
         # Build a post-fit workspace
         #header.executeCmd('text2workspace.py -b card_'+card_tag+'.txt -o impactworkspace.root')
         header.setSnapshot()
-        initialfit_cmd = 'combineTool.py -M Impacts -n '+taskName+' --rMin -5 --rMax 5 -d initialFitWorkspace.root --snapshotName initialFit --doInitialFit --robustFit 1 -m 2000 --freezeParameters "var{Fail_.*}" '+impactNuisanceString
+        initialfit_cmd = 'combineTool.py -M Impacts -n '+taskName+' --rMin -15 --rMax 15 -d initialFitWorkspace.root --snapshotName initialFit --doInitialFit --cminDefaultMinimizerStrategy 0 -m 2000 '+impactNuisanceString
         header.executeCmd(initialfit_cmd)
-        impact_cmd = 'combineTool.py -M Impacts -n '+taskName+' --rMin -5 --rMax 5 -d initialFitWorkspace.root --snapshotName initialFit --doFits --robustFit 1 -m 2000 --freezeParameters "var{Fail_.*}" '+impactNuisanceString
+        impact_cmd = 'combineTool.py -M Impacts -n '+taskName+' --rMin -15 --rMax 15 -d initialFitWorkspace.root --snapshotName initialFit --doFits --cminDefaultMinimizerStrategy 0 -m 2000 '+impactNuisanceString
         if options.condor:
             JOB_PREFIX = """#!/bin/bash
 source /cvmfs/cms.cern.ch/cmsset_default.sh
