@@ -653,7 +653,10 @@ def reorderHists(histlist):
 
     return outlist
 
-def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],titles=[],dataName='Data',bkgNames=[],signalNames=[],logy=False,rootfile=False,xtitle='',ytitle='',ztitle='',dataOff=False,datastyle='pe',year=1, addSignals=True):  
+def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],
+            titles=[],dataName='Data',bkgNames=[],signalNames=[],logy=False,
+            rootfile=False,xtitle='',ytitle='',ztitle='',dataOff=False,
+            datastyle='pe',year=1, addSignals=True, extraText='Preliminary'):  
     # histlist is just the generic list but if bkglist is specified (non-empty)
     # then this function will stack the backgrounds and compare against histlist as if 
     # it is data. The imporant bit is that bkglist is a list of lists. The first index
@@ -762,6 +765,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
             if len(bkglist) > 0:
                 raise TypeError('ERROR: It seems you are trying to plot backgrounds with data on a 2D plot. This is not supported since there is no good way to view this type of distribution.')
 
+            CMS_lumi.extraText = extraText
             CMS_lumi.CMS_lumi(thisPad, year, 11, sim=False if 'data' in name.lower() else True)
         
         # Otherwise it's a TH1 hopefully
@@ -1002,7 +1006,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],t
                 if logy == True:
                     mains[hist_index].SetLogy()
 
-                CMS_lumi.extraText = ''
+                CMS_lumi.extraText = extraText#'Preliminary'
                 CMS_lumi.cmsTextSize = 0.9
                 CMS_lumi.cmsTextOffset = 2
                 CMS_lumi.lumiTextSize = 0.9
