@@ -17,6 +17,7 @@ import pprint
 pp = pprint.PrettyPrinter(indent = 2)
 
 import header
+from header import ConvertToEvtsPerUnit 
 import RpfHandler
 
 import ROOT
@@ -82,6 +83,7 @@ class TwoDAlphabet:
         self.plotPrefitSigInFitB = self._getOption('plotPrefitSigInFitB')
         self.plotTitles = self._getOption('plotTitles')
         self.addSignals = self._getOption('addSignals')
+        self.plotEvtsPerUnit = self._getOption('plotEvtsPerUnit')
         self.recycleAll = recycleAll
 
         # Setup a directory to save
@@ -477,7 +479,7 @@ class TwoDAlphabet:
             print 'WARNING: '+optionName+' boolean not set explicitly. Default to True.'
             option_return = True
         # Default to false
-        elif optionName in ['freezeFail','fitGuesses','plotUncerts','prerun','rpfRatio','plotPrefitSigInFitB','parametricFail']:
+        elif optionName in ['freezeFail','fitGuesses','plotUncerts','prerun','rpfRatio','plotPrefitSigInFitB','parametricFail','plotEvtsPerUnit']:
             print 'WARNING: '+optionName+' boolean not set explicitly. Default to False.'
             option_return = False
         elif optionName == 'verbosity':
@@ -1850,28 +1852,59 @@ class TwoDAlphabet:
                     else: titleList.append('')
 
                     # Make the "money plot" of just the y projection of the signal region
-                    # if ('y' in plotType) and (cat == 'pass') and (regionNum == 2): 
-                    #     money_title = 'Data vs Background - '+self.yVarTitle
-                    #     header.makeCan('plots/fit_'+fittag+'/postfit_signal_region_only',self.projPath,[this_data],[bkg_process_list],totalBkg=[this_totalbkg],signals=signalList,titles=[money_title],bkgNames=bkgNameList,signalNames=signal_names,colors=colors,xtitle=self.yVarTitle,year=self.year)
+
+            if self.plotEvtsPerUnit:
+                new_dataList = []
+                new_bkgList = []
+                new_bkgList_logy = []
+                new_signalList = []
+                new_totalBkgs = [] 
+                for i,h in enumerate(dataList):
+                    new_dataList.append(ConvertToEvtsPerUnit(h))
+                    new_totalBkgs.append(ConvertToEvtsPerUnit(totalBkgs[i]))
+                    new_sub_bkgList = []
+                    new_sub_bkgList_logy = []
+                    new_sub_signalList = []
+                    for b in bkgList[i]:
+                        new_sub_bkgList.append(ConvertToEvtsPerUnit(b))
+                    for blog in bkgList_logy[i]:
+                        new_sub_bkgList_logy.append(ConvertToEvtsPerUnit(blog))
+                    for s in signalList[i]:
+                        new_sub_signalList.append(ConvertToEvtsPerUnit(s))
+
+                    new_bkgList.append(new_sub_bkgList)
+                    new_bkgList_logy.append(new_sub_bkgList_logy)
+                    new_signalList.append(new_sub_signalList)
+                dataList = new_dataList
+                bkgList = new_bkgList
+                bkgList_logy = new_bkgList_logy
+                signalList = new_signalList
+                totalBkgs = new_totalBkgs
+
+                # bstar specific (GeV specifically)
+                yAxisTitle = 'Events / %s GeV' % header.GetMinWidth(dataList[0])
+
+            else:
+                yAxisTitle = 'Events / bin'
 
             if 'x' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
                     dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signalList,
                     bkgNames=bkgNameList,signalNames=signal_names,titles=titleList,
-                    colors=colors,xtitle=self.xVarTitle,year=self.year,addSignals=self.addSignals)
+                    colors=colors,xtitle=self.xVarTitle,ytitle=yAxisTitle,year=self.year,addSignals=self.addSignals)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
                     dataList,bkglist=bkgList_logy,totalBkg=totalBkgs,signals=signalList,
                     bkgNames=bkgNameList_logy,signalNames=signal_names,titles=titleList,
-                    colors=colors_logy,xtitle=self.xVarTitle,logy=True,year=self.year,addSignals=self.addSignals)
+                    colors=colors_logy,xtitle=self.xVarTitle,ytitle=yAxisTitle,logy=True,year=self.year,addSignals=self.addSignals)
             elif 'y' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
                     dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signalList,
                     bkgNames=bkgNameList,signalNames=signal_names,titles=titleList,
-                    colors=colors,xtitle=self.yVarTitle,year=self.year,addSignals=self.addSignals)
+                    colors=colors,xtitle=self.yVarTitle,ytitle=yAxisTitle,year=self.year,addSignals=self.addSignals)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
                     dataList,bkglist=bkgList_logy,totalBkg=totalBkgs,signals=signalList,
                     bkgNames=bkgNameList_logy,signalNames=signal_names,titles=titleList,
-                    colors=colors_logy,xtitle=self.yVarTitle,logy=True,year=self.year,addSignals=self.addSignals)
+                    colors=colors_logy,xtitle=self.yVarTitle,ytitle=yAxisTitle,logy=True,year=self.year,addSignals=self.addSignals)
 
         # Make comparisons for each background process of pre and post fit projections
         for plotType in ['projx','projy']:
@@ -2006,7 +2039,7 @@ class TwoDAlphabet:
         rpf_c = TCanvas('rpf_c','Post-fit R_{P/F}',1000,700)
         CMS_lumi.lumiTextSize = 0.75
         CMS_lumi.cmsTextSize = 0.85
-        CMS_lumi.extraText = ''
+        CMS_lumi.extraText = 'Preliminary'
         CMS_lumi.CMS_lumi(rpf_c, self.year, 11)
         rpf_c.SetRightMargin(0.2)
         rpf_final.Draw('colz')
