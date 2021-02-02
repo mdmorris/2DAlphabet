@@ -3,264 +3,143 @@ from ROOT import *
 
 import header, os, subprocess, copy
 
-class RpfHandler():
-    def __init__ (self,fitDict,name,dummy_TH2=None,tag=''):
+class BinnedParametricFunc():
+    def __init__(self,fitDict,name,dummy_TH2=None,funcname=''):
         self.fitDict = fitDict
-        self.projDir = name+'/'+tag
-        self.fitType = 'generic'#self.fitType()
+        self.funcname = funcname
         self.name = name
-        self.tag = tag
         self.dummy_TH2 = dummy_TH2
-        self.rpfVars = {}
+        self.funcVars = {}
         self.binVars = {} # RooFormulaVars for each bin for later evaluation
         self.allVars = []
+        self.formula = self.getRooFunctionForm()
 
-        # Initialize rpfVars according to form of function
-        if False:#self.fitType == 'splitPoly':
-            # Do some quick checks to make sure these are formatted correctly
-            header.checkFitForm(self.fitDict['XPFORM'],self.fitDict['YPFORM'])
+        # Initialize vars 
+        for c in sorted(self.fitDict.keys()):
+            input_param_vals = self.fitDict[c]
+            if c.isdigit():
+                this_nom = input_param_vals['NOMINAL']
+                if 'MIN' in input_param_vals.keys() and 'MAX' in input_param_vals.keys():
+                    this_min = input_param_vals['MIN']
+                    this_max = input_param_vals['MAX']
+                    varname = self.funcname+c+'_'+self.name
+                    self.funcVars[varname] = RooRealVar(varname, varname, this_nom, this_min, this_max)
 
-            nxparams = max([int(param[1:]) for param in self.fitDict.keys() if param.find('X') != -1 and param != 'XPFORM'])
-            nyparams = max([int(param[1:]) for param in self.fitDict.keys() if param.find('Y') != -1 and param != 'YPFORM'])
-            print 'Total number of x fit parameters is ' + str(nxparams)
-            print 'Total number of y fit parameters is ' + str(nyparams)
+                    if 'ERROR_UP' in input_param_vals.keys() and 'ERROR_DOWN' in input_param_vals.keys():
+                        self.funcVars[varname].setAsymError(input_param_vals['ERROR_DOWN'],input_param_vals['ERROR_UP'])
+                    elif 'ERROR' in self.fitDict[c].keys():
+                        self.funcVars[varname].setError(input_param_vals['ERROR'])
 
-            # Make and store RRVs for each param
-            for this_var in {'X':nxparams, 'Y':nyparams}.keys():
-                nparams = {'X':nxparams, 'Y':nyparams}[this_var]
-                for ip in range(1,nparams+1):
-                    input_param_vals = self.fitDict[this_var+str(ip)]
-                    this_nom = input_param_vals['NOMINAL']
-
-                    varname = self.fitType+this_var+'_'+str(ip)+'_'+self.name
-
-                    # Set ranges if they're defined
-                    if 'MIN' in input_param_vals.keys() and 'MAX' in input_param_vals.keys():
-                        this_min = input_param_vals['MIN']
-                        this_max = input_param_vals['MAX']
-                        self.rpfVars[varname] = RooRealVar(varname,varname,this_nom,this_min,this_max)
-
-                        if 'ERROR_UP' in input_param_vals.keys() and 'ERROR_DOWN' in input_param_vals.keys():
-                            self.rpfVars[varname].setAsymError(input_param_vals['ERROR_DOWN'],input_param_vals['ERROR_UP'])
-                        elif 'ERROR' in input_param_vals.keys():
-                            self.rpfVars[varname].setError(input_param_vals['ERROR'])
-
+                else:
+                    input_break = raw_input('WARNING: Upper and lower bounds on fit parameter ' + c + ' not defined. Please type "N" if you would like to quit or enter if you would like to treat the parameter as constant')
+                    if input_break == 'N':
+                        quit()
                     else:
-                        input_break = raw_input('WARNING: Upper and lower bounds on global fit parameter ' +this_var+str(ip) + ' not defined. Please type "N" if you would like to quit or enter if you would like to treat the parameter as constant')
-                        if input_break == 'N':
-                            quit()
-                        else:
-                            self.rpfVars[varname] = RooConstVar(varname,varname,this_nom)
-
-                    # self.allVars.append(self.rpfVars[varname])
-
-        elif False:#self.fitType == 'fullPoly':
-            # Polynomial Order
-            polXO = 0
-            polYO = 0
-            for param_name in [key for key in self.fitDict.keys() if key != 'HELP' and key != 'PFORM']:
-                # Assuming poly order is a single digit (pretty reasonable I think...)
-                tempXorder = int(param_name[param_name.find('X')+1])
-                tempYorder = int(param_name[param_name.find('Y')+1])
-                if tempXorder > polXO:
-                    polXO = tempXorder
-                if tempYorder > polYO:
-                    polYO = tempYorder
-
-            self.polXO = polXO
-            self.polYO = polYO
-
-            for yi in range(polYO+1):
-                for xi in range(polXO+1):
-
-                    input_param_vals = self.fitDict['X'+str(xi)+'Y'+str(yi)]
-                    this_nom = input_param_vals['NOMINAL']
-                    
-                    varname = self.fitType+'X'+str(xi)+'Y'+str(yi)+'_'+self.name
-
-                    if 'MIN' in input_param_vals.keys() and 'MAX' in input_param_vals.keys():
-                        this_min = input_param_vals['MIN']
-                        this_max = input_param_vals['MAX']
-                        self.rpfVars[varname] = RooRealVar(varname,varname,this_nom,this_min,this_max)
-
-                        if 'ERROR_UP' in input_param_vals.keys() and 'ERROR_DOWN' in input_param_vals.keys():
-                            self.rpfVars[varname].setAsymError(input_param_vals['ERROR_DOWN'],input_param_vals['ERROR_UP'])
-                        elif 'ERROR' in input_param_vals.keys():
-                            self.rpfVars[varname].setError(input_param_vals['ERROR'])
-
-                    else:
-                        input_break = raw_input('WARNING: Upper and lower bounds on fit parameter ' + 'x'+str(xi)+'y'+str(yi) + ' not defined. Please type "N" if you would like to quit or enter if you would like to treat the parameter as constant')
-                        if input_break == 'N':
-                            quit()
-                        else:
-                            self.rpfVars[varname] = RooConstVar(varname,varname,this_nom)
-                    # self.allVars.append(self.rpfVars[varname])
-
-        elif self.fitType == 'generic':
-            for c in sorted(self.fitDict.keys()):
-                input_param_vals = self.fitDict[c]
-                if c.isdigit():
-                    this_nom = input_param_vals['NOMINAL']
-                    if 'MIN' in input_param_vals.keys() and 'MAX' in input_param_vals.keys():
-                        this_min = input_param_vals['MIN']
-                        this_max = input_param_vals['MAX']
-                        varname = self.fitType+c+'_'+self.name
-                        self.rpfVars[varname] = RooRealVar(varname, varname, this_nom, this_min, this_max)
-
-                        if 'ERROR_UP' in input_param_vals.keys() and 'ERROR_DOWN' in input_param_vals.keys():
-                            self.rpfVars[varname].setAsymError(input_param_vals['ERROR_DOWN'],input_param_vals['ERROR_UP'])
-                        elif 'ERROR' in self.fitDict[c].keys():
-                            self.rpfVars[varname].setError(input_param_vals['ERROR'])
-
-                    else:
-                        input_break = raw_input('WARNING: Upper and lower bounds on fit parameter ' + c + ' not defined. Please type "N" if you would like to quit or enter if you would like to treat the parameter as constant')
-                        if input_break == 'N':
-                            quit()
-                        else:
-                            self.rpfVars[varname] = RooConstVar(varname,varname,this_nom)
-                    # self.allVars.append(self.rpfVars[varname])
-
-            
-        elif False:#self.fitType == 'cheb':
-            # Make a dummy TH2 for binning to be used by the chebyshevBasis class
-            self.chebBasis = chebyshevBasis(name,'chebBasis',self.fitDict['CHEBYSHEV']['XORDER'],self.fitDict['CHEBYSHEV']['YORDER'],dummy_TH2)
-            if os.path.isdir(self.projDir+'/basis_plots'): header.executeCmd('rm -rf %s/basis_plots'%self.projDir)
-            header.executeCmd('mkdir %s/basis_plots'%self.projDir)
-
-            self.chebBasis.drawBasis(self.projDir+'/basis_plots')
-
-            # This class handles the RRV management itself so we just keep track of the class instance
-            cheb_coeffs = self.chebBasis.getCoeffs()
-            i = 0
-            while cheb_coeffs.at(i):
-                c = cheb_coeffs.at(i)
-                self.rpfVars[c.GetName()] = c
-                i += 1
-
-    def fitType(self):
-        if 'XPFORM' in self.fitDict.keys() and 'YPFORM' in self.fitDict.keys():
-            return 'splitPoly'
-        elif 'PFORM' in self.fitDict.keys():
-            return 'fullPoly'
-        elif 'CHEBYSHEV' in self.fitDict.keys():
-            return 'cheb'
-        elif 'FORM' in self.fitDict.keys():
-            return 'generic'
-        else:
-            print 'ERROR: Fit type failed. Check that your FIT section is defined correctly. Quitting...'
-            quit()
+                        self.funcVars[varname] = RooConstVar(varname,varname,this_nom)
 
     def getRooFunctionForm(self):
-        if False:#self.fitType == 'splitPoly':
-            return '('+self.fitDict['XPFORM'] +')*('+self.fitDict['YPFORM']+')'
-        elif False:#self.fitType == 'fullPoly':
-            return self.fitDict['PFORM']
-        elif self.fitType == 'generic':
-            params = [int(param) for param in self.fitDict.keys() if param != 'FORM' and param != 'HELP']
-            if len(params) > 0:
-                nCoeffs = max([int(param) for param in self.fitDict.keys() if param != 'FORM' and param != 'HELP'])+1
-            else: nCoeffs = 0
-            
-            gFormula = self.fitDict['FORM'].replace('+x','+@'+str(nCoeffs)).replace('+y','+@'+str(nCoeffs+1))
-            gFormula = gFormula.replace('*x','*@'+str(nCoeffs)).replace('*y','*@'+str(nCoeffs+1))
-            gFormula = gFormula.replace('-x','-@'+str(nCoeffs)).replace('-y','-@'+str(nCoeffs+1))
-            gFormula = gFormula.replace('/x','/@'+str(nCoeffs)).replace('/y','/@'+str(nCoeffs+1))
-            gFormula = gFormula.replace('(x','(@'+str(nCoeffs)).replace('(y','(@'+str(nCoeffs+1))
-            gFormula = gFormula.replace(' x',' @'+str(nCoeffs)).replace(' y',' @'+str(nCoeffs+1))
-            return gFormula
+        params = [int(param) for param in self.fitDict.keys() if param != 'FORM' and param != 'HELP' and param != "START"]
+        if len(params) > 0:
+            nCoeffs = max(params)+1
+        else: nCoeffs = 0
+        
+        gFormula = self.fitDict['FORM'].replace('+x','+@'+str(nCoeffs)).replace('+y','+@'+str(nCoeffs+1))
+        gFormula = gFormula.replace('*x','*@'+str(nCoeffs)).replace('*y','*@'+str(nCoeffs+1))
+        gFormula = gFormula.replace('-x','-@'+str(nCoeffs)).replace('-y','-@'+str(nCoeffs+1))
+        gFormula = gFormula.replace('/x','/@'+str(nCoeffs)).replace('/y','/@'+str(nCoeffs+1))
+        gFormula = gFormula.replace('(x','(@'+str(nCoeffs)).replace('(y','(@'+str(nCoeffs+1))
+        gFormula = gFormula.replace(' x',' @'+str(nCoeffs)).replace(' y',' @'+str(nCoeffs+1))
+        return gFormula
+    
+    def Eval(self,xbin,ybin,name=''):
+        '''Evaluate and store the value of the parametric function in provided global bins
 
-        elif False:#self.fitType == 'cheb':
-            return False    # No string form for this. Dependencies already built into chebyshevBasis class
+        Args:
+            xbin (int): X axis bin number
+            ybin (int): Y axis bin number
 
-    def evalRpf(self,xConst,yConst,xbin,ybin):
+        Returns:
+            RooFormulaVar: The RooFormulaVar for this bin of the parametric function
+        '''
+        xConst,yConst = self.binToConst(xbin,ybin)
+
         # Get category name for naming
         c = xConst.GetName().split('_')[2]
 
-        full_formula_name = 'formula_'+c+'_bin_'+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
+        if name != '':
+            full_formula_name = name
+        else:
+            full_formula_name = 'formula_bin_'+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
 
-        if False:#self.fitType == 'splitPoly':
-            # Make var lists
-            x_param_list = RooArgList(xConst)
-            y_param_list = RooArgList(yConst)
-            for v in self.getRpfVarNames():
-                if 'splitPolyX' in v:
-                    x_param_list.add(self.rpfVars[v])
-                elif 'splitPolyY' in v:
-                    y_param_list.add(self.rpfVars[v])
+        formula_list = RooArgList()
+        for c in self.getFuncVarNames():
+            formula_list.add(self.funcVars[c])
 
-            # Make formulas
-            x_formula_name = 'xPol_'+c+'_bin_'+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
-            x_formula_var = RooFormulaVar(x_formula_name, x_formula_name, self.fitDict['XPFORM'].replace('x','@0'), x_param_list)
-            self.allVars.extend([x_formula_var, x_param_list])
+        formula_list.add(xConst)
+        formula_list.add(yConst)
+        func_val = RooFormulaVar(full_formula_name,full_formula_name,"max(1e-9,"+self.formula+")",formula_list)
 
-            y_formula_name = 'yPol_'+c+'_bin_'+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
-            y_formula_var = RooFormulaVar(y_formula_name, y_formula_name, self.fitDict['YPFORM'].replace('y','@0'), y_param_list)
-            self.allVars.extend([y_formula_var, y_param_list])
+        self.storeFuncBin(func_val,full_formula_name)         
 
-            rpf_val = RooFormulaVar(full_formula_name, full_formula_name, "max(1e-9,@0*@1)", RooArgList(x_formula_var, y_formula_var))
+        return func_val
+    
+    def binToConst(self,xbin,ybin):
+        '''Convert global x and y bin to RooConstVars in center of bins
 
+        Args:
+            xbin (int): X axis bin number
+            ybin (int): Y axis bin number
 
-        elif False:#self.fitType == 'fullPoly':
-            x_poly_list = RooArgList()
-            for y_coeff in range(self.polYO+1):
-                x_coeff_list = RooArgList()
+        Returns:
+            tuple of RooConstVar: First item is X const var and second is Y
+        '''
 
-                # Get each x coefficient for this y
-                for x_coeff in range(self.polXO+1):
-                    v = self.fitType+'X'+str(x_coeff)+'Y'+str(y_coeff)+'_'+self.name                  
-                    x_coeff_list.add(self.rpfVars[v])
+        # Get this bin center 
+        x_center = self.dummy_TH2.GetXaxis().GetBinCenter(xbin)
+        y_center = self.dummy_TH2.GetYaxis().GetBinCenter(ybin)
 
-                # Make the polynomial and save it to the list of x polynomials
-                this_x_polyvar_label = "xPol_y"+str(y_coeff)+'_'+c+"_bin_"+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
-                x_poly_var = RooPolyVar(this_x_polyvar_label,this_x_polyvar_label,xConst,x_coeff_list)
-                x_poly_list.add(x_poly_var)
-                self.allVars.append(x_poly_var)
+        # Get min and range from dummy_TH2
+        x_min = self.dummy_TH2.GetXaxis().GetBinLowEdge(1)
+        y_min = self.dummy_TH2.GetYaxis().GetBinLowEdge(1)
+        x_range = self.dummy_TH2.GetXaxis().GetBinUpEdge(self.dummy_TH2.GetNbinsX()) - x_min
+        y_range = self.dummy_TH2.GetYaxis().GetBinUpEdge(self.dummy_TH2.GetNbinsY()) - y_min
 
-            # Now make a polynomial out of the x polynomials
-            this_x_polyvar_label = "yPol_y"+str(y_coeff)+'_'+c+"_bin_"+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
-            rpf_val_poly = RooPolyVar(this_x_polyvar_label,this_x_polyvar_label,yConst,x_poly_list)
-            self.allVars.append(rpf_val_poly)
-            rpf_val = RooFormulaVar(full_formula_name,full_formula_name,"max(1e-9,@0)",RooArgList(rpf_val_poly))
+        # Remap to [-1,1]
+        x_center_mapped = (x_center - x_min)/x_range
+        y_center_mapped = (y_center - y_min)/y_range
 
-        elif self.fitType == 'generic':
-            formula_list = RooArgList()
-            for c in self.getRpfVarNames():
-                formula_list.add(self.rpfVars[c])
+        # And assign it to a RooConstVar 
+        x_const = RooConstVar("ConstVar_x_"+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+str(xbin)+'-'+str(ybin)+'_'+self.name,x_center_mapped)
+        y_const = RooConstVar("ConstVar_y_"+str(xbin)+'-'+str(ybin)+'_'+self.name,"ConstVar_x_"+str(xbin)+'-'+str(ybin)+'_'+self.name,y_center_mapped)
+        
+        self.allVars.append(x_const)
+        self.allVars.append(y_const)
 
-            generic_formula = self.getRooFunctionForm()
-            formula_list.add(xConst)
-            formula_list.add(yConst)
-            rpf_val = RooFormulaVar(full_formula_name,full_formula_name,"max(1e-9,"+generic_formula+")",formula_list)
+        return x_const,y_const
 
-        elif False:#self.fitType == 'cheb':
-            # chebBasis.getBinVal() returns a RooAddition with the proper construction to be the sum of the shapes with floating coefficients
-            cheb_val = self.chebBasis.getBinVal(xConst.getValV(), yConst.getValV())
-            rpf_val = RooFormulaVar(full_formula_name,full_formula_name,'(1+@0)/2',RooArgList(cheb_val)) # translate the [-1,1] range to [0,1] to guarantee positivity
-            self.allVars.append(cheb_val)
+    def storeFuncBin(self,val,name):
+        self.binVars[name] = val
 
-        self.storeRpfBin(rpf_val,full_formula_name)         
+    def setFuncParam(self,varname,value):
+        self.funcVars[varname].setVal(value)
 
-        return rpf_val
-
-    def storeRpfBin(self,rpf_val,name):
-        self.binVars[name] = rpf_val
-
-    def setRpfParam(self,varname,value):
-        self.rpfVars[varname].setVal(value)
-
-    def getRpfBinVal(self,c,xbin,ybin):
-        formula_name = 'formula_'+c+'_bin_'+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
+    def getFuncBinVal(self,c,xbin,ybin):
+        formula_name = 'formula_bin_'+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
         return self.binVars[formula_name].getValV()
 
-    def getRpfBinRRV(self,c,xbin,ybin):
-        formula_name = 'formula_'+c+'_bin_'+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
+    def getFuncBinRRV(self,c,xbin,ybin):
+        formula_name = 'formula_bin_'+str(int(xbin))+"-"+str(int(ybin))+'_'+self.name
         return self.binVars[formula_name]
 
-    def getRpfVarNames(self):
-        return sorted(self.rpfVars.keys())
+    def getFuncVarNames(self):
+        return sorted(self.funcVars.keys())
+
+class RpfHandler(BinnedParametricFunc):
+    def __init__ (self,fitDict,name,dummy_TH2=None,tag=''):
+        BinnedParametricFunc.__init__(self,fitDict,name,dummy_TH2,'rpf')
 
     # Removes everything but basic values for storage
     def getReducedCopy(self):
-        newcopy = RpfHandler(self.fitDict,self.name,self.dummy_TH2,self.tag)
-        newcopy.rpfVars = copy.deepcopy(self.rpfVars)
+        newcopy = RpfHandler(self.fitDict,self.name,self.dummy_TH2)
+        newcopy.funcVars = copy.deepcopy(self.funcVars)
         return newcopy

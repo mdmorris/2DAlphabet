@@ -66,7 +66,7 @@ for i,c in enumerate(inputConfigsAndArgs):
 print 'Setting on-fly parameters:'
 print '\ttag\t\t = '+options.quicktag
 print '\trecycleAll\t = '+str(options.recycleAll)
-# print '\trecycle\t\t = '+str(options.recycle)
+print '\trecycle\t\t = '+str(options.recycle)
 print '\tskipFit\t\t = '+str(options.skipFit)
 print 'Remaining arguments:'
 for i in inputConfigs:

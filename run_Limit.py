@@ -94,7 +94,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,freezeFail=False,location=
     print 'Getting current dir'
     current_dir = os.getcwd()
 
-    aL_cmd = 'combine -M AsymptoticLimits workspace.root --cminDefaultMinimizerStrategy 0 --snapshotName initialFit --saveWorkspace' +blind_option + syst_option # + sig_option 
+    aL_cmd = 'combine -M AsymptoticLimits workspace.root --snapshotName initialFit --saveWorkspace --cminDefaultMinimizerStrategy 0 ' +blind_option + syst_option # + sig_option 
 
     # Run combine if not on condor
     if location == 'local':    
@@ -174,7 +174,6 @@ else:
     print "ERROR: post-fit '"+postfitWorkspaceDir+"/fitDiagnostics.root' could not be found. Please specify the location of the post-fit workspace (postfitb_workspace.root) that you would like to load. Quitting..."
     quit()
 
-
 # Initialize
 twoDinstances = []
 
@@ -188,14 +187,14 @@ if len(inputConfigs) > 1:
     # For each instance, check tags match and if they don't, ask the user for one
     for t in twoDinstances:
         if t.tag != twoDinstances[0].tag:
-            raise ValueErro('ERROR: tags in configuration files do not match. '+t.tag+' does not match '+twoDinstances[0].tag+'. Please make sure they match and try again. Quitting...')
+            raise ValueError('ERROR: tags in configuration files do not match. '+t.tag+' does not match '+twoDinstances[0].tag+'. Please make sure they match and try again. Quitting...')
             
     thistag = twoDinstances[0].tag
 
     # Combine the cards 
     print 'cd ' + thistag
     with header.cd(thistag):
-        card_combination_command = 'combineCards.py'
+        card_combination_command = 'combineCards.py --X-no-jmax '
         for i in twoDinstances:
             card_combination_command += ' '+i.name+'/card_'+i.name+'.txt'
         card_combination_command += ' > card_'+thistag+'.txt'

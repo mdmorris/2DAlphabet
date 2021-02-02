@@ -17,7 +17,7 @@ lumiTextSize     = 0.6
 lumiTextOffset   = 0.2
 
 cmsTextSize      = 0.75
-cmsTextOffset    = 0.1
+cmsTextOffset    = 0.15
 
 relPosX    = 0.045
 relPosY    = 0.035
