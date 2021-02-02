@@ -149,6 +149,32 @@ def copyHistWithNewYbins(thisHist,newYbins,copyName):
 
     return hist_copy
 
+def ConvertToEvtsPerUnit(hist,width=None):
+    if width == None:
+        use_width = GetMinWidth(hist)
+    else:
+        use_width = width
+
+    converted = hist.Clone()
+    for ibin in range(1,hist.GetNbinsX()+1):
+        if hist.GetBinWidth(ibin) == use_width:
+            continue
+        else:
+            factor = use_width/hist.GetBinWidth(ibin)
+            new_content = factor * converted.GetBinContent(ibin)
+            new_error = factor * converted.GetBinError(ibin)
+            converted.SetBinContent(ibin,new_content)
+            converted.SetBinError(ibin,new_error)
+    
+    return converted
+
+def GetMinWidth(hist):
+    use_width = 10**6
+    for ibin in range(1,hist.GetNbinsX()+1):
+        if hist.GetBinWidth(ibin) < use_width:
+            use_width = hist.GetBinWidth(ibin)
+    return int(use_width)
+
 def smoothHist2D(name,histToSmooth,renormalize=False,iterate=1,skipEdges=False):
     print "Smoothing "+name
     if renormalize: norm = histToSmooth.Integral()
