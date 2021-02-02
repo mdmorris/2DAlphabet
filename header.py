@@ -1057,6 +1057,23 @@ def reducedCorrMatrixHist(fit_result,varsOfInterest=[]):
 
     return out
 
+def ColorCodeSortedIndices(colors):
+    possible_colors = []
+    for c in colors:
+        if c not in possible_colors:
+            possible_colors.append(c)
+
+    # BSTAR SPECIFIC
+    if 861 in possible_colors and 2 in possible_colors:
+        possible_colors[possible_colors.index(861)], possible_colors[possible_colors.index(2)] = possible_colors[possible_colors.index(2)], possible_colors[possible_colors.index(861)] 
+    
+    new_color_order = []
+    for c in possible_colors:
+        for idx in [idx for idx,color in enumerate(colors) if color == c]:
+            if idx not in new_color_order:
+                new_color_order.append(idx)
+    return new_color_order
+
 def FindCommonString(string_list):
     to_match = ''   # initialize the string we're looking for/building
     for s in string_list[0]:    # for each character in the first string
