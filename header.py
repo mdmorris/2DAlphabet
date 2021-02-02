@@ -713,6 +713,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],
     default_colors = [kRed,kMagenta,kGreen,kCyan,kBlue]
     if len(colors) == 0:   
         colors = default_colors
+    color_idx_order = None
     stacks = []
     tot_hists_err = []
     tot_hists = []
@@ -744,16 +745,25 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],
 
         # If this is a TH2, just draw the lego
         if hist.ClassName().find('TH2') != -1:
-            if logy == True:
-                gPad.SetLogy()
-            gPad.SetLeftMargin(0.1)
+            gPad.SetLeftMargin(0.15)
             gPad.SetRightMargin(0.2)
+            gPad.SetBottomMargin(0.12)
+            gPad.SetTopMargin(0.1)
+            if logy: gPad.SetLogz()
             hist.GetXaxis().SetTitle(xtitle)
             hist.GetYaxis().SetTitle(ytitle)
             hist.GetZaxis().SetTitle(ztitle)
-            hist.GetXaxis().SetTitleOffset(1.5)
-            hist.GetYaxis().SetTitleOffset(2.0)
-            hist.GetZaxis().SetTitleOffset(1.8)
+            hist.GetXaxis().SetTitleOffset(1.15)
+            hist.GetYaxis().SetTitleOffset(1.5)
+            hist.GetZaxis().SetTitleOffset(1.5)
+            hist.GetYaxis().SetLabelSize(0.05)
+            hist.GetYaxis().SetTitleSize(0.05)
+            hist.GetXaxis().SetLabelSize(0.05)
+            hist.GetXaxis().SetTitleSize(0.05)
+            hist.GetZaxis().SetLabelSize(0.05)
+            hist.GetZaxis().SetTitleSize(0.05)
+            hist.GetXaxis().SetNdivisions(505)
+            # hist.GetXaxis().SetLabelOffset(0.02)
             if 'lego' in datastyle.lower(): hist.GetZaxis().SetTitleOffset(1.4)
             if len(titles) > 0:
                 hist.SetTitle(titles[hist_index])
@@ -781,11 +791,12 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],
             if 'hist' in datastyle.lower():
                 hist.SetFillColorAlpha(0,0)
             
+            hist.GetXaxis().SetTitle(xtitle)
+            hist.GetYaxis().SetTitle(ytitle)
+
             # If there are no backgrounds, only plot the data (semilog if desired)
             if len(bkglist) == 0:
                 hist.SetMaximum(1.13*hist.GetMaximum())
-                hist.GetXaxis().SetTitle(xtitle)
-                hist.GetYaxis().SetTitle(ytitle)
                 if len(titles) > 0:
                     hist.SetTitle(titles[hist_index])
                 hist.SetTitleOffset(1.1)
@@ -811,7 +822,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],
                     nsignals = 1
                 else:
                     nsignals = len(signals[0])
-                legend_topY = 0.73-0.03*(len(bkglist[0])+nsignals+1)
+                legend_topY = 0.73-0.03*(min(len(bkglist[0]),6)+nsignals+1)
                 # legend_bottomY = 0.2+0.02*(len(bkglist[0])+nsignals+1)
 
                 legends.append(TLegend(0.65,legend_topY,0.90,0.88))
@@ -835,7 +846,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],
                 mains[hist_index].SetBottomMargin(0.04)
                 mains[hist_index].SetLeftMargin(0.17)
                 mains[hist_index].SetRightMargin(0.05)
-                mains[hist_index].SetTopMargin(0.09)
+                mains[hist_index].SetTopMargin(0.1)
 
                 subs[hist_index].SetLeftMargin(0.17)
                 subs[hist_index].SetRightMargin(0.05)
@@ -847,6 +858,15 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],
                 # If logy, put QCD on top
                 # if logy: bkglist[0], bkglist[-1] = bkglist[-1], bkglist[0]
 
+                # Order based on colors
+                if color_idx_order == None:
+                    color_idx_order = ColorCodeSortedIndices(colors)
+                    colors = [colors[i] for i in color_idx_order]
+                
+                bkglist[hist_index] = [bkglist[hist_index][i] for i in color_idx_order]
+                if bkgNames != [] and isinstance(bkgNames[0],list):
+                    bkgNames[hist_index] = [bkgNames[hist_index][i] for i in color_idx_order]
+
                 # Build the stack
                 legend_info = collections.OrderedDict()
                 for bkg_index,bkg in enumerate(bkglist[hist_index]):     # Won't loop if bkglist is empty
@@ -856,7 +876,7 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],
                     if logy:
                         bkg.SetMinimum(1e-3)
 
-                    if bkg.GetName().find('qcd') != -1:
+                    if 'qcd' in bkg.GetName():
                         bkg.SetFillColor(kYellow)
                         bkg.SetLineColor(kYellow)
                     else:
@@ -901,13 +921,8 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],
                 data_leg_title = hist.GetTitle()
                 if len(titles) > 0:
                     hist.SetTitle(titles[hist_index])
-                # Bstar specific
-                # hist.SetTitle('')
+
                 hist.SetTitleOffset(1.15,"xy")
-                if 'projx' not in name:
-                    hist.GetYaxis().SetTitle('Events / bin')
-                else:
-                    hist.GetYaxis().SetTitle('Events / 20 GeV')
                 hist.GetYaxis().SetTitleOffset(1.04)
                 hist.GetYaxis().SetLabelSize(0.07)
                 hist.GetYaxis().SetTitleSize(titleSize)
