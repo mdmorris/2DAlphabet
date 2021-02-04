@@ -30,8 +30,8 @@ class TwoDAlphabet:
     def __init__(self):
         pass
 
-    def __del__(self):
-        del self.workspace
+    # def __del__(self):
+    #     del self.workspace
 
     # Initialization setup to just build workspace. All other steps must be called with methods
     def __init__ (self,jsonFileName,quicktag='',recycleAll=False,recycle=False,CLoptions=[],stringSwaps={}): # jsonFileNames is a list
@@ -144,9 +144,7 @@ class TwoDAlphabet:
             self.newYbins = self._readIn('newYbins')
 
         # Get one list of the x bins over the full range
-        self.fullXbins = list(self.newXbins['LOW']) # need list() to make a copy - not a reference
-        for c in ['SIG','HIGH']:
-            self.fullXbins.extend(self.newXbins[c][1:])
+        self.fullXbins = self._getFullXbins(self.newXbins)
 
         print '\n'
         print self.fullXbins
@@ -458,7 +456,40 @@ class TwoDAlphabet:
             elif v == 'Y':
                 newYbins = new_bins
 
+        self._checkBinning(temp_input_hist,newXbins,newYbins)
+
         return newXbins,newYbins,oldXwidth,oldYwidth
+
+    def _checkBinning(self,inputHist,newXbinsDict,newYbins):
+        input_xmin = inputHist.GetXaxis().GetXmin()
+        input_xmax = inputHist.GetXaxis().GetXmax()
+        input_ymin = inputHist.GetYaxis().GetXmin()
+        input_ymax = inputHist.GetYaxis().GetXmax()
+
+        newXbins = self._getFullXbins(newXbinsDict)
+
+        if (newXbins[0] < input_xmin) or (newXbins[-1] > input_xmax):
+            raise ValueError('X axis requested is larger than input\n\tInput: [%s,%s]\n\tRequested: [%s,%s]'%(input_xmin,input_xmax,newXbins[0],newXbins[-1]))
+        if (newYbins[0] < input_ymin) or (newYbins[-1] > input_ymax):
+            raise ValueError('X axis requested is larger than input\n\tInput: [%s,%s]\n\tRequested: [%s,%s]'%(input_ymin,input_ymax,newYbins[0],newYbins[-1]))
+        prev = -1000000
+        for x in newXbins:
+            if x > prev:
+                prev = x
+            else:
+                raise ValueError('X axis bin edges must be in increasing order!')
+        prev = -1000000
+        for y in newYbins:
+            if y > prev:
+                prev = y
+            else:
+                raise ValueError('Y axis bin edges must be in increasing order!')
+
+    def _getFullXbins(self,xdict):
+        full_x_bins = list(xdict['LOW']) # need list() to make a copy - not a reference
+        for c in ['SIG','HIGH']:
+            full_x_bins.extend(xdict[c][1:])
+        return full_x_bins
 
     def _getFullXbin(self,xbin,c):
         # Evaluate for the bin - a bit tricky since it was built with separate categories

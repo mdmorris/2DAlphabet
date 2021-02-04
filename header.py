@@ -83,11 +83,22 @@ def copyHistWithNewXbins(thisHist,newXbins,copyName):
 
             # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
             for old_xbin in range(1,thisHist.GetNbinsX()+1):
-                if thisHist.GetXaxis().GetBinLowEdge(old_xbin) >= new_bin_min and thisHist.GetXaxis().GetBinUpEdge(old_xbin) <= new_bin_max:
-                    # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
-                    # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
-                    new_bin_content += thisHist.GetBinContent(old_xbin,ybin)
-                    new_bin_errorsq += thisHist.GetBinError(old_xbin,ybin)**2
+                old_bin_min = thisHist.GetXaxis().GetBinLowEdge(old_xbin)
+                old_bin_max = thisHist.GetXaxis().GetBinUpEdge(old_xbin)
+                if old_bin_min >= new_bin_max:
+                    break
+                elif old_bin_min >= new_bin_min and old_bin_min < new_bin_max:
+                    if old_bin_max <= new_bin_max:
+                        new_bin_content += thisHist.GetBinContent(old_xbin,ybin)
+                        new_bin_errorsq += thisHist.GetBinError(old_xbin,ybin)**2
+                    elif old_bin_max > new_bin_max:
+                        raise ValueError(
+                            '''The requested X rebinning does not align bin edges with the input bin edge.
+                            Cannot split input bin [%s,%s] with output bin [%s,%s]'''%(old_bin_min,old_bin_max,new_bin_min,new_bin_max))
+                elif old_bin_min <= new_bin_min and old_bin_max > new_bin_min:
+                    raise ValueError(
+                        '''The requested Y rebinning does not align bin edges with the input bin edge.
+                        Cannot split input bin [%s,%s] with output bin [%s,%s]'''%(old_bin_min,old_bin_max,new_bin_min,new_bin_max))
 
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             if new_bin_content > 0:
@@ -132,11 +143,22 @@ def copyHistWithNewYbins(thisHist,newYbins,copyName):
 
             # print '\t New bin x: ' + str(newBinX) + ', ' + str(newBinXlow) + ', ' + str(newBinXhigh)
             for old_ybin in range(1,thisHist.GetNbinsY()+1):
-                if thisHist.GetYaxis().GetBinLowEdge(old_ybin) >= new_bin_min and thisHist.GetYaxis().GetBinUpEdge(old_ybin) <= new_bin_max:
-                    # print '\t \t Old bin x: ' + str(oldBinX) + ', ' + str(thisHist.GetXaxis().GetBinLowEdge(oldBinX)) + ', ' + str(thisHist.GetXaxis().GetBinUpEdge(oldBinX))
-                    # print '\t \t Adding content ' + str(thisHist.GetBinContent(oldBinX,binY))
-                    new_bin_content += thisHist.GetBinContent(xbin,old_ybin)
-                    new_bin_errorsq += thisHist.GetBinError(xbin,old_ybin)**2
+                old_bin_min = thisHist.GetYaxis().GetBinLowEdge(old_ybin)
+                old_bin_max = thisHist.GetYaxis().GetBinUpEdge(old_ybin)
+                if old_bin_min >= new_bin_max:
+                    break
+                elif old_bin_min >= new_bin_min and old_bin_min < new_bin_max:
+                    if old_bin_max <= new_bin_max:
+                        new_bin_content += thisHist.GetBinContent(xbin,old_ybin)
+                        new_bin_errorsq += thisHist.GetBinError(xbin,old_ybin)**2
+                    elif old_bin_max > new_bin_max:
+                        raise ValueError(
+                            '''The requested Y rebinning does not align bin edges with the input bin edge.
+                            Cannot split input bin [%s,%s] with output bin [%s,%s]'''%(old_bin_min,old_bin_max,new_bin_min,new_bin_max))
+                elif old_bin_min <= new_bin_min and old_bin_max > new_bin_min:
+                    raise ValueError(
+                        '''The requested Y rebinning does not align bin edges with the input bin edge.
+                        Cannot split input bin [%s,%s] with output bin [%s,%s]'''%(old_bin_min,old_bin_max,new_bin_min,new_bin_max))
 
             # print '\t Setting content ' + str(newBinContent) + '+/-' + str(sqrt(newBinErrorSq))
             if new_bin_content > 0:
