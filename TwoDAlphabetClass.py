@@ -30,8 +30,8 @@ class TwoDAlphabet:
     def __init__(self):
         pass
 
-    def __del__(self):
-        del self.workspace
+    # def __del__(self):
+    #     del self.workspace
 
     # Initialization setup to just build workspace. All other steps must be called with methods
     def __init__ (self,jsonFileName,quicktag='',recycleAll=False,recycle=False,CLoptions=[],stringSwaps={}): # jsonFileNames is a list
