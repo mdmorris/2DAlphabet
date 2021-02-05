@@ -98,7 +98,7 @@ elif 'bstar' in options.signals:
     label = 'b*'
     theory_var_file = TFile.Open(bs_path+'pdf_norm_uncertainties_bstar.root')
     sigma_max = 20
-    sigma_min = 0.0000008
+    sigma_min = 0.00008
     mass_min = 1.2
     mass_max = 4.2
 else: label = 'X'
