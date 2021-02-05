@@ -1667,10 +1667,10 @@ class TwoDAlphabet:
             y_turnon_endVal = int(axis_hist.GetYaxis().GetBinUpEdge(y_turnon_endBin))
             y_tail_beginningBin = axis_hist.GetYaxis().FindBin((y_high - y_turnon_endVal)/3.0 + y_turnon_endVal)
             
-        if y_turnon_endBin > y_nbins/2.0:  # in case this isn't a distribution with a turn-on
-            y_turnon_endBin = int(round(y_nbins/3.0))
+            if y_turnon_endBin > y_nbins/2.0:  # in case this isn't a distribution with a turn-on
+                y_turnon_endBin = int(round(y_nbins/3.0))
                 y_turnon_endVal = int(axis_hist.GetYaxis().GetBinUpEdge(y_turnon_endBin))
-            y_tail_beginningBin = 2*y_turnon_endBin
+                y_tail_beginningBin = 2*y_turnon_endBin
 
             y_tail_beginningVal = str(int(axis_hist.GetYaxis().GetBinLowEdge(y_tail_beginningBin)))
         
