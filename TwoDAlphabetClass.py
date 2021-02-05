@@ -66,7 +66,7 @@ class TwoDAlphabet:
         self.sigStart = self.inputConfig['BINNING']['X']['SIGSTART']
         self.sigEnd = self.inputConfig['BINNING']['X']['SIGEND']
 
-        # Setup bool options
+        # Setup options
         self.freezeFail = self._getOption('freezeFail')
         self.blindedPlots = self._getOption('blindedPlots')
         self.blindedFit = self._getOption('blindedFit')
@@ -84,6 +84,7 @@ class TwoDAlphabet:
         self.plotTitles = self._getOption('plotTitles')
         self.addSignals = self._getOption('addSignals')
         self.plotEvtsPerUnit = self._getOption('plotEvtsPerUnit')
+        self.ySlices = self._getOption('ySlices')
         self.recycleAll = recycleAll
 
         # Setup a directory to save
@@ -510,7 +511,7 @@ class TwoDAlphabet:
             print 'WARNING: '+optionName+' boolean not set explicitly. Default to True.'
             option_return = True
         # Default to false
-        elif optionName in ['freezeFail','fitGuesses','plotUncerts','prerun','rpfRatio','plotPrefitSigInFitB','parametricFail','plotEvtsPerUnit']:
+        elif optionName in ['freezeFail','fitGuesses','plotUncerts','prerun','rpfRatio','plotPrefitSigInFitB','parametricFail','plotEvtsPerUnit','ySlices']:
             print 'WARNING: '+optionName+' boolean not set explicitly. Default to False.'
             option_return = False
         elif optionName == 'verbosity':
@@ -530,7 +531,7 @@ class TwoDAlphabet:
             if optionName in o:
                 option_return = o.split('=')[1]
                 if option_return in ["True","False"]: 
-                    option_return = bool(option_return)
+                    option_return = (option_return == "True")
                     print 'WARNING: Overriding %s with command line version (%s).'%(optionName,option_return)
 
         return option_return
@@ -1664,6 +1665,7 @@ class TwoDAlphabet:
         #     fd_file = TFile.Open(self.projPath+'/fitDiagnostics.root')
         # else:
         post_file = TFile.Open(self.tag+'/postfitshapes_'+fittag+'.root')
+        axis_hist = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs')
         fd_file = TFile.Open(self.tag+'/fitDiagnostics.root')
 
         if 'RunII_' in fittag:
@@ -1676,14 +1678,7 @@ class TwoDAlphabet:
 
         x_low = self.newXbins['LOW'][0]
         x_high = self.newXbins['HIGH'][-1]
-        y_low = self.newYbins[0]
-        y_high = self.newYbins[-1]
-        y_nbins = len(self.newYbins)-1
 
-        # Define low, middle, high projection regions for y (x regions defined already via signal region bounds)
-        y_turnon_endBin = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').ProjectionY().GetMaximumBin()
-        y_turnon_endVal = int(post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetYaxis().GetBinUpEdge(y_turnon_endBin))
-        y_tail_beginningBin = post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetYaxis().FindBin((y_high - y_turnon_endVal)/3.0 + y_turnon_endVal)
         print 'Finding start and end bin indexes of signal range. Looking for '+str(self.sigStart)+', '+str(self.sigEnd)
         for ix,xwall in enumerate(self.fullXbins):
             if xwall == self.sigStart:
@@ -1693,17 +1688,39 @@ class TwoDAlphabet:
                 print 'Assigning end bin as '+str(ix)
                 x_sigend_bin = ix
 
+        y_low = self.newYbins[0]
+        y_high = self.newYbins[-1]
+        y_nbins = len(self.newYbins)-1
+
+        if self.ySlices == False:
+            # Define low, middle, high projection regions for y (x regions defined already via signal region bounds)
+            y_turnon_endBin = axis_hist.ProjectionY().GetMaximumBin()
+            y_turnon_endVal = int(axis_hist.GetYaxis().GetBinUpEdge(y_turnon_endBin))
+            y_tail_beginningBin = axis_hist.GetYaxis().FindBin((y_high - y_turnon_endVal)/3.0 + y_turnon_endVal)
+            
         if y_turnon_endBin > y_nbins/2.0:  # in case this isn't a distribution with a turn-on
             y_turnon_endBin = int(round(y_nbins/3.0))
+                y_turnon_endVal = int(axis_hist.GetYaxis().GetBinUpEdge(y_turnon_endBin))
             y_tail_beginningBin = 2*y_turnon_endBin
+
+            y_tail_beginningVal = str(int(axis_hist.GetYaxis().GetBinLowEdge(y_tail_beginningBin)))
+        
+        else: # custom slices
+            y_low = self.ySlices[0]
+            y_turnon_endVal = self.ySlices[1]
+            y_turnon_endBin = axis_hist.GetYaxis().FindBin(y_turnon_endVal)-1
+            y_tail_beginningVal = self.ySlices[2]
+            y_tail_beginningBin = axis_hist.GetYaxis().FindBin(y_tail_beginningVal)
+            y_high = self.ySlices[3]
+        
         y_turnon_endVal = str(y_turnon_endVal)
-        y_tail_beginningVal = str(int(post_file.Get('pass_LOW_'+self.name+'_prefit/data_obs').GetYaxis().GetBinLowEdge(y_tail_beginningBin)))
+        y_tail_beginningVal = str(y_tail_beginningVal)
      
         # Save out slice edges in case they aren't plotted in title (don't do for x since those are defined by user in config)
-        y_slices = open(self.projPath+'/y_slices.txt','w')
-        y_slices.write('Bin edge values:  %i %s %s %i\n'%(y_low, y_turnon_endVal, y_tail_beginningVal, y_high))
-        y_slices.write('Bin edge numbers: %i %i %i %i'%(1,     y_turnon_endBin, y_tail_beginningBin, len(self.newYbins)-1))
-        y_slices.close()
+        y_slices_out = open(self.projPath+'/y_slices.txt','w')
+        y_slices_out.write('Bin edge values:  %i %s %s %i\n'%(y_low, y_turnon_endVal, y_tail_beginningVal, y_high))
+        y_slices_out.write('Bin edge numbers: %i %i %i %i'%(1,     y_turnon_endBin+1, y_tail_beginningBin, len(self.newYbins)-1))
+        y_slices_out.close()
 
         # Final fit signal strength
         if fittag == 's':
@@ -1755,8 +1772,8 @@ class TwoDAlphabet:
                 base_proj_name_post = process+'_'+cat+'_'+self.name+'_post_'
 
                 hist_dict[process][cat]['prefit_projx1'] = hist_dict[process][cat]['prefit_2D'].ProjectionX(base_proj_name_pre+'projx_'+str(y_low)+'-'+y_turnon_endVal,              1,                      y_turnon_endBin, 'e')
-                hist_dict[process][cat]['prefit_projx2'] = hist_dict[process][cat]['prefit_2D'].ProjectionX(base_proj_name_pre+'projx_'+y_turnon_endVal+'-'+y_tail_beginningVal,     y_turnon_endBin+1,      y_tail_beginningBin,'e')
-                hist_dict[process][cat]['prefit_projx3'] = hist_dict[process][cat]['prefit_2D'].ProjectionX(base_proj_name_pre+'projx_'+y_tail_beginningVal+'-'+str(y_high),         y_tail_beginningBin+1,  y_nbins,'e')
+                hist_dict[process][cat]['prefit_projx2'] = hist_dict[process][cat]['prefit_2D'].ProjectionX(base_proj_name_pre+'projx_'+y_turnon_endVal+'-'+y_tail_beginningVal,     y_turnon_endBin+1,      y_tail_beginningBin-1,'e')
+                hist_dict[process][cat]['prefit_projx3'] = hist_dict[process][cat]['prefit_2D'].ProjectionX(base_proj_name_pre+'projx_'+y_tail_beginningVal+'-'+str(y_high),         y_tail_beginningBin,  y_nbins,'e')
 
                 hist_dict[process][cat]['prefit_projy1'] = hist_dict[process][cat]['prefit_LOW'].ProjectionY(base_proj_name_pre+'projy_'+str(x_low)+'-'+str(self.sigStart),          1,                      hist_dict[process][cat]['prefit_LOW'].GetNbinsX(),'e')
                 if self.blindedPlots:
@@ -1766,8 +1783,8 @@ class TwoDAlphabet:
                 hist_dict[process][cat]['prefit_projy3'] = hist_dict[process][cat]['prefit_HIGH'].ProjectionY(base_proj_name_pre+'projy_'+str(self.sigEnd)+'-'+str(x_high),          1,                      hist_dict[process][cat]['prefit_HIGH'].GetNbinsX(),'e')
 
                 hist_dict[process][cat]['postfit_projx1'] = hist_dict[process][cat]['postfit_2D'].ProjectionX(base_proj_name_post+'projx_'+str(y_low)+'-'+y_turnon_endVal,           1,                      y_turnon_endBin, 'e')
-                hist_dict[process][cat]['postfit_projx2'] = hist_dict[process][cat]['postfit_2D'].ProjectionX(base_proj_name_post+'projx_'+y_turnon_endVal+'-'+y_tail_beginningVal,  y_turnon_endBin+1,      y_tail_beginningBin,'e')
-                hist_dict[process][cat]['postfit_projx3'] = hist_dict[process][cat]['postfit_2D'].ProjectionX(base_proj_name_post+'projx_'+y_tail_beginningVal+'-'+str(y_high),      y_tail_beginningBin+1,  y_nbins,'e')
+                hist_dict[process][cat]['postfit_projx2'] = hist_dict[process][cat]['postfit_2D'].ProjectionX(base_proj_name_post+'projx_'+y_turnon_endVal+'-'+y_tail_beginningVal,  y_turnon_endBin+1,      y_tail_beginningBin-1,'e')
+                hist_dict[process][cat]['postfit_projx3'] = hist_dict[process][cat]['postfit_2D'].ProjectionX(base_proj_name_post+'projx_'+y_tail_beginningVal+'-'+str(y_high),      y_tail_beginningBin,  y_nbins,'e')
 
                 hist_dict[process][cat]['postfit_projy1'] = hist_dict[process][cat]['postfit_LOW'].ProjectionY(base_proj_name_post+'projy_'+str(x_low)+'-'+str(self.sigStart),       1,                      hist_dict[process][cat]['postfit_LOW'].GetNbinsX(),'e')
                 if self.blindedPlots:
