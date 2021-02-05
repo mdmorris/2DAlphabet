@@ -1,7 +1,8 @@
 from optparse import OptionParser
-import subprocess
-import array, math
-from  array import array
+import subprocess, sys, array, math, os
+from array import array
+
+sys.path.append(os.getcwd())
 
 import ROOT
 from ROOT import *
