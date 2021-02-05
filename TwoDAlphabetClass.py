@@ -500,7 +500,7 @@ class TwoDAlphabet:
             if optionName in o:
                 option_return = o.split('=')[1]
                 if option_return in ["True","False"]: 
-                    option_return = bool(option_return)
+                    option_return = (option_return == "True")
                     print 'WARNING: Overriding %s with command line version (%s).'%(optionName,option_return)
 
         return option_return
