@@ -31,12 +31,8 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,freezeFail=False,location=
         blind_option = ''
 
     # Set the project directory
-    if len(twoDs) > 1:
-        identifier = twoDs[0].tag
-        projDir = twoDs[0].tag
-    else:
-        identifier = twoDs[0].name
-        projDir = twoDs[0].projPath
+    identifier = twoDs[0].tag
+    projDir = twoDs[0].tag
 
     card_name = 'card_'+identifier+'.txt'
     # Check if we can import post-fit result made during MLfit step
@@ -177,40 +173,32 @@ else:
 # Initialize
 twoDinstances = []
 
-# If simultaneous fit
-if len(inputConfigs) > 1:
-    # Instantiate all class instances
-    for i in inputConfigs:
-        instance = TwoDAlphabet(i,options.quicktag,options.recycleAll,stringSwaps=stringSwaps)
-        twoDinstances.append(instance)
+# Instantiate all class instances
+for i in inputConfigs:
+    instance = TwoDAlphabet(i,options.quicktag,options.recycleAll,stringSwaps=stringSwaps)
+    twoDinstances.append(instance)
 
-    # For each instance, check tags match and if they don't, ask the user for one
-    for t in twoDinstances:
-        if t.tag != twoDinstances[0].tag:
-            raise ValueError('ERROR: tags in configuration files do not match. '+t.tag+' does not match '+twoDinstances[0].tag+'. Please make sure they match and try again. Quitting...')
-            
-    thistag = twoDinstances[0].tag
+# For each instance, check tags match and if they don't, ask the user for one
+for t in twoDinstances:
+    if t.tag != twoDinstances[0].tag:
+        raise ValueError('ERROR: tags in configuration files do not match. '+t.tag+' does not match '+twoDinstances[0].tag+'. Please make sure they match and try again. Quitting...')
+        
+thistag = twoDinstances[0].tag
 
-    # Combine the cards 
-    print 'cd ' + thistag
-    with header.cd(thistag):
-        card_combination_command = 'combineCards.py --X-no-jmax '
-        for i in twoDinstances:
-            card_combination_command += ' '+i.name+'/card_'+i.name+'.txt'
-        card_combination_command += ' > card_'+thistag+'.txt'
+# Combine the cards 
+print 'cd ' + thistag
+with header.cd(thistag):
+    card_combination_command = 'combineCards.py --X-no-jmax '
+    for i in twoDinstances:
+        card_combination_command += ' '+i.name+'/card_'+i.name+'.txt'
+    card_combination_command += ' > card_'+thistag+'.txt'
 
-        print 'Executing ' + card_combination_command
-        subprocess.call([card_combination_command],shell=True)
-        for num in range(1,len(twoDinstances)+1):
-            subprocess.call(["sed -i 's/ch"+str(num)+"_//g' card_"+thistag+".txt"],shell=True)
+    print 'Executing ' + card_combination_command
+    subprocess.call([card_combination_command],shell=True)
+    for num in range(1,len(twoDinstances)+1):
+        subprocess.call(["sed -i 's/ch"+str(num)+"_//g' card_"+thistag+".txt"],shell=True)
 
-    if 'condor' in os.getcwd(): runLimit(twoDinstances,postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='condor',freezeFail=options.freezeFail)
-    else: runLimit(twoDinstances,postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local',freezeFail=options.freezeFail)
-
-# If single fit
-else:
-    instance = TwoDAlphabet(inputConfigs[0],options.quicktag,options.recycleAll,stringSwaps=stringSwaps)
-    if 'condor' in os.getcwd(): runLimit([instance],postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='condor',freezeFail=options.freezeFail)
-    else: runLimit([instance],postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local',freezeFail=options.freezeFail)
+if 'condor' in os.getcwd(): runLimit(twoDinstances,postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='condor',freezeFail=options.freezeFail)
+else: runLimit(twoDinstances,postfitWorkspaceDir,blindData=(not bool(options.unblindData)),location='local',freezeFail=options.freezeFail)
 
 print 'Total time: %s min'%((time.time()-start)/60.)
