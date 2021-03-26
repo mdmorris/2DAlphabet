@@ -1018,10 +1018,10 @@ class TwoDAlphabet:
                     # Only care about syst if it's a shape (CODE == 2 or 3)
                     if this_syst_dict['CODE'] == 2:   # same file as norm, different hist names
 
-                        dict_hists[process]['pass'][pass_syst+'Up']   = file_nominal.Get(this_syst_dict['HISTPASS_UP'])
-                        dict_hists[process]['pass'][pass_syst+'Down'] = file_nominal.Get(this_syst_dict['HISTPASS_DOWN'])
-                        dict_hists[process]['fail'][fail_syst+'Up']   = file_nominal.Get(this_syst_dict['HISTFAIL_UP'])
-                        dict_hists[process]['fail'][fail_syst+'Down'] = file_nominal.Get(this_syst_dict['HISTFAIL_DOWN'])
+                        dict_hists[process]['pass'][pass_syst+'Up']   = file_nominal.Get(this_syst_dict['HISTPASS_UP'].replace('*',process))
+                        dict_hists[process]['pass'][pass_syst+'Down'] = file_nominal.Get(this_syst_dict['HISTPASS_DOWN'].replace('*',process))
+                        dict_hists[process]['fail'][fail_syst+'Up']   = file_nominal.Get(this_syst_dict['HISTFAIL_UP'].replace('*',process))
+                        dict_hists[process]['fail'][fail_syst+'Down'] = file_nominal.Get(this_syst_dict['HISTFAIL_DOWN'].replace('*',process))
 
                     if this_syst_dict['CODE'] == 3:   # different file as norm and different files for each process if specified, same hist name if not specified in inputConfig
                         # User will most likely have different file for each process but maybe not so check
