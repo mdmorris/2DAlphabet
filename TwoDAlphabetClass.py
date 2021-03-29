@@ -1942,6 +1942,15 @@ class TwoDAlphabet:
             else:
                 yAxisTitle = 'Events / bin'
 
+            root_out = TFile.Open(self.projPath+'/plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'.root','RECREATE')
+            for h in dataList+bkgList+totalBkgs+signalList:
+                if isinstance(h,list):
+                    for i in h:
+                        root_out.WriteObject(i,i.GetName())
+                else:
+                    root_out.WriteObject(h,h.GetName())
+            root_out.Close()
+
             if 'x' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
                     dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signalList,
