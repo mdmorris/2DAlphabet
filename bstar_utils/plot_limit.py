@@ -194,11 +194,11 @@ if not options.blind:
     print 'Not blinded'
     g_limit = TGraph(len(x_mass), x_mass, y_limit)
     g_limit.SetTitle("")
-    g_limit.SetMarkerStyle(7)
+    g_limit.SetMarkerStyle(8)
     g_limit.SetMarkerColor(1)
     g_limit.SetLineColor(1)
     g_limit.SetLineWidth(2)
-    g_limit.SetMarkerSize(1) #0.5
+    g_limit.SetMarkerSize(0.7) #0.5
     g_limit.GetYaxis().SetRangeUser(0., 80.)
     g_limit.GetXaxis().SetRangeUser(mass_min, mass_max)
     g_limit.SetMinimum(sigma_min) #0.005
@@ -206,7 +206,7 @@ if not options.blind:
 else:
     print 'Blinded'
     g_mclimit.GetXaxis().SetTitle("m_{"+label+"_{"+cstr+"}} [TeV]")  # NOT GENERIC
-    g_mclimit.GetYaxis().SetTitle("#sigma_{"+label+"_{"+cstr+"}} #times B("+label+"_{"+cstr+"}#rightarrow tW) (pb)") # NOT GENERIC
+    g_mclimit.GetYaxis().SetTitle("#sigma_{"+label+"_{"+cstr+"}} #times #bf{#it{#Beta}}("+label+"_{"+cstr+"}#rightarrow tW) (pb)") # NOT GENERIC
     g_mclimit.GetYaxis().SetRangeUser(0., 80.)
     g_mclimit.GetXaxis().SetRangeUser(mass_min, mass_max)
     g_mclimit.SetMinimum(sigma_min) #0.005
@@ -320,7 +320,7 @@ g_error.SetLineColor(0)
 if not options.blind:
 
     g_limit.GetXaxis().SetTitle("m_{"+label+"_{"+cstr+"}} [TeV]")  # NOT GENERIC
-    g_limit.GetYaxis().SetTitle("#sigma_{"+label+"_{"+cstr+"}} #times B("+label+"_{"+cstr+"}#rightarrow tW) (pb)") # NOT GENERIC
+    g_limit.GetYaxis().SetTitle("#sigma_{"+label+"_{"+cstr+"}} #times #bf{#it{#Beta}}("+label+"_{"+cstr+"}#rightarrow tW) (pb)") # NOT GENERIC
     g_limit.GetXaxis().SetTitleSize(0.055)
     g_limit.GetYaxis().SetTitleSize(0.05)
     g_limit.Draw('ap')
@@ -338,7 +338,7 @@ if not options.blind:
 
 else:
     g_mclimit.GetXaxis().SetTitle("m_{"+label+"_{"+cstr+"}} [TeV]")  # NOT GENERIC
-    g_mclimit.GetYaxis().SetTitle("#sigma_{"+label+"_{"+cstr+"}} B("+label+"_{"+cstr+"}#rightarrow tW) (pb)") # NOT GENERIC
+    g_mclimit.GetYaxis().SetTitle("#sigma_{"+label+"_{"+cstr+"}} #bf{#it{#Beta}}("+label+"_{"+cstr+"}#rightarrow tW) (pb)") # NOT GENERIC
     g_limit.GetXaxis().SetTitleSize(0.055)
     g_limit.GetYaxis().SetTitleSize(0.05)
     g_mclimit.Draw("al")
@@ -371,6 +371,7 @@ if options.drawIntersection:
 
 print 'Expected limit: '+str(expectedMassLimit) + ' +'+str(upLimit-expectedMassLimit) +' -'+str(expectedMassLimit-lowLimit) + ' TeV' # NOT GENERIC
 if not options.blind:
+    g_limit.Draw("lp")
     obsMassLimit,obsCrossLimit = Inter(g_limit,graphWP) if len(Inter(g_limit,graphWP)) > 0 else -1.0
     print 'Observed limit: '+str(obsMassLimit) + ' TeV'
 
@@ -389,7 +390,7 @@ gStyle.SetLegendFont(42)
 legend = TLegend(0.6, 0.5, 0.91, 0.87, '')
 legend.SetHeader("95% CL upper limits")
 if not options.blind:
-    legend.AddEntry(g_limit, "Observed", "l")
+    legend.AddEntry(g_limit, "Observed", "lp")
 legend.AddEntry(g_mclimit, "Median expected","l")
 legend.AddEntry(g_error, "68% expected", "f")
 legend.AddEntry(g_error95, "95% expected", "f")
