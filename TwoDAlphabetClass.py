@@ -1861,6 +1861,7 @@ class TwoDAlphabet:
                     bkg_process_names = []
                     signal_process_list = []
                     signal_names = []
+                    sliceranges = []
                     this_totalbkg = hist_dict['TotalBkg'][cat][plotType+str(regionNum)]
                     totalBkgs.append(this_totalbkg)
                     if 'y' in plotType:
@@ -1906,7 +1907,7 @@ class TwoDAlphabet:
                     if self.plotTitles: titleList.append('Data vs bkg - %s - [%s,%s]'%(cat,low_str,high_str))
                     else: titleList.append('')
 
-                    # Make the "money plot" of just the y projection of the signal region
+                    sliceranges = [h.GetName().split('_')[-1] for h in dataList]
 
             if self.plotEvtsPerUnit:
                 new_dataList = []
@@ -1953,20 +1954,20 @@ class TwoDAlphabet:
 
             if 'x' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
-                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signalList,
+                    dataList,bkglist=bkgList,subtitles=sliceranges,sliceVar=self.yVarTitle,totalBkg=totalBkgs,signals=signalList,
                     bkgNames=bkgNameList,signalNames=signal_names,titles=titleList,
                     colors=colors,xtitle=self.xVarTitle,ytitle=yAxisTitle,year=self.year,addSignals=self.addSignals)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
-                    dataList,bkglist=bkgList_logy,totalBkg=totalBkgs,signals=signalList,
+                    dataList,bkglist=bkgList_logy,subtitles=sliceranges,sliceVar=self.yVarTitle,totalBkg=totalBkgs,signals=signalList,
                     bkgNames=bkgNameList_logy,signalNames=signal_names,titles=titleList,
                     colors=colors_logy,xtitle=self.xVarTitle,ytitle=yAxisTitle,logy=True,year=self.year,addSignals=self.addSignals)
             elif 'y' in plotType:
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag,self.projPath,
-                    dataList,bkglist=bkgList,totalBkg=totalBkgs,signals=signalList,
+                    dataList,bkglist=bkgList,subtitles=sliceranges,sliceVar=self.xVarTitle,totalBkg=totalBkgs,signals=signalList,
                     bkgNames=bkgNameList,signalNames=signal_names,titles=titleList,
                     colors=colors,xtitle=self.yVarTitle,ytitle=yAxisTitle,year=self.year,addSignals=self.addSignals)
                 header.makeCan('plots/fit_'+fittag+'/'+plotType+'_fit'+fittag+'_log',self.projPath,
-                    dataList,bkglist=bkgList_logy,totalBkg=totalBkgs,signals=signalList,
+                    dataList,bkglist=bkgList_logy,subtitles=sliceranges,sliceVar=self.xVarTitle,totalBkg=totalBkgs,signals=signalList,
                     bkgNames=bkgNameList_logy,signalNames=signal_names,titles=titleList,
                     colors=colors_logy,xtitle=self.yVarTitle,ytitle=yAxisTitle,logy=True,year=self.year,addSignals=self.addSignals)
 
