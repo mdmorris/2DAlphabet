@@ -576,11 +576,11 @@ def projInfoLookup(projDir,card_tag):
         twoD_names = getTwoDAlphaNames(firstline)
         for n in twoD_names:
             proj_info[n] = pickle.load(open(projDir+'/'+n+'/saveOut.p','r'))
-            proj_info[n]['rpfVarNames'] = proj_info[n]['rpf'].getRpfVarNames()
+            proj_info[n]['rpfVarNames'] = proj_info[n]['rpf'].getFuncVarNames()
 
     elif not more_than_one:
         proj_info[card_tag] = pickle.load(open(projDir+'/saveOut.p','r'))
-        proj_info['rpfVarNames'] = proj_info['rpf'].getRpfVarNames()
+        proj_info['rpfVarNames'] = proj_info['rpf'].getFuncVarNames()
 
     return proj_info
 
