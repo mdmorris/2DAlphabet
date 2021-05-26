@@ -1,0 +1,9 @@
+Two types of configs
+1) Inputs
+- Nest current structure into values where key is region name
+- Can have as many or few as this as you'd like and just extend iternally
+- Ability to do multiple
+- House processes, systematics, binning, and per-region options
+2) Fitting+options
+- Only one per run
+- Have to 
