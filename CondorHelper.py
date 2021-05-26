@@ -2,7 +2,6 @@ import subprocess
 from optparse import OptionParser
 import time
 
-
 parser = OptionParser()
 
 parser.add_option('-r', '--runscript', metavar='FILE', type='string', action='store',

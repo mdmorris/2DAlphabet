@@ -36,8 +36,8 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,freezeFail=False,location=
 
     card_name = 'card_'+identifier+'.txt'
     # Check if we can import post-fit result made during MLfit step
-    if not os.path.isfile(postfitWorkspaceDir+'/fitDiagnostics.root'):
-        print 'ERROR: '+postfitWorkspaceDir+'/fitDiagnostics.root does not exist. Please check that run_MLfit.py finished correctly. Quitting...'
+    if not os.path.isfile(postfitWorkspaceDir+'/fitDiagnosticsTest.root'):
+        print 'ERROR: '+postfitWorkspaceDir+'/fitDiagnosticsTest.root does not exist. Please check that run_MLfit.py finished correctly. Quitting...'
         quit()
 
     for t in twoDs:
@@ -56,7 +56,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,freezeFail=False,location=
     print 'Getting workspace w'
     postfit_w = prefit_file.Get('w')
     print 'Opening fitDiagnostics'
-    fit_result_file = ROOT.TFile.Open(postfitWorkspaceDir+'/fitDiagnostics.root')
+    fit_result_file = ROOT.TFile.Open(postfitWorkspaceDir+'/fitDiagnosticsTest.root')
     print 'Getting b only fit result'
     fit_result = fit_result_file.Get("fit_b")
     print 'Making RooArgSet out of fit result parameters'
@@ -164,10 +164,10 @@ for c in inputConfigs:
     print '\t'+c
     
 # Check for workspace to load
-if os.path.isfile(postfitWorkspaceDir +'/fitDiagnostics.root'):
-    print 'Loading '+postfitWorkspaceDir +'/fitDiagnostics.root'
+if os.path.isfile(postfitWorkspaceDir +'/fitDiagnosticsTest.root'):
+    print 'Loading '+postfitWorkspaceDir +'/fitDiagnosticsTest.root'
 else:
-    print "ERROR: post-fit '"+postfitWorkspaceDir+"/fitDiagnostics.root' could not be found. Please specify the location of the post-fit workspace (postfitb_workspace.root) that you would like to load. Quitting..."
+    print "ERROR: post-fit '"+postfitWorkspaceDir+"/fitDiagnosticsTest.root' could not be found. Please specify the location of the post-fit workspace (postfitb_workspace.root) that you would like to load. Quitting..."
     quit()
 
 # Initialize

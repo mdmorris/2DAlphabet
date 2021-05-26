@@ -1,5 +1,5 @@
 # Use: python importPars.py <card to make workspace and manipulate> <file1 with fit result> <file2 with fit result> ...
-# Example: python importPars.py /path/to/SRfit/card.txt /path/to/CRfit/fitDiagnostics.root 
+# Example: python importPars.py /path/to/SRfit/card.txt /path/to/CRfit/fitDiagnosticsTest.root 
 
 import sys, subprocess, ROOT
 

@@ -109,7 +109,7 @@ if not options.skipFit:
 # Plot
 if not options.skipPlots:
     with header.cd(thistag):
-        covMtrx_File = TFile.Open('fitDiagnostics.root')
+        covMtrx_File = TFile.Open('fitDiagnosticsTest.root')
         fit_result = covMtrx_File.Get("fit_b")
         if hasattr(fit_result,'correlationMatrix'):
             corrMtrx = header.reducedCorrMatrixHist(fit_result)

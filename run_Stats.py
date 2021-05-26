@@ -197,8 +197,8 @@ with header.cd(projDir):
             # First morph the base workspace to post-fit according to MLfit result #
             ########################################################################
             # Check if we can import post-fit result made during MLfit step
-            # if not os.path.isfile('fitDiagnostics.root'):
-            #     print 'ERROR: '+projDir+'/fitDiagnostics.root does not exist. Please check that run_MLfit.py finished correctly. Quitting...'
+            # if not os.path.isfile('fitDiagnosticsTest.root'):
+            #     print 'ERROR: '+projDir+'/fitDiagnosticsTest.root does not exist. Please check that run_MLfit.py finished correctly. Quitting...'
             #     quit()
 
             gof_data_cmd = 'combine -M GoodnessOfFit '+workspace_name+' --algo=saturated '+blind_string+freeze_string+freeze_r_string+' -n gof_data'
