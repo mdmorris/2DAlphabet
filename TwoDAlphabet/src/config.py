@@ -1,6 +1,6 @@
 import itertools, ROOT, argparse
-from src.helpers import nested_dict, open_json, parse_arg_dict, set_hist_maximums
-from src.binning import Binning
+from TwoDAlphabet.src.helpers import nested_dict, open_json, parse_arg_dict, set_hist_maximums
+from TwoDAlphabet.src.binning import Binning
 
 class Config:
     '''Class to handle the reading and manipulation of data provided 
