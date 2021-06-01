@@ -59,11 +59,9 @@ def parse_arg_dict(parser,indict):
     Returns:
         Namespace: Object storing each argument as an attribute of the Namespace.
     '''
-    default_args_dict = vars(parser.parse_args([]))
-    default_args_dict.update(indict)
-    new_namespace = argparse.Namespace()
-    new_namespace.__dict__.update(default_args_dict)
-    return parser.parse_args(namespace=new_namespace)
+    new_namespace = parser.parse_args([])
+    new_namespace.__dict__.update(indict)
+    return new_namespace
 
 def execute_cmd(cmd,dryrun=False):
     '''Print and execute a command-line command via subprocess.call().
@@ -132,7 +130,7 @@ def dict_copy(inDict,structureOnly=False):
     newDict = {}
     for k1,v1 in inDict.items():
         if isinstance(v1,dict):
-            newDict[k1] = dict_copy(v1)
+            newDict[k1] = dict_copy(v1,structureOnly)
         else:
             if structureOnly: newDict[k1] = 0
             else: newDict[k1] = v1
@@ -172,8 +170,9 @@ def roofit_form_to_TF1(RFVform,shift=0): # shift tells function how much to shif
             lookingForDigit = True
         elif lookingForDigit:
             if char.isdigit():
-                if RFVform[index+1].isdigit() == False:     # if this is the last digit
-                    TF1form+=str(int(char)+shift)
+                TF1form+=str(int(char)+shift)
+                if index == len(RFVform)-1:
+                    TF1form+=']'
             else:
                 TF1form+=']'+char
                 lookingForDigit = False
