@@ -2,7 +2,7 @@ import itertools
 from TwoDAlphabet.src.binning import *
 from ROOT import TH2F
 import pytest
-from copy import copy, deepcopy
+from copy import deepcopy
 
 basedict = {
     "HELP": "The binning of the x and y axes should be configured here",
