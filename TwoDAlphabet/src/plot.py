@@ -1,3 +1,55 @@
+import itertools, ROOT
+from TwoDAlphabet.src.helpers import nested_dict, set_hist_maximums
+
+def MakeSystematicPlots(configObj):
+    '''Make plots of the systematic shape variations of each process based on those
+    processes and systematic shapes specified in the config. Shapes are presented 
+    as projections onto 1D axis where no selection has been made on the axis not
+    being plotted. Plots are saved to UncertPlots/.
+    '''
+    regions = ['pass','fail']
+    variations = ['nom','up','down']
+    axes = ['X','Y']
+    for proc in configObj.Section('PROCESS'):
+        for syst in configObj.processes[proc]['SYSTEMATICS']:
+            if configObj.systematics[syst]['CODE'] < 2: continue
+
+            tracking_dict = nested_dict(3,None)
+            for r,v,x in itertools.product(regions,variations,axes):
+                if v == 'nom': h = configObj.orgFile.Get(configObj.organizedDict[proc][r+'_FULL']['nominal'])
+                else:          h = configObj.orgFile.Get(configObj.organizedDict[proc][r+'_FULL'][syst+v.capitalize()])
+                if x == 'Y':   tracking_dict[r][x][v] = h.ProjectionY(proc +'_'+r+ '_'+syst+'_'+x+'_'+v)
+                elif x == 'X': tracking_dict[r][x][v] = h.ProjectionX(proc +'_'+r+ '_'+syst+'_'+x+'_'+v)
+
+            for r,x in itertools.product(regions,axes):
+                thisCan = ROOT.TCanvas('canvas_'+proc+'_'+syst,'canvas_'+proc+'_'+syst,800,700)
+
+                nom, up, down = (tracking_dict[r][x]['nom'],
+                                    tracking_dict[r][x]['up'],
+                                    tracking_dict[r][x]['down'])
+
+                nom.SetLineColor(ROOT.kBlack)
+                nom.SetFillColor(ROOT.kYellow-9)
+                up.SetLineColor(ROOT.kRed)
+                down.SetLineColor(ROOT.kBlue)
+
+                up.SetLineStyle(9)
+                down.SetLineStyle(9)
+                up.SetLineWidth(2)
+                down.SetLineWidth(2)
+
+                nom,up,down = set_hist_maximums([nom,up,down])
+                
+                if x == 'X': nom.SetXTitle(configObj.inputConfig['BINNING']['X']['TITLE'])
+                elif x == 'Y': nom.SetXTitle(configObj.inputConfig['BINNING']['Y']['TITLE'])
+
+                nom.SetTitle('')
+                nom.GetXaxis().SetTitleOffset(1.0)
+                nom.GetXaxis().SetTitleSize(0.05)
+                thisCan.SetRightMargin(0.16)
+
+                nom.Draw('hist'); up.Draw('same hist'); down.Draw('same hist')
+                thisCan.Print(configObj.projPath+'/UncertPlots/Uncertainty_'+proc+'_'+syst+r+x+'.png','png')
 
 def plotFitResults(self,fittag):#,simfit=False): # fittag means 'b' or 's'
     allVars = []
