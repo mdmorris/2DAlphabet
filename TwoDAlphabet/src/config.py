@@ -123,235 +123,8 @@ class Config:
         pickle.dump(self.organized_hists, open(self.projPath+'hist_map.p','wb'))
         self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
 
-    def _inputOrganizer(self):
-        #################################################################################
-        # First we need to get histograms from files and store them in a new dictionary #
-        #################################################################################
-        dict_hists = {}
-
-        # Stores [process,cat] pairs of regions with integral of zero so we can tell the card this
-        self.integralZero = []
-
-        # Grab all process names and loop through
-        processes = [process for process in self.inputConfig['PROCESS'].keys() if process != "HELP"]
-        if self.rpfRatio != False: processes.append('qcdmc')
-
-        for process in processes:
-            if process == 'qcdmc': this_process_dict = self.inputConfig['OPTIONS']['rpfRatio']
-            else: this_process_dict = self.inputConfig['PROCESS'][process]
-            
-            dict_hists[process] = {  
-                'file': 0,
-                'pass': {},
-                'fail': {}
-            }
-
-            # Grab nominal pass and fail distributions
-            file_nominal = TFile.Open(this_process_dict['FILE'])
-            hist_pass = file_nominal.Get(this_process_dict['HISTPASS'])
-            hist_fail = file_nominal.Get(this_process_dict['HISTFAIL'])
-
-            # DOCUMENT
-            # Flat scale
-            if "SCALE" in this_process_dict.keys():
-                this_proc_scale = this_process_dict["SCALE"]
-                hist_pass.Scale(this_proc_scale)
-                hist_fail.Scale(this_proc_scale)
-            # Scale by another hist or function
-            elif "SCALEPASS" in this_process_dict.keys() and "SCALEFAIL" in this_process_dict.keys():
-                this_scale_pass_file = TFile.Open(this_process_dict["SCALEPASS"])
-                this_scale_fail_file = TFile.Open(this_process_dict["SCALEFAIL"])
-                
-                this_proc_scale_pass = this_scale_pass_file.Get(this_process_dict["SCALEPASS_HISTNAME"])
-                this_proc_scale_fail = this_scale_fail_file.Get(this_process_dict["SCALEFAIL_HISTNAME"])
-
-                hist_pass.Multiply(this_proc_scale_pass)
-                hist_fail.Multiply(this_proc_scale_fail)
-
-            # Smooth
-            if 'SMOOTH' in this_process_dict.keys() and this_process_dict['SMOOTH']: smooth_this = True# and self.inputConfig['OPTIONS']['rpfRatio'] != False and self.inputConfig['OPTIONS']['rpfRatio']['SMOOTH']: smooth_this = True
-            else: smooth_this = False
-
-            if smooth_this:
-                if process != 'qcdmc':
-                    hist_pass.Smooth(1,"k5a") #= header.smoothHist2D('smooth_'+process+'_pass',hist_pass,renormalize=False,iterate = 1 if process != 'qcdmc' else 1)
-                    hist_fail.Smooth(1,"k5a") #= header.smoothHist2D('smooth_'+process+'_fail',hist_fail,renormalize=False,iterate = 1 if process != 'qcdmc' else 1)
-
-            dict_hists[process]['file'] = file_nominal
-            dict_hists[process]['pass']['nominal'] = hist_pass
-            dict_hists[process]['fail']['nominal'] = hist_fail
-
-            # If there are systematics
-            if 'SYSTEMATICS' not in this_process_dict.keys() or len(this_process_dict['SYSTEMATICS']) == 0:
-                print 'No systematics for process ' + process
-            else:
-                # Loop through them and grab info from inputConfig['SYSTEMATIC']
-                for syst in this_process_dict['SYSTEMATICS']:
-                    try:
-                        this_syst_dict = self.inputConfig['SYSTEMATIC'][syst]
-
-                    # Quit if syst does not exist and user does not want to skip
-                    except:
-                        skip = raw_input('No entry named "' + syst + '" exists in the SYSTEMATIC section of the input JSON. Skip it? (y/n)')
-                        if skip == 'y' or skip == 'Y':
-                            print 'Skipping ' + syst
-                        else: 
-                            print 'Quiting'
-                            quit()
-
-                    # Handle case where pass and fail are uncorrelated
-                    if 'UNCORRELATED' in this_syst_dict and this_syst_dict['UNCORRELATED']:
-                        pass_syst = syst+'_pass'
-                        fail_syst = syst+'_fail'
-                    else:
-                        pass_syst = syst
-                        fail_syst = syst
-
-                    # Only care about syst if it's a shape (CODE == 2 or 3)
-                    if this_syst_dict['CODE'] == 2:   # same file as norm, different hist names
-
-                        dict_hists[process]['pass'][pass_syst+'Up']   = file_nominal.Get(this_syst_dict['HISTPASS_UP'].replace('*',process))
-                        dict_hists[process]['pass'][pass_syst+'Down'] = file_nominal.Get(this_syst_dict['HISTPASS_DOWN'].replace('*',process))
-                        dict_hists[process]['fail'][fail_syst+'Up']   = file_nominal.Get(this_syst_dict['HISTFAIL_UP'].replace('*',process))
-                        dict_hists[process]['fail'][fail_syst+'Down'] = file_nominal.Get(this_syst_dict['HISTFAIL_DOWN'].replace('*',process))
-
-                    if this_syst_dict['CODE'] == 3:   # different file as norm and different files for each process if specified, same hist name if not specified in inputConfig
-                        # User will most likely have different file for each process but maybe not so check
-                        if 'FILE_UP' in this_syst_dict:
-                            file_up = TFile.Open(this_syst_dict['FILE_UP'])
-                        # Wild card to replace * with the process name
-                        elif 'FILE_UP_*' in this_syst_dict:
-                            file_up = TFile.Open(this_syst_dict['FILE_UP_*'].replace('*',process))
-                        else:
-                            file_up = TFile.Open(this_syst_dict['FILE_UP_'+process])
-
-                        if 'FILE_DOWN' in this_syst_dict:
-                            file_down = TFile.Open(this_syst_dict['FILE_DOWN'])
-                        elif 'FILE_DOWN_*' in this_syst_dict:
-                            file_down = TFile.Open(this_syst_dict['FILE_DOWN_*'].replace('*',process))
-                        else:
-                            file_down = TFile.Open(this_syst_dict['FILE_DOWN_'+process])
-
-                        dict_hists[process]['file_'+syst+'Up'] = file_up
-                        dict_hists[process]['file_'+syst+'Down'] = file_down
-
-                        if 'HISTPASS_UP' in this_syst_dict:
-                            dict_hists[process]['pass'][pass_syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP'])            # try to grab hist name from SYSTEMATIC dictionary
-                        elif 'HISTPASS' in this_syst_dict:
-                            dict_hists[process]['pass'][pass_syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS'])               # else use the same one as nominal distribution
-                        elif 'HISTPASS_UP_*' in this_syst_dict:
-                            dict_hists[process]['pass'][pass_syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP_*'].replace('*',process))
-                        else: 
-                            dict_hists[process]['pass'][pass_syst+'Up'] = file_up.Get(this_syst_dict['HISTPASS_UP_'+process])   # or use process specific name
-
-                        if 'HISTPASS_DOWN' in this_syst_dict:
-                            dict_hists[process]['pass'][pass_syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS_DOWN'])
-                        elif 'HISTPASS' in this_syst_dict:
-                            dict_hists[process]['pass'][pass_syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS'])
-                        elif 'HISTPASS_DOWN_*' in this_syst_dict:
-                            dict_hists[process]['pass'][pass_syst+'Down'] = file_up.Get(this_syst_dict['HISTPASS_DOWN_*'].replace('*',process))
-                        else:
-                            dict_hists[process]['pass'][pass_syst+'Down'] = file_down.Get(this_syst_dict['HISTPASS_DOWN_' + process])
-
-                        if 'HISTFAIL_UP' in this_syst_dict:
-                            dict_hists[process]['fail'][fail_syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP'])
-                        elif 'HISTFAIL' in this_syst_dict:
-                            dict_hists[process]['fail'][fail_syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL'])
-                        elif 'HISTFAIL_UP_*' in this_syst_dict:
-                            dict_hists[process]['fail'][fail_syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP_*'].replace('*',process))    
-                        else:
-                            dict_hists[process]['fail'][fail_syst+'Up'] = file_up.Get(this_syst_dict['HISTFAIL_UP_' + process])
-
-                        if 'HISTFAIL_DOWN' in this_syst_dict:
-                            dict_hists[process]['fail'][fail_syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL_DOWN'])
-                        elif 'HISTFAIL' in this_syst_dict:
-                            dict_hists[process]['fail'][fail_syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL'])
-                        elif 'HISTFAIL_DOWN_*' in this_syst_dict:
-                            dict_hists[process]['fail'][fail_syst+'Down'] = file_up.Get(this_syst_dict['HISTFAIL_DOWN_*'].replace('*',process))
-                        else:
-                            dict_hists[process]['fail'][fail_syst+'Down'] = file_down.Get(this_syst_dict['HISTFAIL_DOWN_' + process])
-
-                    if this_syst_dict['CODE'] > 1:
-                        if smooth_this:
-                            dict_hists[process]['pass'][pass_syst+'Up'].Smooth(1,"k5a") #= header.smoothHist2D('smooth_'+process+'_pass_'+syst+'Up',dict_hists[process]['pass'][pass_syst+'Up'],renormalize=False)
-                            dict_hists[process]['pass'][pass_syst+'Down'].Smooth(1,"k5a") #= header.smoothHist2D('smooth_'+process+'_pass_'+syst+'Down',dict_hists[process]['pass'][pass_syst+'Down'],renormalize=False)
-                            dict_hists[process]['fail'][fail_syst+'Up'].Smooth(1,"k5a")   #= header.smoothHist2D('smooth_'+process+'_fail_'+syst+'Up',dict_hists[process]['fail'][fail_syst+'Up'],renormalize=False)
-                            dict_hists[process]['fail'][fail_syst+'Down'].Smooth(1,"k5a") #= header.smoothHist2D('smooth_'+process+'_fail_'+syst+'Down',dict_hists[process]['fail'][fail_syst+'Down'],renormalize=False)
-
-                        if "SCALE" in this_process_dict.keys():
-                            dict_hists[process]['pass'][pass_syst+'Up'].Scale(this_proc_scale)
-                            dict_hists[process]['pass'][pass_syst+'Down'].Scale(this_proc_scale)
-                            dict_hists[process]['fail'][fail_syst+'Up'].Scale(this_proc_scale)
-                            dict_hists[process]['fail'][fail_syst+'Down'].Scale(this_proc_scale)
-                        elif "SCALEPASS" in this_process_dict.keys() and "SCALEFAIL" in this_process_dict.keys():
-                            dict_hists[process]['pass'][pass_syst+'Up'].Multiply(this_proc_scale_pass)
-                            dict_hists[process]['pass'][pass_syst+'Down'].Multiply(this_proc_scale_pass)
-                            dict_hists[process]['fail'][fail_syst+'Up'].Multiply(this_proc_scale_fail)
-                            dict_hists[process]['fail'][fail_syst+'Down'].Multiply(this_proc_scale_fail)
-
-        #####################################################################
-        # With dictionary made, we can split around the signal region and   #
-        # start renaming to match the format required by Combine. The       #
-        # dictionary key names are conveniently named so we can do this     #
-        # with minimal pain.                                                #
-        #####################################################################
-        temp_TH2 = dict_hists['data_obs']['pass']['nominal']
-        old_x_min = temp_TH2.GetXaxis().GetXmin()
-        old_x_max = temp_TH2.GetXaxis().GetXmax()
-        # old_x_nbins = temp_TH2.GetNbinsX()
-        # old_x_width = float(old_x_max-old_x_min)/float(old_x_nbins)
-        old_y_min = temp_TH2.GetYaxis().GetXmin()
-        old_y_max = temp_TH2.GetYaxis().GetXmax()
-        old_y_nbins = temp_TH2.GetNbinsY()
-        old_y_width = float(old_y_max-old_y_min)/float(old_y_nbins)
-
-        # Print out info
-        print "Applying new Y bins: ["+str(old_y_min)+","+str(old_y_max)+"] -> ["+str(self.newYbins[0])+","+str(self.newYbins[-1])+"]"
-        print 'Applying new X bins: '
-        for c in ['LOW','SIG','HIGH']: 
-            print '\t'+c + ': ['+str(old_x_min)+","+str(old_x_max)+"] -> ["+str(self.newXbins[c][0])+","+str(self.newXbins[c][-1])+"]"
-
-        self.orgFile.cd()
-
-        # For each process, category, and dist (nominal, systUp, etc)
-        for process in dict_hists.keys():
-            self.organizedDict[process] = {'pass_FULL':{}, 'pass_LOW':{}, 'pass_SIG':{}, 'pass_HIGH':{}, 'fail_FULL':{}, 'fail_LOW':{}, 'fail_SIG':{}, 'fail_HIGH':{}}
-            for cat in ['pass','fail']:
-                for dist in dict_hists[process][cat].keys():
-                    print 'Making ' + process +', ' + cat + ', ' + dist
-
-                    # Get new names
-                    temp_histname = process + '_' + cat
-                    if dist != 'nominal':                           # if not nominal dist
-                        temp_histname = temp_histname + '_' + dist
-
-                    # If there are user specified y bins...
-                    if self.newYbins != False:
-                        temp_hist = header.copyHistWithNewYbins(dict_hists[process][cat][dist],self.newYbins,temp_histname)#,self.oldYwidth)
-                    else:
-                        temp_hist = dict_hists[process][cat][dist]
-
-                    # If there are user specified x bins...
-                    for c in ['FULL','LOW','SIG','HIGH']: 
-                        # Get new names
-                        histname = process + '_' + cat+'_'+c+'_'+self.name
-                        if dist != 'nominal':                           # if not nominal dist
-                            histname = histname + '_' + dist
-                        print 'Making '+histname
-                        if c != 'FULL': finalhist = header.copyHistWithNewXbins(temp_hist,self.newXbins[c],histname)#,self.oldYwidth)
-                        else: finalhist = header.copyHistWithNewXbins(temp_hist,self.fullXbins,histname)
-
-                        # Test if histogram is non-zero
-                        if finalhist.Integral() <= 0:
-                            print 'WARNING: '+process+', '+cat+'_'+c+', '+dist+' has zero or negative events - ' + str(finalhist.Integral())
-                            self.integralZero.append([process,cat+'_'+c])
-                            # If it is, zero the bins except one to avoid Integral=0 errors in combine
-                            for b in range(1,finalhist.GetNbinsX()*finalhist.GetNbinsY()+1):
-                                finalhist.SetBinContent(b,1e-10)
-
-                        finalhist.Write()
-                        self.organizedDict[process][cat+'_'+c][dist] = finalhist.GetName()#header.copyHistWithNewXbins(temp_hist,self.newXbins[c],histname)
-
+    def ReadIn(self):
+        self.organized_hists = pickle.load(open(self.projPath+'hist_map.p','rb'))
 
     def _makeCard(self):
         # Recreate file
@@ -543,6 +316,156 @@ class Config:
            
         card_new.close() 
 
+class OrganizedHists():
+    def __init__(self,configObj):
+        self.name = configObj.name
+        self.filename = configObj.projPath + 'organized_hists.root'
+        self.hists = nested_dict(3,None) # proc, reg, syst
+        self.binning = configObj.binning
+        self.rebinned = False
+
+        if os.path.exists(self.filename) and not configObj.options.overwrite:
+            self.openOption = "OPEN"
+        else:
+            self.openOption = "RECREATE"
+        self.file = ROOT.TFile.Open(self.filename,self.openOption)
+
+    def Add(self,info):
+        if self.openOption == "OPEN":
+            raise RuntimeError('Cannot add a histogram to OrganizedHists if an existing TFile was opened. Set option "overwrite" to True if you wish to delete the existing file.')
+        self.hists[info.process][info.region][info.systematic] = info
+        self.file.WriteObject(info.Fetch(self.binning),info.histname)
+
+    def Get(self,histname='',process='',region='',systematic=''):
+        return self.file.Get(histname if histname != '' else '_'.join(process,region,systematic))
+
+    @property
+    def _allHists(self):
+        return [h.hist for p in self.hists for r in self.hists[p] for h in self.hists[p][r]]
+
+    def CreateSubRegions(self):
+        if self.rebinned: raise RuntimeError('Already rebinned this OrganizedHists object.')
+        self.rebinned = True
+
+        for p in self.hists:
+            for r in self.hists[p]:
+                for s,hinfo in self.hists[p][r].items():
+                    h = hinfo.hist
+
+                    for sub in ['LOW','SIG','HIGH']:
+                        this_sub_hinfo = hinfo.Clone(region=hinfo.region+'_'+sub)
+                        this_sub_hinfo.hist = copy_hist_with_new_bins(hinfo.histname+'_'+sub,'X',h,self.binning.xbinByCat[sub])
+                        self.Add(this_sub_hinfo)
+
+class HistInfo():
+    def __init__(self,proc,region,syst,color,scale):
+        self.process = proc
+        self.region = region
+        self.systematic = syst
+        self.new_name = '%s_%s_%s'%(proc,region,syst) if syst != 'nominal' else '%s_%s'%(proc,region)
+        self.color = color
+        self.scale = scale
+        self.hist = None
+
+    def Clone(self,process=None,region=None,systematic=None):
+        return HistInfo(process if process!=None else self.process,
+                        region if region!=None else self.region,
+                        systematic if systematic!=None else self.systematic,
+                        self.color,self.scale)
+
+    def Fetch(self):
+        return self.hist
+
+class InputHistInfo(HistInfo):
+    def __init__(self, hname, fname, proc, region, syst, color, scale):
+        super().__init__(proc, region, syst, color, scale)
+        self.histname = hname
+        self.filename = fname
+
+    def Fetch(self,binning=None):
+        f = ROOT.TFile.Open(self.filename,'OPEN')
+        h = f.Get(self.input_hname)
+        h.SetDirectory(0)
+        if isinstance(self.scale,float):
+            h.Scale(self.scale)
+        elif isinstance(self.scale,dict) and (self.region in self.scale):
+            if 'FILE' in self.scale:
+                scale_file = ROOT.TFile.Open(self.scale['FILE'])
+            else:
+                scale_file = f
+            scale_hist = scale_file.Get(self.scale[self.region])
+            h.Multiply(scale_hist)
+        f.Close()
+
+        if binning != None:
+            if get_bins_from_hist("Y", h) != binning.ybinList:
+                h = self.Get(self.histname)
+                h = copy_hist_with_new_bins(self.histname+'_rebinY','Y',h,binning.ybinList)
+            if get_bins_from_hist("X") != binning.xbinList:
+                h = copy_hist_with_new_bins(self.histname+'_FULL','X',h,binning.xbinList)
+            else:
+                h.SetName(self.histname+'_FULL')
+
+        if h.Integral() <= 0:
+            print ('WARNING: %s, %s, %s has zero or negative events - %s'%(self.process,self.region,self.syst,h.Integral()))
+            for b in range(1,h.GetNbinsX()*h.GetNbinsY()+1):
+                h.SetBinContent(b,1e-10)
+
+        return h
+
+def organize_inputs(configObj):
+    hists = OrganizedHists(configObj)
+
+    for process,proc_info in configObj.processes.items():
+        if not is_filled_list(proc_info,'SYSTEMATICS'):
+            print ('---- No systematics for process ' + process)
+            this_proc_shape_systs = []
+        else:
+            this_proc_shape_systs = [s for s in proc_info['SYSTEMATICS'] if ('VAL' not in configObj.systematics[s] and 'VALUP' not in configObj.systematics[s])]
+        
+        for filepath,region_pairs,_ in _parse_file_entries(proc_info):
+            # Do Nominal
+            for region_name,hist_name in region_pairs:
+                hists.Add(HistInfo(hist_name,filepath,process,region_name,'nominal',proc_info['COLOR'],proc_info['SCALE']))
+            # Loop over systematics
+            for syst in this_proc_shape_systs:
+                if syst not in configObj.systematics:
+                    raise IndexError('No entry named "%s" exists in the SYSTEMATIC section of the input config.'%syst)
+                syst_info = configObj.systematics[syst]
+                # Get file and hist names for this syst
+                for syst_filepath,syst_region_pairs,_ in _parse_file_entries(syst_info):
+                    if syst_filepath == None: syst_filepath = filepath
+                    syst_filepath = syst_filepath.replace('*',process)
+                    for syst_region_name,syst_hist_name in syst_region_pairs:
+                        syst_hist_name = syst_hist_name.replace('*',process)
+                        region_name    = syst_region_name.split('_')[:-1]
+                        variation      = syst_region_name.split('_')[-1]
+                        syst_name      = syst if region_name not in syst_info['UNCORRELATED'] else syst+'_'+region_name
+
+                        if variation == 'UP':      syst_name+='Up'
+                        elif variation == 'DOWN':  syst_name+='Down'
+                        else:                      raise NameError('Variation for %s, %s is %s but can only be "UP" or "DOWN".'%(process,syst_region_name,variation))
+
+                        hists.Add(InputHistInfo(syst_hist_name,syst_filepath,process,region_name,syst_name+variation,proc_info['COLOR'],proc_info['SCALE']))
+
+    return hists
+
+def _parse_file_entries(d):
+    file_keys = [f for f in d if (f not in _protected_keys and f.endswith('.root'))]
+    if len(file_keys) > 0:
+        for f in file_keys:
+            if not os.path.exists(f):
+                raise FileExistsError("Cannot access file %s"%f)
+
+            regions = [k for f in file_keys for k in d[f]]
+            if len(regions) != len(set(regions)):
+                raise ValueError("There are duplicated regions in this process. Printing config process entry for debug.\n\n%s\n"%{f:r for f,r in proc_info.items() if f in file_keys})
+            
+            yield f,[(rname,d[f][rname]) for rname in d[f]],len(regions)
+    else:
+        region_keys = [rkey for rkey in d if (rkey not in _protected_keys)]
+        region_pairs = [(rname,d[rname]) for rname in region_keys]
+        yield None,region_pairs,len(region_pairs)
 
 def config_loop_replace(config,old,new):
     '''Self-calling function loop to find-replace one pair (old,new)
