@@ -63,7 +63,7 @@ def parse_arg_dict(parser,indict):
     new_namespace.__dict__.update(indict)
     return new_namespace
 
-def execute_cmd(cmd,dryrun=False):
+def execute_cmd(cmd,dryrun=False): # pragma: no cover
     '''Print and execute a command-line command via subprocess.call().
     If dryrun==True, only print.
 
@@ -75,7 +75,7 @@ def execute_cmd(cmd,dryrun=False):
         subprocess.call([cmd],shell=True)
 
 @contextmanager
-def cd(newdir):
+def cd(newdir): # pragma: no cover
     '''Change active directory so that the local directory becomes newdir.
     This affects everything from subprocess calls to ROOT Print() and SaveAs()
     commands. Usage:
@@ -201,3 +201,9 @@ def set_hist_maximums(histList,factor=1.1):
         h.SetMaximum(yMax*factor)
         out.append(h)
     return out
+
+def get_config_dirs(projPath):
+    return [f.path for f in os.scandir(projPath) if f.is_dir()]
+
+def is_filled_list(d,key):
+    return (key in d and len(d['key']) > 0)
