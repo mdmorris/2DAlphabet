@@ -1,0 +1,9 @@
+*.pyc
+.pytest_cache/
+.vscode
+sphinx_docs/
+coverage_html_report/
+cov.xml
+.coverage*
+*.egg-info
+tests_unfinished
