@@ -1,0 +1,20 @@
+{
+    "restructuredtext.confPath": "${workspaceFolder}/sphinx_docs/source",
+    "python.pythonPath": "twoD-env/bin/python",
+    "python.testing.pytestPath": "/home/lucas/CMS/Development/2DAlphabet/twoD-env/bin/pytest",
+    "files.associations": {
+        "Data2017TopZWorkSpaceRooParametricHist.C": "cpp"
+    },
+    "python.testing.pytestArgs": [
+        "test",
+        "--cov-report=xml:cov.xml",
+        "--cov=TwoDAlphabet/",
+        "--cov-append",
+        "--cov-report=html",
+        "--cov-config=.coveragerc"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.testing.promptToConfigure": false
+}

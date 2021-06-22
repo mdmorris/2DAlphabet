@@ -12,6 +12,7 @@ setuptools.setup(name='TwoDAlphabet',
       include_package_data=True,
       # cmdclass={'install': AddToPath},
       install_requires = [
-            'pytest'
+            'pytest',
+            'pytest-cov'
       ]
      )
