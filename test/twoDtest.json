@@ -3,9 +3,8 @@
         "HELP": "The 'global' item can be used to set global variables inside of this json configuration file. This is the only place where you can customize the keys of dictionaries. For example, you could store 'dir': 'path/to/my/files/' and then later use 'dir' instead of writing the same file path multiple times",
         "path": "unit_tests/distributions/lin100kv10k.root"
     },
-
+    "NAME": "lin100kv10k",
     "OPTIONS": {
-        "name":"lin100kv10k",
         "tag":"unitTest",
         "blindedFit":false,
         "blindedPlots":false
