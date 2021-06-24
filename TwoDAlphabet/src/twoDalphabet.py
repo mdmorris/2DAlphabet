@@ -1,6 +1,6 @@
 import argparse, os, json
 from TwoDAlphabet.src.config import Config
-from TwoDAlphabet.src.helpers import execute_cmd, parse_arg_dict
+from TwoDAlphabet.src.helpers import execute_cmd, get_config_dirs, parse_arg_dict
 import ROOT
 
 class TwoDAlphabet:
@@ -9,9 +9,22 @@ class TwoDAlphabet:
     # mkdirs + rebin + organize_hists
     # track naming and fit info internally ("region information")
     def __init__(self,tag,jsons=[],findreplace={},externalOpts={}):
+        '''Construct TwoDAlphabet object which takes as input an identification tag used to name
+        the directory with stored results, JSON configuration files, find-replace pairs,
+        and optional external arguments.
+
+        Args:
+            tag (str): Tag used to identify the outputs and create a project directory of the same name.
+            jsons (list(str), optional): List of JSON configuration file paths. Defaults to [].
+            findreplace (dict, optional):  Non-nested dictionary with key-value pairs to find-replace
+                in the internal class configuration dict. Defaults to {}.
+            externalOpts (dict, optional): Option-value pairs. Defaults to {}.
+        '''
         self.tag = tag
         self.configs = {}
-        self.options = self.GetOptions(self.config['OPTIONS'],externalOpts)
+        self.options = self.GetOptions(externalOpts)
+        if jsons == []:
+            jsons = [d+'/runConfig.json' for d in get_config_dirs(self.tag+'/')]
         for j in jsons:
             self.AddConfig(j,findreplace)
 
@@ -29,15 +42,25 @@ class TwoDAlphabet:
             ArgumentParser.Namespace
         '''
         parser = argparse.ArgumentParser()
-        parser.add_argument('verbosity', default=0, type=int,
+        parser.add_argument('verbosity', default=0, type=int, nargs='?',
             help="Save settings to file in json format. Ignored in json file")
-        parser.add_argument('overwrite', default=False, type=bool,
+        parser.add_argument('overwrite', default=False, type=bool, nargs='?',
             help="Delete project directory if it exists. Defaults to False.")
-        parser.add_argument('debugDraw', default=False, type=bool,
+        parser.add_argument('debugDraw', default=False, type=bool, nargs='?',
             help="Draw all canvases while running for the sake of debugging. Useful for developers only. Defaults to False.")
-        return ParseArgDict(parser,externalOpts)
+        return parse_arg_dict(parser,externalOpts)
 
     def AddConfig(self,jsonFileName,findreplace):
+        '''Add a json configuration to process and track.
+
+        Args:
+            jsonFileName (str): JSON configuration file name/path.
+            findreplace (dict): Non-nested dictionary with key-value pairs to find-replace
+                in the internal class configuration dict.
+
+        Raises:
+            KeyError: If configuration with same name has already been added.
+        '''
         inputConfig = Config(jsonFileName,findreplace,externalOptions=vars(self.options))
         if inputConfig.name in self.configs.keys():
             raise KeyError("Key %s already exists."%(inputConfig.name))
@@ -46,92 +69,31 @@ class TwoDAlphabet:
             self.configs[inputConfig.name] = inputConfig
 
     def SetupProjDir(self):
+        '''Create the directory structure where results will be stored.
+        '''
         if not os.path.isdir(self.tag+'/'):
             if self.options.overwrite: 
-                ExecuteCmd('rm -rf '+self.tag)
+                execute_cmd('rm -rf '+self.tag)
             print ('Making dir '+self.tag+'/')
             os.mkdir(self.tag+'/')
 
         for c in self.configs.values():
-            name = c.name
             dirs_to_make = [
-                self.tag+'/'+name,
-                self.tag+'/'+name+'/plots/',
-                self.tag+'/'+name+'/plots/fit_b/',
-                self.tag+'/'+name+'/plots/fit_s/',
+                self.tag+'/'+c.name,
+                self.tag+'/'+c.name+'/plots/',
+                self.tag+'/'+c.name+'/plots/fit_b/',
+                self.tag+'/'+c.name+'/plots/fit_s/',
             ]
-            if c.options.plotUncerts and not os.path.isdir(self.tag+'/'+name+'/UncertPlots/'): 
-                dirs_to_make.append(self.tag+'/'+name+'/UncertPlots/')
+            if c.options.plotUncerts and not os.path.isdir(self.tag+'/'+c.name+'/UncertPlots/'): 
+                dirs_to_make.append(self.tag+'/'+c.name+'/UncertPlots/')
 
             for d in dirs_to_make:
                 if not os.path.isdir(d):
                     os.mkdir(d)
 
     def SaveOut(self):
-        # runConfig
-        file_out = open(self.projPath+'runConfig.json', 'w')
-        json.dump(self.inputConfig,file_out,indent=2, sort_keys=True)
-        file_out.close()
-
-        self.pickleDict['name'] = self.name
-        self.pickleDict['tag'] = self.tag
-        self.pickleDict['xVarName'] = self.xVarName
-        self.pickleDict['yVarName'] = self.yVarName
-        self.pickleDict['xVarTitle'] = self.xVarTitle
-        self.pickleDict['yVarTitle'] = self.yVarTitle
-        self.pickleDict['sigStart'] = self.sigStart
-        self.pickleDict['sigEnd'] = self.sigEnd
-        self.pickleDict['freezeFail'] = self.freezeFail
-        self.pickleDict['blindedFit'] = self.blindedFit
-        self.pickleDict['blindedPlots'] = self.blindedPlots
-
-        # # Setup a directory to save
-        # self.projPath = self._projPath()
-
-        # bins
-        self.pickleDict['newXbins'] = self.newXbins
-        self.pickleDict['full_x_bins'] = self.fullXbins
-        self.pickleDict['newYbins'] = self.newYbins
-
-        # rpf - Don't do this - takes up +5 GB
-        self.pickleDict['rpf'] = self.rpf.getReducedCopy()
-
-        # organizedDict
-        self.pickleDict['organizedDict'] = self.organizedDict
-
-        # floatingBins
-        self.pickleDict['floatingBins'] = self.floatingBins
-
-        # workspace
-        self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
-
-    def ReadIn(self):
-        if extOption != '':
-            thispickle = pickle.load(open(extOption+'/'+self.name+'/saveOut.p','rb'))
-            self.allVars.append(thispickle)
-        else:
-            thispickle = self.pickleFile
-
-        if attrname == 'runConfig':
-            return header.openJSON(self.projPath+'runConfig.json')
-
-        elif attrname == 'newXbins': 
-            return thispickle['newXbins']
-
-        elif attrname == 'newYbins':
-            return thispickle['newYbins']
-
-        elif attrname == 'rpf': 
-            return thispickle['rpf']
-
-        elif attrname == 'organizedDict':
-            return thispickle['organizedDict']
-
-        elif attrname == 'floatingBins':
-            return thispickle['floatingBins']
-
-        elif attrname == 'workspace':
-            return TFile.Open(self.projPath+'base_'+self.name+'.root').Get('w_'+self.name)
+        for c in self.configs.values():
+            c.SaveOut()
 
     def _buildFitWorkspace(self):
         self.floatingBins = [] # This holds the names of all of the variables that we want to float.
@@ -166,7 +128,7 @@ class TwoDAlphabet:
                         Roo_dict[process][cat+'_'+c][dist] = {}
                         var_list = var_lists[c]
                         Roo_dict[process][cat+'_'+c][dist] = {}
-                        print 'Making RDH '+self.organizedDict[process][cat+'_'+c][dist]
+                        print ('Making RDH '+self.organizedDict[process][cat+'_'+c][dist])
                         Roo_dict[process][cat+'_'+c][dist]['RDH'] = header.makeRDH(self.orgFile.Get(self.organizedDict[process][cat+'_'+c][dist]),var_list)
 
 
@@ -301,11 +263,11 @@ class TwoDAlphabet:
                             else:
                                 if bin_content < 1: # Give larger floating to range to bins with fewer events
                                     binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,0.1), 1e-9, 10)
-                                    print fail_bin_name + ' < 1'
+                                    print (fail_bin_name + ' < 1')
 
                                 elif bin_content < 10: # Give larger floating to range to bins with fewer events
                                     binRRV = RooRealVar(fail_bin_name, fail_bin_name, max(bin_content,1), 1e-9, 50)
-                                    print fail_bin_name + ' < 10'
+                                    print (fail_bin_name + ' < 10')
                                 else:
                                     binRRV = RooRealVar(fail_bin_name, fail_bin_name, bin_content, max(1e-9,bin_range_down), bin_range_up)
 
@@ -338,7 +300,7 @@ class TwoDAlphabet:
                             self.allVars.append(this_rpf)
 
 
-            print "Making RPH2Ds"
+            print ("Making RPH2Ds")
             Roo_dict['qcd']['fail_'+c] = {}
             Roo_dict['qcd']['pass_'+c] = {}
 
@@ -416,7 +378,7 @@ class TwoDAlphabet:
                                                                             'qcd_pass_'+c+'_'+self.name+'_KDEbandwidth'+v.capitalize()+'_norm',
                                                                             bin_list_pass)
 
-        print "Making workspace..."
+        print ("Making workspace...")
         # Make workspace to save in
         self.workspace = RooWorkspace("w_"+self.name)
         for process in Roo_dict.keys():
@@ -424,7 +386,7 @@ class TwoDAlphabet:
                 if process == 'qcd':
                     rooObj = Roo_dict[process][cat]
                     for itemkey in rooObj.keys():
-                        print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat + ', ' + itemkey
+                        print ("Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat + ', ' + itemkey)
                         getattr(self.workspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes(),RooFit.Silence())
                 elif process == 'qcdmc':
                     continue
@@ -432,7 +394,7 @@ class TwoDAlphabet:
                     for dist in Roo_dict[process][cat].keys():
                         rooObj = Roo_dict[process][cat][dist]
                         for itemkey in rooObj.keys():
-                            print "Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat  +', ' +dist+ ', ' + itemkey
+                            print ("Importing " + rooObj[itemkey].GetName() + ' from ' + process + ', ' + cat  +', ' +dist+ ', ' + itemkey)
                             getattr(self.workspace,'import')(rooObj[itemkey],RooFit.RecycleConflictNodes(),RooFit.Silence())
 
     def _makeCard(self):
@@ -449,7 +411,7 @@ class TwoDAlphabet:
         # ...
         pass
 
-def ProjInfoLookup(projDir,card_tag):
+def proj_info_lookup(projDir,card_tag):
     # Check if there was more than one 2DAlphabet object run over
     more_than_one = False
     run_card = open(projDir+'/card_'+card_tag+'.txt','r')
