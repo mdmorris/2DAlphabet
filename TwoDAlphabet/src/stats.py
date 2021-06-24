@@ -18,7 +18,7 @@ def Condor(runscript):
     # commands.append("condor_q lcorcodi")
 
     for s in commands:
-        print s
+        print (s)
         subprocess.call([s],shell=True)
 
 def StatsForCondor(run_name,toyDict,tarFilesList,commands,files_to_grab=[]):
