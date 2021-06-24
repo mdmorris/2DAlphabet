@@ -13,6 +13,8 @@ setuptools.setup(name='TwoDAlphabet',
       # cmdclass={'install': AddToPath},
       install_requires = [
             'pytest',
-            'pytest-cov'
+            'pytest-cov',
+            'recommonmark',
+            # 'sphinx-book-theme' # uncomment if python3 and generating docs
       ]
      )
