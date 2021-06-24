@@ -43,5 +43,5 @@ commands.append("condor_submit "+out_jdl)
 # commands.append("condor_q lcorcodi")
 
 for s in commands:
-    print s
+    print (s)
     subprocess.call([s],shell=True)

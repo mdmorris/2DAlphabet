@@ -12,7 +12,7 @@ def SystematicParser(cardname):
 
     return systs
 
-from optparse import OptionParser
+from optparse import OptionError, OptionParser
 
 parser = OptionParser()
 parser.add_option("-d", "--projDir", metavar='<dir>', dest="projDir",
@@ -37,9 +37,7 @@ else: card_tag = projDir.split('/')[-2]
 if taskName == '':
     raise NameError('ERROR in project directory name (where your workspace and data card lives). Did you accidentally provide a leading slash? (ie /projDir/) Quitting...')
 if options.condor:
-    print 'Condor task name = '+taskName
-    print 'Condor submission not currently working'
-    quit()
+    raise OptionError('Condor task name = %s. Condor submission not currently working'%taskName)
 
 if not os.path.isdir(projDir): 
     raise TypeError(projDir +' is not a directory. Quitting...')
