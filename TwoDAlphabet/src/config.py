@@ -1,25 +1,31 @@
-import itertools, ROOT, argparse
-from TwoDAlphabet.src.helpers import nested_dict, open_json, parse_arg_dict, set_hist_maximums
-from TwoDAlphabet.src.binning import Binning
+import ROOT, argparse, json, pickle, os
+from TwoDAlphabet.src.helpers import is_filled_list, nested_dict, open_json, parse_arg_dict
+from TwoDAlphabet.src.binning import Binning, copy_hist_with_new_bins, get_bins_from_hist
 
+_protected_keys = ["PROCESS","SYSTEMATICS","SYSTEMATIC","BINNING","OPTIONS","GLOBAL","SCALE","COLOR","TYPE","X","Y","NAME","TITLE","BINS","NBINS","LOW","HIGH"]
 class Config:
     '''Class to handle the reading and manipulation of data provided 
     in 2DAlphabet JSON configuration files.
     '''
-    def __init__(self,json,findreplace={},externalOptions={}):
+    def __init__(self,json,projPath,findreplace={},externalOptions={},loadPrevious=False):
         '''Initialize a Config object for a given JSON file and perform
         all initial checks and manipulations.
 
-        @param json (str): File name and path.
-        @param findreplace (dict, optional): Find-replace pairs. Defaults to {}.
-        @param externalOptions (dict, optional): Extra key-value pairs to add to the OPTIONS
-            section of the JSON file. Defaults to {}.
+        Args:
+            json (str): File name and path.
+            projPath (str): Project path.
+            findreplace (dict, optional): Find-replace pairs. Defaults to {}.
+            externalOptions (dict, optional): Extra key-value pairs to add to the OPTIONS
+                section of the JSON file. Defaults to {}.
+            loadPrevious (bool, optional): Load the previous histograms made instead of remaking. Defaults to False.
         '''
         self.config = open_json(json)
         self._addFindReplace(findreplace)
         self._varReplacement()
         self.name = self.config['NAME']
+        self.projPath = projPath+'/'+self.name+'/'
         self.options = self.GetOptions(externalOptions)
+        self.loadPrevious = loadPrevious
 
     def Construct(self):
         '''Uses the config as instructions to setup binning, manipulate histograms,
@@ -29,23 +35,36 @@ class Config:
         self.binning = Binning(self.config['BINNING'])
         self.processes = self.Section('PROCESSES')
         self.systematics = self.Section('SYSTEMATICS')
-        self.hists = self.organize_hists() # takes config info, makes a TFile with new hists, returns map to the file contents
+        if self.loadPrevious: self.organized_hists = self.ReadIn()
+        else:
+            self.organized_hists = organize_inputs(self)
+            self.organized_hists.CreateSubRegions()
 
     def Section(self,key):
+        '''Derive the dictionary for a given section of the configuration file
+        with HELP keys removed.
+
+        Args:
+            key (str): Section name (all capital letters) of the configuration file.
+
+        Returns:
+            dict: Section of config.
+        '''
         return {k:v for k,v in self.config[key].items() if k != 'HELP'}
 
     def _addFindReplace(self,findreplace):
         '''Add external find-replace pairs to the "GLOBAL" entry of config.
 
-        @param findreplace (dict): Find-replace pairs in non-nested dictionary.
+        Args:
+            findreplace (dict): Find-replace pairs in non-nested dictionary.
 
         Raises:
             ValueError: If a "find" already exists in self.config['GLOBAL'].
         '''
-        for s in self.findreplace.keys():
+        for s in findreplace.keys():
             if s in self.config['GLOBAL'].keys():
                 raise ValueError('A command line string replacement (%s) conflicts with one already in the configuration file. Quitting...' %(s))
-            self.config['GLOBAL'][s] = self.findreplace[s]
+            self.config['GLOBAL'][s] = findreplace[s]
 
     def _varReplacement(self):
         '''Do string substitution for config entries based on the dictionary of find
@@ -81,56 +100,55 @@ class Config:
         self.config['OPTIONS'].update(externalOpts)
         parser = argparse.ArgumentParser()
 
-        parser.add_argument('blindedPlots', default=True, type=bool,
+        parser.add_argument('blindedPlots', default=True, type=bool, nargs='?',
             help='Blind plots to SIG region. Does not blind fit. Defaults to True.')
-        parser.add_argument('blindedFit', default=True, type=bool,
+        parser.add_argument('blindedFit', default=True, type=bool, nargs='?',
             help='Blind fit to SIG region. Does not blind plots. Defaults to True.')
-        parser.add_argument('haddSignals', default=True, type=bool,
+        parser.add_argument('haddSignals', default=True, type=bool, nargs='?',
             help='Combine signals into one histogram for the sake of plotting. Still treated as separate in fit. Defaults to True.')
 
-        parser.add_argument('plotTitles', default=False, type=bool,
+        parser.add_argument('plotTitles', default=False, type=bool, nargs='?',
             help='Include titles in plots. Defaults to False.')
-        parser.add_argument('freezeFail', default=False, type=bool,
+        parser.add_argument('freezeFail', default=False, type=bool, nargs='?',
             help='Freeze the QCD failing bins to their pre-fit values. Defaults to False.')
-        # parser.add_argument('fitGuesses', default=False, type=bool,
-        #     help='Save settings to file in json format. Ignored in json file. Defaults to False.')
-        parser.add_argument('plotUncerts', default=False, type=bool,
+        parser.add_argument('plotUncerts', default=False, type=bool, nargs='?',
             help='Plot comparison of pre-fit uncertainty shape templates in 1D projections. Defaults to False.')
-        # parser.add_argument('prerun', default=False, type=bool,
-        #     help='Run a fit of just this config by itself to establish. Defaults to False.')
-        # parser.add_argument('rpfRatio', default={}, type=dict,
-        #     help='. Defaults to empty dict.')
-        parser.add_argument('plotPrefitSigInFitB', default=False, type=bool,
+        parser.add_argument('plotPrefitSigInFitB', default=False, type=bool, nargs='?',
             help='In the b-only post-fit plots, plot the signal normalized to its pre-fit value. Defaults to False.')
-        # parser.add_argument('parametricFail', default=False, type=bool,
-        #     help='. Defaults to False.')
-        parser.add_argument('plotEvtsPerUnit', default=False, type=bool,
+        parser.add_argument('plotEvtsPerUnit', default=False, type=bool, nargs='?',
             help='Post-fit bins are plotted as events per unit rather than events per bin. Defaults to False.')
         
-        parser.add_argument('ySlices', default=[], type=list,
+        parser.add_argument('ySlices', default=[], type=list, nargs='?',
             help='Manually define the slices in the y-axis for the sake of plotting. Only needed if the automated algorithm is not working as intended. Defaults to empty list.')
-        parser.add_argument('year', default=1, type=int,
+        parser.add_argument('year', default=1, type=int, nargs='?',
             help='Year information used for the sake of plotting text. Defaults to 1 which indicates that the full Run 2 is being analyzed.')
-        parser.add_argument('recycle', default=[], type=list,
+        parser.add_argument('recycle', default=[], type=list, nargs='?',
             help='List of items to recycle. Not currently working.')
         
         return parse_arg_dict(parser,self.config['OPTIONS'])
 
-    def SaveOut(self):
+    def SaveOut(self): # pragma: no cover
+        '''Save three objects to the <self.projPath> directory:
+        - a copy of the manipulated config (runConfig.json)
+        - the pickled histogram map (hist_map.p)
+        - the RooWorkspace (base_<self.name>.root)
+        '''
         file_out = open(self.projPath+'runConfig.json', 'w')
         json.dump(self.inputConfig,file_out,indent=2,sort_keys=True)
         file_out.close()
         pickle.dump(self.organized_hists, open(self.projPath+'hist_map.p','wb'))
         self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
 
-    def ReadIn(self):
+    def ReadIn(self): # pragma: no cover
+        '''Read the histogram map from the pickled file.
+        '''
         self.organized_hists = pickle.load(open(self.projPath+'hist_map.p','rb'))
 
-    def _makeCard(self):
+    def MakeCard(self):
         # Recreate file
-        card_new = open(self.projPath + 'card_'+self.name+'.txt','w')
+        card_new = open(self.projPath+'card_'+self.name+'.txt','w')
 
-        column_width = 11+len(self.name)
+        # column_width = 11+len(self.name)
 
         #######################################################
         # imax (bins), jmax (backgrounds), kmax (systematics) #
@@ -203,8 +221,7 @@ class Config:
             elif self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 2 or self.inputConfig['SYSTEMATIC'][syst]['CODE'] == 3:      # shape
                 syst_type = 'shape'
             else:
-                print 'Systematic ' + syst + ' does not have one of the four allowed codes (0,1,2,3). Quitting.'
-                quit()
+                raise NameError('Systematic ' + syst + ' does not have one of the four allowed codes (0,1,2,3). Quitting.')
             
             # Build line
             if 'UNCORRELATED' in self.inputConfig['SYSTEMATIC'][syst].keys() and self.inputConfig['SYSTEMATIC'][syst]['UNCORRELATED']:
@@ -317,7 +334,25 @@ class Config:
         card_new.close() 
 
 class OrganizedHists():
+    '''Class to store histograms in a consistent data structure and with accompanying
+    methods to store, manipulate, and access the histograms.
+
+    Attributes:
+        name (str): Name, taken from input configObj.
+        filename (str): Path to `organized_hists.root`.
+        hists (dict): Three-level nested dictionary organized as [process][region][systematic variation].
+        binning (Binning): Binning object, taken from configObj.
+        rebinned (bool): Flag to denote if a rebinning has already occured.
+        openOption (str): ROOT TFile::Open option set based on whether the file exists and if the configObj requests an overwrite.
+        file (ROOT.TFile): TFile to store histograms on disk.
+    '''
     def __init__(self,configObj):
+        '''Constructor based on a Config object.
+
+        Args:
+            configObj (Config): Config object.
+        '''
+        ##
         self.name = configObj.name
         self.filename = configObj.projPath + 'organized_hists.root'
         self.hists = nested_dict(3,None) # proc, reg, syst
@@ -331,25 +366,58 @@ class OrganizedHists():
         self.file = ROOT.TFile.Open(self.filename,self.openOption)
 
     def Add(self,info):
+        '''Add histogram and save information on it. Input is a HistInfo object
+        used as a package of relevant info.
+
+        Args:
+            info (HistInfo): HistInfo object to add.
+
+        Raises:
+            RuntimeError: If openOption == "OPEN" in which case no new histograms can be added since this object is in read-only mode.
+        '''
         if self.openOption == "OPEN":
             raise RuntimeError('Cannot add a histogram to OrganizedHists if an existing TFile was opened. Set option "overwrite" to True if you wish to delete the existing file.')
         self.hists[info.process][info.region][info.systematic] = info
         self.file.WriteObject(info.Fetch(self.binning),info.histname)
 
     def Get(self,histname='',process='',region='',systematic=''):
+        '''Get histogram from the opened TFile. Specify the histogram
+        you want via `histname` or by the combination of `process`, `region`,
+        and `systematic` options. The `histname` option will take priority.
+
+        Args:
+            histname (str, optional): Name of histogram to get. Overrides other three options if specified. Defaults to ''.
+            process (str, optional): Name of process to search for. Must be used in conjunction with `region` and `systematic` options. Overridden by `histname`. Defaults to ''.
+            region (str, optional): Name of region to search for. Must be used in conjunction with `process` and `systematic` options. Overridden by `histname`. Defaults to ''.
+            systematic (str, optional): Name of systematic to search for. Must be used in conjunction with `process` and `region` options. Overridden by `histname`. Defaults to ''.
+
+        Returns:
+            TH2F: Histogram from file.
+        '''
         return self.file.Get(histname if histname != '' else '_'.join(process,region,systematic))
 
     @property
     def _allHists(self):
+        '''List of all stored/tracked histograms.
+
+        Returns:
+            list(): [description]
+        '''
         return [h.hist for p in self.hists for r in self.hists[p] for h in self.hists[p][r]]
 
     def CreateSubRegions(self):
+        '''Sub-divide all histograms along the X axis into the regions specified in the config
+        and add the new histograms to the object for tracking. Sets the attribute `rebinned` to True.
+
+        Raises:
+            RuntimeError: If `rebinned` is already True.
+        '''
         if self.rebinned: raise RuntimeError('Already rebinned this OrganizedHists object.')
         self.rebinned = True
 
         for p in self.hists:
             for r in self.hists[p]:
-                for s,hinfo in self.hists[p][r].items():
+                for hinfo in self.hists[p][r].values():
                     h = hinfo.hist
 
                     for sub in ['LOW','SIG','HIGH']:
@@ -421,9 +489,9 @@ def organize_inputs(configObj):
             print ('---- No systematics for process ' + process)
             this_proc_shape_systs = []
         else:
-            this_proc_shape_systs = [s for s in proc_info['SYSTEMATICS'] if ('VAL' not in configObj.systematics[s] and 'VALUP' not in configObj.systematics[s])]
+            this_proc_shape_systs = [s for s in proc_info['SYSTEMATICS'] if len(set(configObj.systematics[s]) & {'VAL','VALUP','VALDOWN'}) == 0]
         
-        for filepath,region_pairs,_ in _parse_file_entries(proc_info):
+        for filepath,region_pairs in _parse_file_entries(proc_info):
             # Do Nominal
             for region_name,hist_name in region_pairs:
                 hists.Add(HistInfo(hist_name,filepath,process,region_name,'nominal',proc_info['COLOR'],proc_info['SCALE']))
@@ -433,7 +501,7 @@ def organize_inputs(configObj):
                     raise IndexError('No entry named "%s" exists in the SYSTEMATIC section of the input config.'%syst)
                 syst_info = configObj.systematics[syst]
                 # Get file and hist names for this syst
-                for syst_filepath,syst_region_pairs,_ in _parse_file_entries(syst_info):
+                for syst_filepath,syst_region_pairs in _parse_file_entries(syst_info):
                     if syst_filepath == None: syst_filepath = filepath
                     syst_filepath = syst_filepath.replace('*',process)
                     for syst_region_name,syst_hist_name in syst_region_pairs:
@@ -451,21 +519,59 @@ def organize_inputs(configObj):
     return hists
 
 def _parse_file_entries(d):
+    '''Logic to parse sub-dictionaries of the JSON config containing the file and region information. 
+    A given entry in the dictionary can have two forms:
+    
+    - The file name/path is the key and the corresponding value is a new dictionary
+    with region names as keys and the sub-values are histogram names inside
+    the file specified at the first level [1].
+    
+    - There is no file name/path which can only happen in the case of looking
+    up systematic uncertainty shape variations (in SYSTEMATIC section of config).
+    This form assumes one is already nested inside the file level described above.
+    Region name as the key and histogram name as the value still applies [2].
+
+    [1] -
+    {"path/to/myfile1.root":
+        {
+            "regA":"histA", "regB":"histB"
+        },
+     "path/to/myfile2.root":
+        {
+            "regC":"histC", "regD":"histD"
+        }
+    }
+    [2] - 
+    {"regA":"histA",
+     "regB":"histB",
+     "regC":"histC",
+     "regD":"histD"
+    }
+
+    @param d (dict): Input dictionary to parse.
+
+    Raises:
+        FileExistsError: If file specified by key does not exist.
+        ValueError: If there are duplicate regions are specified. Only one histogram per-region can be provided.
+
+    Yields:
+        tuple( str, list(tuple(str,str)) ): The first return is the file path (`None` if `d` is of form #2). The second is a list
+            of the (region name, histogram name) pairs.
+    '''
     file_keys = [f for f in d if (f not in _protected_keys and f.endswith('.root'))]
     if len(file_keys) > 0:
+        regions = [k for f in file_keys for k in d[f]]
+        if len(regions) != len(set(regions)):
+            raise ValueError("There are duplicated regions in this process. Printing config process entry for debug.\n\n%s\n"%{f:r for f,r in d.items() if f in file_keys})
+
         for f in file_keys:
             if not os.path.exists(f):
                 raise FileExistsError("Cannot access file %s"%f)
-
-            regions = [k for f in file_keys for k in d[f]]
-            if len(regions) != len(set(regions)):
-                raise ValueError("There are duplicated regions in this process. Printing config process entry for debug.\n\n%s\n"%{f:r for f,r in proc_info.items() if f in file_keys})
             
-            yield f,[(rname,d[f][rname]) for rname in d[f]],len(regions)
+            yield f,[(rname,d[f][rname]) for rname in d[f]]
     else:
-        region_keys = [rkey for rkey in d if (rkey not in _protected_keys)]
-        region_pairs = [(rname,d[rname]) for rname in region_keys]
-        yield None,region_pairs,len(region_pairs)
+        region_pairs = [(rname,d[rname]) for rname in d if (rname not in _protected_keys)]
+        yield None,region_pairs
 
 def config_loop_replace(config,old,new):
     '''Self-calling function loop to find-replace one pair (old,new)
@@ -476,8 +582,8 @@ def config_loop_replace(config,old,new):
 
     @param config (dict,list): Nested dictionary or list where keys and values will have the
         find-replace algorithm applied.
-    @param old (non-nested obj): Object to replace (string, int, float, etc). No lists or dictionaries.
-    @param new (non-nested obj): Object replacement (string, int, float, etc). No lists or dictionaries.
+    @param old (non-nested obj): Object to replace (of type string, int, float, etc - no lists or dictionaries).
+    @param new (non-nested obj): Object replacement (of type string, int, float, etc) - no lists or dictionaries).
 
     Raises:
         TypeError: If input is not a dict or list.
@@ -491,7 +597,7 @@ def config_loop_replace(config,old,new):
                 config[k.replace(old,new)] = config.pop(k)
                 k = k.replace(old,new)
             if isinstance(v,dict) or isinstance(v,list):
-                config[k] = config_loop_replace(v)
+                config[k] = config_loop_replace(v,old,new)
             elif isinstance(v,str) and isinstance(old,str) and isinstance(new,str):
                 if old in v:
                     config[k] = v.replace(old,new)
@@ -501,7 +607,7 @@ def config_loop_replace(config,old,new):
     elif isinstance(config,list):
         for i,v in enumerate(config):
             if isinstance(v,dict) or isinstance(v,list):
-                config[i] = config_loop_replace(v)
+                config[i] = config_loop_replace(v,old,new)
             elif isinstance(v,str):
                 if old in v:
                     config[i] = v.replace(old,new)
