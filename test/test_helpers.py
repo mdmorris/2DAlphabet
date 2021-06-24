@@ -2,14 +2,16 @@
 from argparse import ArgumentParser
 from ROOT import TH2F, RooArgList, RooRealVar, TH1F
 import pytest
-from TwoDAlphabet.src.helpers import open_json, ascii_encode_dict, arg_dict_to_list, parse_arg_dict, execute_cmd, cd, make_RDH, dict_copy, nested_dict, roofit_form_to_TF1, set_hist_maximums
+from TwoDAlphabet.helpers import open_json, arg_dict_to_list, parse_arg_dict, make_RDH, dict_copy, nested_dict, roofit_form_to_TF1, set_hist_maximums
 
 test_dict = {
-    'this': 'is',
-    'a' : {
-        'test': 1,
-        'dictionary': False
-    }
+    "NAME": "bare",
+    "this": "is",
+    "a" : {
+        "test": 1,
+        "dictionary": False
+    },
+    "OPTIONS": {}
 }
 
 test_dict_zeros = {

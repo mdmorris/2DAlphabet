@@ -1,5 +1,5 @@
 import itertools
-from TwoDAlphabet.src.binning import *
+from TwoDAlphabet.binning import *
 from ROOT import TH2F
 import pytest
 from copy import deepcopy

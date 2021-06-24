@@ -1,6 +1,6 @@
 import argparse, os, json
-from TwoDAlphabet.src.config import Config
-from TwoDAlphabet.src.helpers import execute_cmd, get_config_dirs, parse_arg_dict
+from TwoDAlphabet.config import Config
+from TwoDAlphabet.helpers import execute_cmd, get_config_dirs, parse_arg_dict
 import ROOT
 
 class TwoDAlphabet:

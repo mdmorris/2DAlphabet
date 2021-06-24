@@ -1,6 +1,6 @@
 import ROOT, argparse, json, pickle, os
-from TwoDAlphabet.src.helpers import is_filled_list, nested_dict, open_json, parse_arg_dict
-from TwoDAlphabet.src.binning import Binning, copy_hist_with_new_bins, get_bins_from_hist
+from TwoDAlphabet.helpers import is_filled_list, nested_dict, open_json, parse_arg_dict
+from TwoDAlphabet.binning import Binning, copy_hist_with_new_bins, get_bins_from_hist
 
 _protected_keys = ["PROCESS","SYSTEMATICS","SYSTEMATIC","BINNING","OPTIONS","GLOBAL","SCALE","COLOR","TYPE","X","Y","NAME","TITLE","BINS","NBINS","LOW","HIGH"]
 class Config:
