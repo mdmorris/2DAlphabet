@@ -6,9 +6,10 @@ class Binning:
     def __init__(self, config_name, binning_dict, start_template):
         '''Initialize Binning object.
 
-        @param config_name (str): Config name to create unique objects owned by Binning.
-        @param binning_dict (dict): "BINNING" section of configuration json which specifies the X and Y binning schemes.
-        @param start_template (TH2): Histogram to compare against when doing sanity checks.
+        Args:
+            config_name (str): Config name to create unique objects owned by Binning.
+            binning_dict (dict): "BINNING" section of configuration json which specifies the X and Y binning schemes.
+            start_template (TH2): Histogram to compare against when doing sanity checks.
         '''
         self.configName = config_name
         self.startTemplate = start_template.Clone()
@@ -26,8 +27,9 @@ class Binning:
         For the X axis, three RooRealVars are returned in a dictionary with
         each key mapping the RooRealVar to either LOW, SIG, or HIGH categories.
 
-        @param xdict (dict): "X" subsection of the "BINNING" section of the config.
-        @param ydict (dict): "Y" subsection of the "BINNING" section of the config.
+        Args:
+            xdict (dict): "X" subsection of the "BINNING" section of the config.
+            ydict (dict): "Y" subsection of the "BINNING" section of the config.
 
         Returns:
             tuple(RooRealVars): (0) dict of X axis RooRealVars and (1) Y axis RooRealVar.
@@ -46,7 +48,8 @@ class Binning:
         '''Perform sanity check that new binning scheme is a subset of the
         starting input space.
 
-        @param axis (str): Either "X" or "Y".
+        Args:
+            axis (str): Either "X" or "Y".
 
         Raises:
             ValueError: If requested binning is not a subset of the input space.
@@ -72,8 +75,9 @@ class Binning:
         Returns the index of upper global wall - AKA index of bin we want in the the
         histogram (remember those bin indices start at 1 not 0).
 
-        @param xbin (int): Category local bin index
-        @param c ([type]): Category name - LOW, SIG, or HIGH
+        Args:
+            xbin (int): Category local bin index
+            c ([type]): Category name - LOW, SIG, or HIGH
 
         Returns:
             int: Global index
@@ -85,16 +89,17 @@ class Binning:
         '''
         Returns:
             list: X axis binning dict converted from a dictionary of the regions to
-                  a continuous list of bin edges for the full X axis.
+            a continuous list of bin edges for the full X axis.
         '''
         return concat_bin_dicts(self.xbinByCat)
 
 def create_RRV_base(name,title,bins):
     '''Generically create a RooRealVar with the specified bin edges.
 
-    @param name (str): Object name.
-    @param title (str): Object title.
-    @param bins ([type]): List of bin edges.
+    Args:
+        name (str): Object name.
+        title (str): Object title.
+        bins ([type]): List of bin edges.
 
     Returns:
         RooRealVar: 
@@ -129,7 +134,8 @@ def parse_binning_info(binDict):
     - Custom bins over one category - list of bin walls
     - Custom bins over three categories - three lists of bin walls (organized by dict)
 
-    @param binDict (dict): Usually the "BINNING" section of the configuration file.
+    Args:
+        binDict (dict): Usually the "BINNING" section of the configuration file.
 
     Returns:
         tuple: In order - new bins in the X axis, new bins in the Y axis
@@ -154,7 +160,8 @@ def parse_axis_info(axisDict):
     '''Return list of bin edges based off of the scheme specified in the "BINNING"
     section of the json config.
 
-    @param axisDict (dict): config["BINNING"]["X" or "Y"]
+    Args:
+        axisDict (dict): config["BINNING"]["X" or "Y"]
 
     Raises:
         RuntimeError: If binning scheme not specified with the correct syntax.
@@ -176,10 +183,10 @@ def binlist_to_bindict(binList, sigLow, sigHigh):
     where the three regions are separated by the values sigLow and sigHigh.
     The sigLow and sigHigh values should be bin edges.
 
-
-    @param binList ([type]): 
-    @param sigLow (int): [description]
-    @param sigHigh (int): [description]
+    Args:
+        binList ([type]): 
+        sigLow (int): [description]
+        sigHigh (int): [description]
 
     Raises:
         ValueError: If sigLow or sigHig is not in binList.
@@ -205,7 +212,8 @@ def concat_bin_dicts(binDict):
     '''Convert a dictionary of shape {'LOW':[...],'SIG':[...],'HIGH':[...]}
     to a list, avoiding overlapping values and the start and ends of each dict entry.
 
-    @param binDict (dict): Input dictionary
+    Args:
+        binDict (dict): Input dictionary
 
     Returns:
         list: List of bin edges concatenated from the dictionary entries.
@@ -219,7 +227,8 @@ def concat_bin_lists(binLists):
     '''Convert a list of separate bin edges to one continuous list.
     Will check that the start and ends of each sublist in binList are the same (continuous).
 
-    @param binList (list): Input list of bin edges.
+    Args:
+        binList (list): Input list of bin edges.
 
     Raises:
         ValueError: If bins in binList are not continuous along axis.
@@ -238,8 +247,9 @@ def get_bins_from_hist(XYZ,h):
     '''Get list of all bin edges from a histogram.
     Specify which axis in the histogram via XYZ.
 
-    @param XYZ (str): "X", "Y", or "Z".
-    @param h (TH1): Histogram to get binning from.
+    Args:
+        XYZ (str): "X", "Y", or "Z".
+        h (TH1): Histogram to get binning from.
 
     Returns:
         list: List of all bin edges.
@@ -253,8 +263,9 @@ def histlist_to_binlist(XYZ,histList):
     '''Input a list of separate histograms and return one continuous list of bins along the XYZ axis.
     Will check that the start and ends of each sublist in binList are the same (continuous).
 
-    @param XYZ (str): "X", "Y", or "Z".
-    @param histList (list(TH1)): List of histograms.
+    Args:
+        XYZ (str): "X", "Y", or "Z".
+        histList (list(TH1)): List of histograms.
 
     Returns:
         list: List of bin edges. 
@@ -266,9 +277,10 @@ def stitch_hists_in_x(template,histList,blinded=[]):
     '''Required that histList be in order of desired stitching
     `blinded` is a list of the index of regions you wish to skip/blind.
 
-    @param template (TH2): Template histogram which will be cloned and the clone filled.
-    @param histList (list(TH2)): List of histograms to stitch together. Binning must be continious.
-    @param blinded (list(int), optional): List of indexes of histList which should be dropped/blinded. Defaults to [].
+    Args:
+        template (TH2): Template histogram which will be cloned and the clone filled.
+        histList (list(TH2)): List of histograms to stitch together. Binning must be continious.
+        blinded (list(int), optional): List of indexes of histList which should be dropped/blinded. Defaults to [].
 
     Raises:
         ValueError: If X axis bins stitched together from histList are not the same as the input template.
@@ -305,8 +317,9 @@ def make_blinded_hist(h,sigregion):
     '''Clone histogram (h) and set the bins in range
     sigregion[0] to sigregion[1] on the X axis to zero.
 
-    @param h (TH2): Input unblinded histogram
-    @param sigregion (list(float)): Axis range to blind.
+    Args:
+        h (TH2): Input unblinded histogram
+        sigregion (list(float)): Axis range to blind.
         Edges must line up with h's bin edges. Must have length of 2 (lower and upper bound).
 
     Raises:
@@ -339,10 +352,11 @@ def copy_hist_with_new_bins(copyName,XorY,inHist,new_bins):
     New bins must be larger than the old bins and the edges of new bins must line up with 
     existing edges (no finer binning and no splitting bins).
 
-    @param copyName (str): Name of copy.
-    @param XorY (str): "X" or "Y" to change which axis is rebinned.
-    @param inHist (TH2): Input histogram to rebin.
-    @param new_bins (list): New list of bin edges.
+    Args:
+        copyName (str): Name of copy.
+        XorY (str): "X" or "Y" to change which axis is rebinned.
+        inHist (TH2): Input histogram to rebin.
+        new_bins (list): New list of bin edges.
 
     Raises:
         ValueError: If XorY is not "X" or "Y".
@@ -423,7 +437,8 @@ def copy_hist_with_new_bins(copyName,XorY,inHist,new_bins):
 def get_min_bin_width(hist):
     '''Get the minimum width among all bins in a 1D histogram.
 
-    @param hist (TH1): 1D histogram to analyze.
+    Args:
+        hist (TH1): 1D histogram to analyze.
 
     Raises:
         TypeError: If number of dimensions in hist is != 1.
@@ -443,8 +458,9 @@ def convert_to_events_per_unit(hist,width=None):
     '''Convert the bin contents of a 1D histogram so they are normalized to the
     width of the narrowest bin. Only useful if the bin widths are variable.
 
-    @param hist (TH1): 1D histogram to manipulate.
-    @param width (int, optional): Override the automatic determination of the minimum bin width.
+    Args:
+        hist (TH1): 1D histogram to manipulate.
+        width (int, optional): Override the automatic determination of the minimum bin width.
         Defaults to None in which case get_min_bin_width is used.
 
     Raises:
@@ -476,8 +492,9 @@ def convert_to_events_per_unit(hist,width=None):
 def zero_negative_bins(name,inhist):
     '''Set all negative bins in 2D inhist to zero with zero error.
 
-    @param name (str): Name of returned histogram.
-    @param inhist (TH2): Input histogram.
+    Args:
+        name (str): Name of returned histogram.
+        inhist (TH2): Input histogram.
 
     Returns:
         TH2: Clone of input histogram with negative bins set to zero.
@@ -494,9 +511,10 @@ def zero_negative_bins(name,inhist):
 def remap_binlist(binList,new_min=0.0,new_max=1.0):
     '''Remap a list of bin edges to [new_min, new_max].
 
-    @param binList (list(float)): List of bin edges (including first and last).
-    @param new_min (float, optional): New minimum. Defaults to 0.0.
-    @param new_max (float, optional): New maximum. Defaults to 1.0.
+    Args:
+        binList (list(float)): List of bin edges (including first and last).
+        new_min (float, optional): New minimum. Defaults to 0.0.
+        new_max (float, optional): New maximum. Defaults to 1.0.
 
     Returns:
         list(float): List of bin edges mapped to new range.
@@ -513,9 +531,10 @@ def remap_binlist(binList,new_min=0.0,new_max=1.0):
 def remap_hist_axis(hist,new_min=0,new_max=1):
     '''Remap axes of a 2D histogram to [new_min, new_max].
 
-    @param hist (TH2): Histogram to remap.
-    @param new_min (int, optional): New minimum. Defaults to 0.
-    @param new_max (int, optional): New maximum. Defaults to 1.
+    Args:
+        hist (TH2): Histogram to remap.
+        new_min (int, optional): New minimum. Defaults to 0.
+        new_max (int, optional): New maximum. Defaults to 1.
 
     Raises:
         TypeError: If number of dimensions in hist is != 1.
