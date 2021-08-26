@@ -26,7 +26,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,freezeFail=False,location=
 
     # Run blind (turns off data everywhere) but don't mask (examines signal region)
     if blindData:
-        blind_option = ' --run blind'
+        blind_option = ' --run blind --snapshotName initialFit'
     else:
         blind_option = ''
 
@@ -90,7 +90,7 @@ def runLimit(twoDs,postfitWorkspaceDir,blindData=True,freezeFail=False,location=
     print 'Getting current dir'
     current_dir = os.getcwd()
 
-    aL_cmd = 'combine -M AsymptoticLimits workspace.root --snapshotName initialFit --saveWorkspace --cminDefaultMinimizerStrategy 0 ' +blind_option + syst_option # + sig_option 
+    aL_cmd = 'combine -M AsymptoticLimits workspace.root --saveWorkspace --cminDefaultMinimizerStrategy 0 ' +blind_option + syst_option # + sig_option 
 
     # Run combine if not on condor
     if location == 'local':    
