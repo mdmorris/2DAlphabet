@@ -1880,10 +1880,13 @@ class TwoDAlphabet:
                                 bkg_process_names.append(process_name)
                             elif (process != 'qcd' and process != 'TotalBkg' and self.inputConfig['PROCESS'][process]['CODE'] == 0):
                                 process_name = process if 'TITLE' not in self.inputConfig['PROCESS'][process].keys() else self.inputConfig['PROCESS'][process]['TITLE']
-                                if self.plotPrefitSigInFitB and fittag == 'b':
-                                    signal_process_list.append(hist_dict[process][cat][plotType.replace("postfit","prefit")+str(regionNum)])
+                                if fittag == 'b':
+                                    if self.plotPrefitSigInFitB:
+                                        signal_process_list.append(hist_dict[process][cat][plotType.replace("postfit","prefit")+str(regionNum)])
+                                    else:
+                                        hist_dict[process][cat][plotType+str(regionNum)].Scale(signal_strength)
+                                        signal_process_list.append(hist_dict[process][cat][plotType+str(regionNum)])
                                 else:
-                                    hist_dict[process][cat][plotType+str(regionNum)].Scale(signal_strength)
                                     signal_process_list.append(hist_dict[process][cat][plotType+str(regionNum)])
                                 signal_names.append(process_name)
                                 
