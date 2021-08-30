@@ -28,6 +28,7 @@ class TwoDAlphabet:
         for j in jsons:
             self.AddConfig(j,findreplace)
 
+        self.SetupProjDir()
         if self.options.draw == False:
             ROOT.gROOT.SetBatch(True)
 
