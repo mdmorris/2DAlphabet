@@ -86,10 +86,12 @@ def cd(newdir): # pragma: no cover
     commands.
 
     Example:
-        with cd('/path/to/stuff/'):
-            ...
-            <code acting in /path/to/stuff/ directory>
-            ...
+        ::
+        
+            with cd('/path/to/stuff/'):
+                ...
+                <code acting in /path/to/stuff/ directory>
+                ...
 
     Args:
         newdir (str): Directory to cd to within the `with` statement.
