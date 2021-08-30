@@ -9,8 +9,9 @@ def open_json(f,twoDconfig=True):
 
     Function adapted from https://stackoverflow.com/questions/9590382/forcing-python-json-module-to-work-with-ascii
 
-    @param f (str): File name and path.
-    @param twoDconfig (bool, optional): Set to True if the JSON file is a 2DAlphabet
+    Args:
+        f (str): File name and path.
+        twoDconfig (bool, optional): Set to True if the JSON file is a 2DAlphabet
         configuration file. Defaults to True.
 
     Returns:
@@ -29,7 +30,8 @@ def open_json(f,twoDconfig=True):
 def ascii_encode_dict(data): 
     '''Convert a unicode encoded dictionary into ascii.
 
-    @param data (dict): Input dictionary.
+    Args:
+        data (dict): Input dictionary.
 
     Returns:
         dict: Dict encoded with ascii instead of unicode.
@@ -41,7 +43,8 @@ def arg_dict_to_list(indict):
     '''Convert dictionary of arguments into a list of
     `<key>=<value>` strings.
 
-    @param indict (dict): Dictionary of arguments where keys are
+    Args:
+        indict (dict): Dictionary of arguments where keys are
         the argument name and values are the value for the argument to take.
 
     Returns:
@@ -53,8 +56,9 @@ def parse_arg_dict(parser,indict):
     '''Use ArgumentParser to parse arguments in an input dictionary
     where the key is the arg name and the value is the value for the arg to take.
 
-    @param parser (ArgumentParser): Object to update with indict key-values.
-    @param indict (dict): Dictionary holding argument names (keys) and values (values).
+    Args:
+        parser (ArgumentParser): Object to update with indict key-values.
+        indict (dict): Dictionary holding argument names (keys) and values (values).
 
     Returns:
         Namespace: Object storing each argument as an attribute of the Namespace.
@@ -67,8 +71,9 @@ def execute_cmd(cmd,dryrun=False): # pragma: no cover
     '''Print and execute a command-line command via subprocess.call().
     If dryrun==True, only print.
 
-    @param cmd (str): Command to execute as a subprocess.
-    @param dryrun (bool, optional): If True, only print. Defaults to False.
+    Args:
+        cmd (str): Command to execute as a subprocess.
+        dryrun (bool, optional): If True, only print. Defaults to False.
     '''
     print ('Executing: '+cmd)
     if not dryrun:
@@ -78,14 +83,16 @@ def execute_cmd(cmd,dryrun=False): # pragma: no cover
 def cd(newdir): # pragma: no cover
     '''Change active directory so that the local directory becomes newdir.
     This affects everything from subprocess calls to ROOT Print() and SaveAs()
-    commands. Usage:
+    commands.
 
-    with cd('/path/to/stuff/'):
-        ...
-        <code acting in /path/to/stuff/ directory>
-        ...
+    Example:
+        with cd('/path/to/stuff/'):
+            ...
+            <code acting in /path/to/stuff/ directory>
+            ...
 
-    @param newdir (str): Directory to cd to within the `with` statement.
+    Args:
+        newdir (str): Directory to cd to within the `with` statement.
     '''
     print ('cd '+newdir)
     prevdir = os.getcwd()
@@ -99,9 +106,10 @@ def make_RDH(myTH2,RAL_vars,altname=''):
     '''Create a RooDataHist from the input TH2 and RooArgList of
     axis variables.
 
-    @param myTH2 (TH2): Histogram to turn into RooDataHist.
-    @param RAL_vars (RooArgList): List of RooRealVars representing the axes.
-    @param altname (str, optional): Alternate name. Defaults to '' in which case the TH2 name is used.
+    Args:
+        myTH2 (TH2): Histogram to turn into RooDataHist.
+        RAL_vars (RooArgList): List of RooRealVars representing the axes.
+        altname (str, optional): Alternate name. Defaults to '' in which case the TH2 name is used.
 
     Returns:
         RooDataHist
@@ -120,8 +128,9 @@ def dict_copy(inDict,structureOnly=False):
     '''Recursively copy a dictionary with the option to only copy the
     dictionary structure.
 
-    @param inDict (dict): Input dictionary.
-    @param structureOnly (bool, optional): If True, only copy the structure of the dictionary
+    Args:
+        inDict (dict): Input dictionary.
+        structureOnly (bool, optional): If True, only copy the structure of the dictionary
         with stand-in value of 0. Defaults to False.
 
     Returns:
@@ -140,8 +149,9 @@ def nested_dict(level,t):
     '''Create an empty dictionary nested to <level> levels
     and with type <t> as the default stand-in in the inner-most dictionary.
 
-    @param level (int): Number of nested levels (ie. max number of keys that can be used).
-    @param t (type): Type to provide to defaultdict to determine the stand-in values.
+    Args:
+        level (int): Number of nested levels (ie. max number of keys that can be used).
+        t (type): Type to provide to defaultdict to determine the stand-in values.
 
     Returns:
         [type]: [description]
@@ -155,8 +165,9 @@ def nested_dict(level,t):
 def roofit_form_to_TF1(RFVform,shift=0): # shift tells function how much to shift the indices of the coefficients by
     '''Convert a RooFit formula (using @) to a ROOT.TF1 type formula (using []).
 
-    @param RFVform (str): RooFit formula string.
-    @param shift (int, optional): Number of indices to shift the coefficients in the case of abormal
+    Args:
+        RFVform (str): RooFit formula string.
+        shift (int, optional): Number of indices to shift the coefficients in the case of abormal
         indexing. Defaults to 0.
 
     Returns:
@@ -185,8 +196,9 @@ def set_hist_maximums(histList,factor=1.1):
     '''Take in a list of histograms and set the maximum of each
     to the maximum of the group multiplied by `factor`.
 
-    @param histList (list(TH1)): List of histograms to compare and set.
-    @param factor (float, optional): Defaults to 1.1.
+    Args:
+        histList (list(TH1)): List of histograms to compare and set.
+        factor (float, optional): Defaults to 1.1.
 
     Returns:
         list(TH1): Histograms with maximum set.
@@ -203,7 +215,27 @@ def set_hist_maximums(histList,factor=1.1):
     return out
 
 def get_config_dirs(projPath):
+    '''Get the sub-directories in the project directory
+    that correspond to the configs used.
+
+    Args:
+        projPath (str): Path to project directory.
+
+    Returns:
+        list(str): List of sub-directories.
+    '''
     return [f.path for f in os.scandir(projPath) if f.is_dir()]
 
 def is_filled_list(d,key):
-    return (key in d and len(d['key']) > 0)
+    '''Checks if the dictionary (`d`) entry at `key` is
+    a non-empty list. If the key does not exist in the dictionary,
+    return False.
+
+    Args:
+        d (dict): Dictionary.
+        key (non-enumerable): Key in dictionary.
+
+    Returns:
+        bool: True if `d[key]` is a non-empty list. Otherwise, False.
+    '''
+    return (key in d and len(d[key]) > 0)
