@@ -1,8 +1,9 @@
 
 from argparse import ArgumentParser
+from typing import Type
 from ROOT import TH2F, RooArgList, RooRealVar, TH1F
 import pytest
-from TwoDAlphabet.helpers import open_json, arg_dict_to_list, parse_arg_dict, make_RDH, dict_copy, nested_dict, roofit_form_to_TF1, set_hist_maximums
+from TwoDAlphabet.helpers import is_filled_list, open_json, arg_dict_to_list, parse_arg_dict, make_RDH, dict_copy, nested_dict, roofit_form_to_TF1, set_hist_maximums
 
 test_dict = {
     "NAME": "bare",
@@ -15,11 +16,13 @@ test_dict = {
 }
 
 test_dict_zeros = {
+    'NAME': 0,
     'this': 0,
     'a' : {
         'test': 0,
         'dictionary': 0
-    }
+    },
+    "OPTIONS": {}
 }
 
 def test__open_json():
@@ -74,3 +77,12 @@ def test__set_hist_maximums():
     h1.SetMaximum(100)
     for h in set_hist_maximums([h1,h2,h3], factor=1.1):
         assert int(h.GetMaximum()) == 110
+
+def test__is_filled_list():
+    assert is_filled_list({},'test_key') == False
+    assert is_filled_list({'no_key':'no_val'},'test_key') == False
+    with pytest.raises(TypeError):
+        is_filled_list('not a dict','test_key')
+    assert is_filled_list({'test_key':'test_val'},'test_key') == False
+    assert is_filled_list({'test_key':[]},'test_key') == False
+    assert is_filled_list({'test_key':['test_val']},'test_key') == True

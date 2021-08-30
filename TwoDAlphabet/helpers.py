@@ -231,7 +231,7 @@ def get_config_dirs(projPath):
 def is_filled_list(d,key):
     '''Checks if the dictionary (`d`) entry at `key` is
     a non-empty list. If the key does not exist in the dictionary,
-    return False.
+    return False. If the value in the dictionary is not a list, return False.
 
     Args:
         d (dict): Dictionary.
@@ -240,4 +240,6 @@ def is_filled_list(d,key):
     Returns:
         bool: True if `d[key]` is a non-empty list. Otherwise, False.
     '''
-    return (key in d and len(d[key]) > 0)
+    if not isinstance(d, dict):
+        raise TypeError('Arg d is not a dictionary.')
+    return (key in d and isinstance(d[key],list) and len(d[key]) > 0)
