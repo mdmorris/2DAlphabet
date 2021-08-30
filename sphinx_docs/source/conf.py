@@ -49,7 +49,7 @@ extensions = [
     'recommonmark',
     'sphinx.ext.autosectionlabel'
 ]
-add_module_names = False
+# add_module_names = False
 napolean_google_docstring = True
 napoleon_numpy_docstring = False
 
@@ -101,6 +101,10 @@ html_theme = 'sphinx_book_theme'
 #         ('API', 'api')
 #     ]
 # }
+html_theme_options = {
+    "repository_url": "https://github.com/lcorcodilos/2DAlphabet",
+}
+html_title = project + ' Docs'
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
 autodoc_mock_imports = ["ROOT"]

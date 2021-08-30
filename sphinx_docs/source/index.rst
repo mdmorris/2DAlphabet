@@ -14,13 +14,22 @@ The documentation for the Higgs Analysis Combine Tool can be found
 `here <https://cms-hcomb.gitbooks.io/combine/content/>`_.
 One significant addition is made to the central Combine release to make
 Combine 2D Alphabet-friendly - the RooParametricHist2D class. This is
-identical to the RooParametricHist class already provided by Combine but take
+identical to the RooParametricHist class already provided by Combine but takes
 as input a TH2 instead of a TH1. The accompanying changes to accommodate this
 class are made in the Combine Tool code. Additionally, code has been added
 and modified in Combine Harvester (used for plotting) to plot the 2D
 distributions. User's not interested in development do not need to worry
 about the specifics of this since calls to RooParametricHist2D are all
 internal.
+
+Table of Contents
+-----------------
+.. toctree::
+   :maxdepth: 2
+   
+   pages/how-to.rst
+   pages/config.rst
+   doctrees/modules.rst
 
 Overview of model building approach
 ------------------------------------
@@ -39,7 +48,7 @@ ABCD method. All three use an analytic "transfer function" to "transfer" the
 background contribution in a control region to the contribution in the signal
 region. If the shapes of the background distributions in the control region and
 signal region are identical, then the transfer function is just a constant factor
-which just changes the normalization from one region to the other.
+which only changes the normalization from one region to the other.
 
 However, having a "flat" transfer function is unusual as there is typically
 a shape dependence along the measurement variable. The ABCD method measures
@@ -70,7 +79,7 @@ of the QCD.
 
 While this method has proven successful in the past, it has the disadvantage that
 it extrapolates the shape of the background to region C by assuming that A/B and C/D
-are equal. If a different var2 can be chosen such that the signal lies in the middle
+are equal. If a different `var2` can be chosen such that the signal lies in the middle
 of the axis (still region C of the next figure), one can instead interpolate the
 background which is often more robust than extrapolation. It would be inconvenient
 to call this the ABCDEF method so it is instead referred to
@@ -99,8 +108,6 @@ are representing some histogram counts - D and C are empty since those are blind
    :caption: Figure: Split Alphabet regions
    :name: alphabetsplit
 
-   this is a test
-
     var1  |         |       |
    (upper)| .   A   |   C   |    E
           |_:_:_:_:_|_______|_._._._.__
@@ -119,7 +126,7 @@ middle signal region. The value of the analytic transfer function in the middle 
 
 Note that ``var2`` is not our measurement variable though. It's simply the variable in which we
 measure the transfer function. The technical aspect of creating the QCD estimate in the C region is the same
-as was done for the ABCD method but :math:`A/B` (which was a function of ``var3`` is now :math:`f`(``var2``).
+as was done for the ABCD method but :math:`A/B` (which was a function of ``var3``) is now :math:`f`( ``var2`` :math:).
 
 We make the jump to 2DAlphabet by asking the interpolation method of Alphabet to measure :math:`f` in ``var3`` as well
 so that it becomes :math:`f` (``var2``, ``var3``) and we get the best of both worlds. There are several advantages to this.
@@ -156,11 +163,3 @@ uncertainties are explained in the :doc:`pages/config` section.
 
 For more information, see the table of contents below.
 
-Table of Contents
------------------
-.. toctree::
-   :maxdepth: 2
-   
-   pages/how-to.rst
-   pages/config.rst
-   doctrees/modules.rst

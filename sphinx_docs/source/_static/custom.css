@@ -14,3 +14,6 @@ h2 {
     margin: 1.5rem 0 1.05rem;
 }
 
+.simple li p {
+    margin-bottom: 0.1em;
+}
