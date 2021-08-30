@@ -5,20 +5,26 @@ from TwoDAlphabet.binning import Binning, copy_hist_with_new_bins, get_bins_from
 _protected_keys = ["PROCESS","SYSTEMATICS","SYSTEMATIC","BINNING","OPTIONS","GLOBAL","SCALE","COLOR","TYPE","X","Y","NAME","TITLE","BINS","NBINS","LOW","HIGH"]
 class Config:
     '''Class to handle the reading and manipulation of data provided 
-    in 2DAlphabet JSON configuration files.
+    in 2DAlphabet JSON configuration files. Constructor initializes
+    a Config object for a given JSON file and performs
+    all initial checks and manipulations.
+
+    Args:
+        json (str): File name and path.
+        projPath (str): Project path.
+        findreplace (dict, optional): Find-replace pairs. Defaults to {}.
+        externalOptions (dict, optional): Extra key-value pairs to add to the OPTIONS
+            section of the JSON file. Defaults to {}.
+        loadPrevious (bool, optional): Load the previous histograms made instead of remaking. Defaults to False.
+
+    Attributes:
+        config (dict): JSON config opened as a dict.
+        name (str): Name, inherited from the input JSON config.
+        projPath (str): The project path + self.name.
+        options (Namespace): Final set of options to use.
+        loadPrevious (bool): Equal to the constructor arg of the same name.
     '''
     def __init__(self,json,projPath,findreplace={},externalOptions={},loadPrevious=False):
-        '''Initialize a Config object for a given JSON file and perform
-        all initial checks and manipulations.
-
-        Args:
-            json (str): File name and path.
-            projPath (str): Project path.
-            findreplace (dict, optional): Find-replace pairs. Defaults to {}.
-            externalOptions (dict, optional): Extra key-value pairs to add to the OPTIONS
-                section of the JSON file. Defaults to {}.
-            loadPrevious (bool, optional): Load the previous histograms made instead of remaking. Defaults to False.
-        '''
         self.config = open_json(json)
         self._addFindReplace(findreplace)
         self._varReplacement()
@@ -132,7 +138,7 @@ class Config:
         return parse_arg_dict(parser,self.Section('OPTIONS'))
 
     def SaveOut(self): # pragma: no cover
-        '''Save three objects to the <self.projPath> directory:
+        '''Save two objects to the <self.projPath> directory:
         - a copy of the manipulated config (runConfig.json)
         - the pickled histogram map (hist_map.p)
         - the RooWorkspace (base_<self.name>.root)
@@ -160,14 +166,11 @@ class OrganizedHists():
         rebinned (bool): Flag to denote if a rebinning has already occured.
         openOption (str): ROOT TFile::Open option set based on whether the file exists and if the configObj requests an overwrite.
         file (ROOT.TFile): TFile to store histograms on disk.
+
+    Args:
+        configObj (Config): Config object.
     '''
     def __init__(self,configObj):
-        '''Constructor based on a Config object.
-
-        Args:
-            configObj (Config): Config object.
-        '''
-        ##
         self.name = configObj.name
         self.filename = configObj.projPath + 'organized_hists.root'
         self.hists = nested_dict(3,None) # proc, reg, syst
@@ -213,6 +216,7 @@ class OrganizedHists():
 
     @property
     def _allHists(self):
+        '''list(TH2): List of all stored/tracked histograms.'''
         '''List of all stored/tracked histograms.
 
         Returns:
@@ -346,24 +350,29 @@ def _parse_file_entries(d):
     This form assumes one is already nested inside the file level described above.
     Region name as the key and histogram name as the value still applies [2].
 
-    [1] -
-    {"path/to/myfile1.root":
-        {
-            "regA":"histA", "regB":"histB"
-        },
-     "path/to/myfile2.root":
-        {
-            "regC":"histC", "regD":"histD"
-        }
-    }
-    [2] - 
-    {"regA":"histA",
-     "regB":"histB",
-     "regC":"histC",
-     "regD":"histD"
-    }
+    Examples:
+    ::
 
-    @param d (dict): Input dictionary to parse.
+        {"path/to/myfile1.root":
+            {
+                "regA":"histA", "regB":"histB"
+            },
+        "path/to/myfile2.root":
+            {
+                "regC":"histC", "regD":"histD"
+            }
+        }
+    
+    ::
+
+        {"regA":"histA",
+        "regB":"histB",
+        "regC":"histC",
+        "regD":"histD"
+        }
+
+    Args:
+        d (dict): Input dictionary to parse.
 
     Raises:
         FileExistsError: If file specified by key does not exist.
@@ -395,10 +404,11 @@ def config_loop_replace(config,old,new):
     string in the config. If this condition is not satisified, <old> must match the config
     entry in its entirety (ie. <old> == <config dict value>).
 
-    @param config (dict,list): Nested dictionary or list where keys and values will have the
-        find-replace algorithm applied.
-    @param old (non-nested obj): Object to replace (of type string, int, float, etc - no lists or dictionaries).
-    @param new (non-nested obj): Object replacement (of type string, int, float, etc) - no lists or dictionaries).
+    Args:
+        config (dict,list): Nested dictionary or list where keys and values will have the
+            find-replace algorithm applied.
+        old (non-nested obj): Object to replace (of type string, int, float, etc - no lists or dictionaries).
+        new (non-nested obj): Object replacement (of type string, int, float, etc) - no lists or dictionaries).
 
     Raises:
         TypeError: If input is not a dict or list.
