@@ -479,7 +479,7 @@ def plotFitResults(self,fittag):#,simfit=False): # fittag means 'b' or 's'
 
                 rpf_samples.Fill(thisXCenter,thisYCenter,bin_val)
 
-    print '\n'
+    print ('\n')
     rpf_final = TH2F('rpf_final','rpf_final',rpf_xnbins, array.array('d',self.fullXbins), rpf_ynbins, array.array('d',self.newYbins))
     # Now loop over all x,y bin in rpf_samples, project onto Z axis, 
     # get the mean and RMS and set as the bin content and error in rpf_final
@@ -563,8 +563,8 @@ def makeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],colors=[],
         if titles != []: titles = reorderHists(titles)
         if subtitles != []: subtitles = reorderHists(subtitles)
     else:
-        print 'histlist of size ' + str(len(histlist)) + ' not currently supported'
-        print histlist
+        print ('histlist of size ' + str(len(histlist)) + ' not currently supported')
+        print (histlist)
         return 0
 
     tdrstyle.setTDRStyle()

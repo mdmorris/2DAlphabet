@@ -13,13 +13,13 @@ def FtestInfoLookup(projInfoDict):
     return nrpfparams,nbins
 
 def FstatCalc(filename1,filename2,p1,p2,n):
-    print 'Calculating F statistic'
+    print ('Calculating F statistic')
     # Flip flop to make sure p2 is always greater than p1 (more parameters should always fit better)
     if p1 > p2:
         p1, p2 = p2, p1
         filename1, filename2 = filename2, filename1
-    print 'Files: ',filename1,filename2
-    print 'Parameters: p1 %f, p2 %f, n %f'%(p1,p2,n)
+    print ('Files: ',filename1,filename2)
+    print ('Parameters: p1 %f, p2 %f, n %f'%(p1,p2,n))
 
     # Get limit trees from each file
     file1 = TFile.Open(filename1)
@@ -40,7 +40,7 @@ def FstatCalc(filename1,filename2,p1,p2,n):
             # if F < 50: 
             diffs.append(F)
         else:
-            print 'WARNING in calculation of F statistic for entry %i. limit1-limit2 <=0 (%f - %f)' %(i,tree1.limit,tree2.limit)
+            print ('WARNING in calculation of F statistic for entry %i. limit1-limit2 <=0 (%f - %f)' %(i,tree1.limit,tree2.limit))
             diffs.append(0)
     # print 'Diffs F stat: ',diffs
     return diffs

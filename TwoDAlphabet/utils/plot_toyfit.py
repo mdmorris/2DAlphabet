@@ -81,7 +81,7 @@ class ToyFit():
         for ibranch in range(branches.GetEntries()):
             branch_name = branches.At(ibranch).GetName()
             if '_In' in branch_name:
-                print 'Adding nuisance: '+branch_name.replace('_In','')
+                print ('Adding nuisance: '+branch_name.replace('_In',''))
                 nuis_list.append(branch_name.replace('_In',''))
 
         out_plot = TH1F('nuisance_pulls','nuisance_pulls',len(nuis_list),0,len(nuis_list))
@@ -128,13 +128,13 @@ class ToyFit():
         # Define low, middle, high projection regions for y (x regions defined already via signal region bounds)
         y_turnon_endBin = self.post_file.Get('pass_LOW_'+name+'_prefit/data_obs').ProjectionY().GetMaximumBin()
         y_tail_beginningBin = int((y_nbins - y_turnon_endBin)/2.0 + y_turnon_endBin)
-        print 'Finding start and end bin indexes of signal range. Looking for '+str(sigStart)+', '+str(sigEnd)
+        print ('Finding start and end bin indexes of signal range. Looking for '+str(sigStart)+', '+str(sigEnd))
         for ix,xwall in enumerate(fullXbins):
             if xwall == sigStart:
-                print 'Assigning start bin as '+str(ix+1)
+                print ('Assigning start bin as '+str(ix+1))
                 x_sigstart_bin = ix+1
             if xwall == sigEnd:
-                print 'Assigning end bin as '+str(ix)
+                print ('Assigning end bin as '+str(ix))
                 x_sigend_bin = ix
 
         if y_turnon_endBin > y_nbins/2.0:  # in case this isn't a distribution with a turn-on
@@ -346,5 +346,5 @@ class ToyFit():
                     if 'x' in plotType: header.makeCan(process+'_'+plotType+'_fit'+fittag,plotOutDir,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=xVarTitle,datastyle='histe')
                     if 'y' in plotType: header.makeCan(process+'_'+plotType+'_fit'+fittag,plotOutDir,post_list,bkglist=pre_list,colors=prepostcolors,xtitle=yVarTitle,datastyle='histe')
 
-print options
+print (options)
 tf = ToyFit(options)

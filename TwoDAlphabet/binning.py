@@ -32,7 +32,7 @@ class Binning:
             ydict (dict): "Y" subsection of the "BINNING" section of the config.
 
         Returns:
-            tuple(RooRealVars): (0) dict of X axis RooRealVars and (1) Y axis RooRealVar.
+            tuple: (0) dict of X axis RooRealVars and (1) Y axis RooRealVar.
         '''
         yRRV = create_RRV_base(ydict['NAME']+'_'+self.configName,
                           ydict['TITLE'],

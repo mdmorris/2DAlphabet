@@ -2,7 +2,6 @@
 per-bin over the full 2D space.'''
 
 import sys,os,ROOT,math,array
-sys.append('../')
 import header
 
 def stitchHists(name,thisHistList,blinded=[]):
