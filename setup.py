@@ -1,6 +1,15 @@
 #!/usr/bin/env python
 
-import setuptools
+import setuptools, sys
+
+requires = [
+      'pytest',
+      'pytest-cov',
+      'recommonmark',
+      'pandas'
+]
+if sys.version_info.major == 3:
+      requires.append('sphinx-book-theme')
 
 setuptools.setup(name='TwoDAlphabet',
       version='2.0',
@@ -11,10 +20,5 @@ setuptools.setup(name='TwoDAlphabet',
       packages=setuptools.find_packages(),
       include_package_data=True,
       # cmdclass={'install': AddToPath},
-      install_requires = [
-            'pytest',
-            'pytest-cov',
-            'recommonmark',
-            # 'sphinx-book-theme' # uncomment if python3 and generating docs
-      ]
-     )
+      install_requires = requires
+)
