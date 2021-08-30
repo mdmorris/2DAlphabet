@@ -174,7 +174,7 @@ class OrganizedHists():
         self.filename = configObj.projPath + 'organized_hists.root'
         self.hists = nested_dict(3,None) # proc, reg, syst
         self.binning = configObj.binning
-        self.rebinned = False
+        self.subdivided = False
 
         if os.path.exists(self.filename) and not configObj.options.overwrite:
             self.openOption = "OPEN"
@@ -230,8 +230,8 @@ class OrganizedHists():
         Raises:
             RuntimeError: If `rebinned` is already True.
         '''
-        if self.rebinned: raise RuntimeError('Already rebinned this OrganizedHists object.')
-        self.rebinned = True
+        if self.subdivided: raise RuntimeError('Already rebinned this OrganizedHists object.')
+        self.subdivided = True
 
         for p in self.hists:
             for r in self.hists[p]:
