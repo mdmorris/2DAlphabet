@@ -65,8 +65,7 @@ class TwoDAlphabet:
         if inputConfig.name in self.configs.keys():
             raise KeyError("Key %s already exists."%(inputConfig.name))
         else:
-            inputConfig.Process()
-            self.configs[inputConfig.name] = inputConfig
+            self.configs[inputConfig.name] = inputConfig.Construct()
 
     def SetupProjDir(self):
         '''Create the directory structure where results will be stored.
