@@ -49,7 +49,7 @@ extensions = [
     'recommonmark',
     'sphinx.ext.autosectionlabel'
 ]
-# add_module_names = False
+add_module_names = False
 napolean_google_docstring = True
 napoleon_numpy_docstring = False
 
