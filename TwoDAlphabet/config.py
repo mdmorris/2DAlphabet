@@ -32,13 +32,15 @@ class Config:
         save outputs, etc. Separated from the constructor so information from the config
         can be extracted for basic sanity checks before it is processed.
         '''
-        self.binning = Binning(self.config['BINNING'])
+        self.binning = Binning(self.Section('BINNING'))
         self.processes = self.Section('PROCESSES')
         self.systematics = self.Section('SYSTEMATICS')
         if self.loadPrevious: self.organized_hists = self.ReadIn()
         else:
             self.organized_hists = organize_inputs(self)
             self.organized_hists.CreateSubRegions()
+
+        return self
 
     def Section(self,key):
         '''Derive the dictionary for a given section of the configuration file
@@ -50,6 +52,8 @@ class Config:
         Returns:
             dict: Section of config.
         '''
+        if not isinstance(self.config[key],dict):
+            raise TypeError('Section access is only for sub-dictionaries. Try accessing directly reading config[key].')
         return {k:v for k,v in self.config[key].items() if k != 'HELP'}
 
     def _addFindReplace(self,findreplace):
@@ -62,9 +66,9 @@ class Config:
             ValueError: If a "find" already exists in self.config['GLOBAL'].
         '''
         for s in findreplace.keys():
-            if s in self.config['GLOBAL'].keys():
+            if s in self.Section('GLOBAL').keys():
                 raise ValueError('A command line string replacement (%s) conflicts with one already in the configuration file. Quitting...' %(s))
-            self.config['GLOBAL'][s] = findreplace[s]
+            self.Section('GLOBAL')[s] = findreplace[s]
 
     def _varReplacement(self):
         '''Do string substitution for config entries based on the dictionary of find
@@ -79,11 +83,11 @@ class Config:
             None.
         '''
         print ("Doing GLOBAL variable replacement in input json...")
-        for old_string in self.inputConfig['GLOBAL'].keys():
+        for old_string in self.Section('GLOBAL').keys():
             if old_string == "HELP":
                 print ('WARNING: The HELP entry is deprecated and checking for it will be removed in the future. Please remove it from your config.')
                 continue
-            new_string = self.inputConfig['GLOBAL'][old_string]
+            new_string = self.Section('GLOBAL')[old_string]
             self.config = self.config_loop_replace(self.config, old_string, new_string)
 
     def GetOptions(self,externalOpts={}):
@@ -125,7 +129,7 @@ class Config:
         parser.add_argument('recycle', default=[], type=list, nargs='?',
             help='List of items to recycle. Not currently working.')
         
-        return parse_arg_dict(parser,self.config['OPTIONS'])
+        return parse_arg_dict(parser,self.Section('OPTIONS'))
 
     def SaveOut(self): # pragma: no cover
         '''Save three objects to the <self.projPath> directory:
