@@ -141,13 +141,12 @@ class Config:
         '''Save two objects to the <self.projPath> directory:
         - a copy of the manipulated config (runConfig.json)
         - the pickled histogram map (hist_map.p)
-        - the RooWorkspace (base_<self.name>.root)
         '''
         file_out = open(self.projPath+'runConfig.json', 'w')
-        json.dump(self.inputConfig,file_out,indent=2,sort_keys=True)
+        json.dump(self.config,file_out,indent=2,sort_keys=True)
         file_out.close()
         pickle.dump(self.organized_hists, open(self.projPath+'hist_map.p','wb'))
-        self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
+        # self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
 
     def ReadIn(self): # pragma: no cover
         '''Read the histogram map from the pickled file.
