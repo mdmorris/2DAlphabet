@@ -48,13 +48,17 @@ class Config:
         save outputs, etc. Separated from the constructor so information from the config
         can be extracted for basic sanity checks before it is processed.
         '''
-        self.binning = Binning(self.Section('BINNING'))
+        self.df = self.full_table()
+        print ('%s:%s'%(self.df.iloc[0].source_filename,self.df.iloc[0].source_histname))
+        template_file = ROOT.TFile.Open(self.df.iloc[0].source_filename)
+        template = template_file.Get(self.df.iloc[0].source_histname)
+        template.SetDirectory(0)
+        self.binning = Binning(self.name, self.Section('BINNING'), template)
         self.processes = self.Section('PROCESSES')
         self.systematics = self.Section('SYSTEMATICS')
         if self.loadPrevious: 
             self.ReadIn()
         else:
-            self.df = self.full_table()
             self.organized_hists = OrganizedHists(self)
 
         return self
@@ -248,13 +252,13 @@ class Config:
         for g in df.groupby(['source_filename']):
             group_df = g[1]
             group_df = group_df[(group_df.variation == 'nominal') | (group_df.syst_type == 'shapes')]
-            group_df['out_histname'] = '%s_%s_FULL_%s'%(group_df.process, group_df.cat, group_df.region)
-            hists[g[0]] = group_df[['source_histname','out_histname']]
+            group_df['out_histname'] = '%s_%s_%s_FULL'%(group_df.process, group_df.cat, group_df.region)
+            hists[g[0]] = group_df[['source_histname','out_histname','scale','color']]
         return hists
 
 class OrganizedHists():
     '''Class to store histograms in a consistent data structure and with accompanying
-    methods to store, manipulate, and access the histograms.
+    methods to access the histograms.
 
     Attributes:
         name (str): Name, taken from input configObj.
@@ -271,30 +275,58 @@ class OrganizedHists():
     def __init__(self,configObj):
         self.name = configObj.name
         self.filename = configObj.projPath + 'organized_hists.root'
-        self.hists = configObj.get_hist_map()
         self.binning = configObj.binning
-        self.subdivided = False
+        self.hist_map = configObj.get_hist_map()
 
         if os.path.exists(self.filename) and not configObj.options.overwrite:
-            self.openOption = "OPEN"
+            self.file = ROOT.TFile.Open(self.filename,"OPEN")
         else:
-            self.openOption = "RECREATE"
-        self.file = ROOT.TFile.Open(self.filename,self.openOption)
+            self.file = ROOT.TFile.Open(self.filename,"RECREATE")
+            self.Add()
 
-    def Add(self,info):
-        '''Add histogram and save information on it. Input is a HistInfo object
-        used as a package of relevant info.
+    def __del__(self):
+        self.file.Close()
+
+    def Add(self):
+        '''Add histogram and save information on it. Input is a pandas Series generated
+        with InputHistInfo().
 
         Args:
-            info (HistInfo): HistInfo object to add.
+            info (Series): Series holding histogram information which is generated with InputHistInfo.
 
         Raises:
             RuntimeError: If openOption == "OPEN" in which case no new histograms can be added since this object is in read-only mode.
         '''
         if self.openOption == "OPEN":
-            raise RuntimeError('Cannot add a histogram to OrganizedHists if an existing TFile was opened. Set option "overwrite" to True if you wish to delete the existing file.')
-        self.hists[info.process][info.region][info.systematic] = info
-        self.file.WriteObject(info.Fetch(self.binning),info.histname)
+            raise RuntimeError('Cannot add a histogram to OrganizedHists if an existing TFile was opened. Set OrganizedHists option "overwrite" to True if you wish to delete the existing file.')
+
+        for infilename,histdf in self.hist_map.items():
+            infile = ROOT.TFile.Open(infilename)
+            for row in histdf.itertuples():
+                h = infile.Get(row.source_histname)
+                h.SetDirectory(0)
+                h.Scale(row.scale)
+
+                if get_bins_from_hist("Y", h) != self.binning.ybinList:
+                    h = copy_hist_with_new_bins(row.out_histname+'_rebinY','Y',h,self.binning.ybinList)
+                if get_bins_from_hist("X") != self.binning.xbinList:
+                    h = copy_hist_with_new_bins(row.out_histname,'X',h,self.binning.xbinList)
+                else:
+                    h.SetName(self.info['new_name']+'_FULL')
+
+                h.SetTitle(row.out_histname)
+                h.SetFillColor(row.color)
+
+                if h.Integral() <= 0:
+                    print ('WARNING: %s has zero or negative events - %s'%(row.out_histname, h.Integral()))
+                    for b in range(1,h.GetNbinsX()*h.GetNbinsY()+1):
+                        h.SetBinContent(b,1e-10)
+
+                self.file.WriteObject(h, row.out_histname)
+
+                self.CreateSubRegions(h)
+
+            infile.Close()
 
     def Get(self,histname='',process='',region='',systematic=''):
         '''Get histogram from the opened TFile. Specify the histogram
@@ -312,35 +344,15 @@ class OrganizedHists():
         '''
         return self.file.Get(histname if histname != '' else '_'.join(process,region,systematic))
 
-    @property
-    def _allHists(self):
-        '''list(TH2): List of all stored/tracked histograms.'''
-        '''List of all stored/tracked histograms.
-
-        Returns:
-            list(): [description]
-        '''
-        return [h.hist for p in self.hists for r in self.hists[p] for h in self.hists[p][r]]
-
-    def CreateSubRegions(self):
+    def CreateSubRegions(self,h):
         '''Sub-divide all histograms along the X axis into the regions specified in the config
-        and add the new histograms to the object for tracking. Sets the attribute `rebinned` to True.
-
-        Raises:
-            RuntimeError: If `rebinned` is already True.
+        and add the new histograms to the object for tracking.
         '''
-        if self.subdivided: raise RuntimeError('Already rebinned this OrganizedHists object.')
-        self.subdivided = True
-
-        for p in self.hists:
-            for r in self.hists[p]:
-                for hinfo in self.hists[p][r].values():
-                    h = hinfo.hist
-
-                    for sub in ['LOW','SIG','HIGH']:
-                        this_sub_hinfo = hinfo.Clone(region=hinfo.region+'_'+sub)
-                        this_sub_hinfo.hist = copy_hist_with_new_bins(hinfo.histname+'_'+sub,'X',h,self.binning.xbinByCat[sub])
-                        self.Add(this_sub_hinfo)
+        for sub in self.binning.xbinByCat.keys():
+            hsub = h.Clone()
+            hsub = copy_hist_with_new_bins(h.GetName().replace('_FULL','_'+sub),'X',h,self.binning.xbinByCat[sub])
+            hsub.SetTitle(hsub.GetName())
+            self.file.WriteObject(h, hsub.GetName())
 
 
 def _keyword_replace(df,col_strs):
@@ -400,8 +412,6 @@ def _df_sanity_checks(df):
     dupes = df[df.duplicated(subset=['process','region','variation','source_filename','source_histname'],keep=False)]
     if dupes.shape[0] > 0:
         raise RuntimeError('Duplicates exist. Printing them...\n%s'%dupes)
-
-
       
 def config_loop_replace(config,old,new,inGLOBAL=False):
     '''Self-calling function loop to find-replace one pair (old,new)

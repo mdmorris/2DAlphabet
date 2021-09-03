@@ -1,9 +1,9 @@
-import argparse, subprocess, json, ROOT, os
+import subprocess, json, ROOT, os, copy
 from collections import defaultdict
 from contextlib import contextmanager
 
 # Function stolen from https://stackoverflow.com/questions/9590382/forcing-python-json-module-to-work-with-ascii
-def open_json(f,twoDconfig=True):
+def open_json(f):
     '''Open a JSON file. Specify twoDconfig to true if this is a 2DAlphabet 
     configuration file.
 
