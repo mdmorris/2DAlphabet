@@ -54,9 +54,8 @@ class Config:
         if self.loadPrevious: 
             self.ReadIn()
         else:
-            self.df = full_table(self)
-            self.organized_hists = organize_inputs(self)
-            self.organized_hists.CreateSubRegions()
+            self.df = self.full_table()
+            self.organized_hists = OrganizedHists(self)
 
         return self
 
@@ -185,7 +184,7 @@ class OrganizedHists():
     def __init__(self,configObj):
         self.name = configObj.name
         self.filename = configObj.projPath + 'organized_hists.root'
-        self.hists = nested_dict(3,None) # proc, reg, syst
+        self.hists = configObj.get_hist_map()
         self.binning = configObj.binning
         self.subdivided = False
 
@@ -256,6 +255,89 @@ class OrganizedHists():
                         this_sub_hinfo.hist = copy_hist_with_new_bins(hinfo.histname+'_'+sub,'X',h,self.binning.xbinByCat[sub])
                         self.Add(this_sub_hinfo)
 
+    def full_table(self):
+        regions = self._region_table()
+        processes = self._process_table()
+        systematics = self._systematics_table()
+
+        proc_syst = processes.merge(systematics,right_index=True,left_on='variation',how='left',suffixes=['','_syst'])
+        proc_syst = _df_condense_nameinfo(proc_syst,'source_histname')
+        proc_syst = _df_condense_nameinfo(proc_syst,'source_filename')
+
+        final = regions.merge(proc_syst,right_index=True,left_on='process',how='left')
+        final = _keyword_replace(final, ['source_filename', 'source_histname'])
+        _df_sanity_checks(final)
+        return final
+
+    def _region_table(self):
+        def _data_not_included(self,region):
+            region_df = pandas.DataFrame({'process':self.Section('REGIONS')[region]})
+            process_df = pandas.DataFrame(self.Section('PROCESSES')).T[['TYPE']]
+            region_df = region_df.merge(process_df,
+                                        left_on='process',
+                                        right_index=True,
+                                        how='left')
+
+            # Check DATA type is even provided in the PROCESSES
+            if (process_df['TYPE'] == 'DATA').sum() == 0:
+                raise RuntimeError('No process of TYPE == "DATA" provided.')
+            elif (process_df['TYPE'] == 'DATA').sum() > 1:
+                raise RuntimeError('Multiple processes of TYPE == "DATA" provided in PROCESSES section.')
+            else:
+                data_key = process_df[process_df['TYPE'] == 'DATA'].index[0]
+            # Check if it's included in the regions
+            if (region_df['TYPE'] == 'DATA').sum() == 0:
+                out = data_key
+            elif ((region_df['TYPE'] == 'DATA').sum() == 1):
+                out = False
+            else:
+                raise RuntimeError('Multiple processes of TYPE == "DATA" provided in REGIONS subsection.')
+
+            return out
+
+        out_df = pandas.DataFrame(columns=['process','region'])
+        for r in self.Section('REGIONS'):
+            data_key = self._data_not_included(r)
+            if data_key:
+                out_df = out_df.append(pandas.Series({'process':data_key,'region':r}),ignore_index=True)
+
+            for p in self.Section('REGIONS')[r]:
+                out_df = out_df.append(pandas.Series({'process':p,'region':r}),ignore_index=True)
+            
+        return out_df
+
+    def _process_table(self):
+        out_df = pandas.DataFrame(columns=['color','process_type','scale','variation','source_filename','source_histname'])
+        for p in self.Section('PROCESSES'):
+            this_proc_info = self.Section('PROCESSES')[p]
+            for s in this_proc_info['SYSTEMATICS']+['nominal']:
+                out_df = out_df.append(pandas.Series(
+                                {'color': nan if 'COLOR' not in this_proc_info else this_proc_info['COLOR'],
+                                'process_type': this_proc_info['TYPE'],
+                                'scale': 1.0 if 'SCALE' not in this_proc_info else this_proc_info['SCALE'],
+                                'source_filename': this_proc_info['LOC'].split(':')[0],
+                                'source_histname': this_proc_info['LOC'].split(':')[1],
+                                'variation': s},
+                                name=p)
+                            )
+        return out_df
+
+    def _systematics_table(self):
+        out_df = pandas.DataFrame(columns=_syst_col_defaults.keys())
+        for s in self.Section('SYSTEMATICS'):
+            for syst in _get_syst_attrs(s,self.Section('SYSTEMATICS')[s]):
+                out_df = out_df.append(syst)
+        return out_df
+
+    def get_hist_map(self):
+        hists = {}
+        for g in self.df.groupby(['source_filename']):
+            group_df = g[1]
+            group_df = group_df[(group_df.variation == 'nominal') | (group_df.syst_type == 'shapes')]
+            hists[g[0]] = group_df.source_histname.to_list() # TODO: Need more than just the source histname - also want the process+region+syst so output name can be made
+        return hists
+
+
 def _keyword_replace(df,col_strs):
     def _batch_replace(row,s=None):
         if pandas.isna(row[s]):
@@ -271,79 +353,6 @@ def _keyword_replace(df,col_strs):
     for col_str in col_strs:
         df[col_str] = df.apply(_batch_replace, axis='columns', s=col_str)
     return df
-
-def full_table(config):
-    regions = _region_table(config)
-    processes = _process_table(config)
-    systematics = _systematics_table(config)
-
-    proc_syst = processes.merge(systematics,right_index=True,left_on='variation',how='left',suffixes=['','_syst'])
-    proc_syst = _df_condense_nameinfo(proc_syst,'source_histname')
-    proc_syst = _df_condense_nameinfo(proc_syst,'source_filename')
-
-    final = regions.merge(proc_syst,right_index=True,left_on='process',how='left')
-    final = _keyword_replace(final, ['source_filename', 'source_histname'])
-    return final
-
-def _region_table(config):
-    def _data_not_included(config,region):
-        region_df = pandas.DataFrame({'process':config.Section('REGIONS')[region]})
-        process_df = pandas.DataFrame(config.Section('PROCESSES')).T[['TYPE']]
-        region_df = region_df.merge(process_df,
-                                    left_on='process',
-                                    right_index=True,
-                                    how='left')
-
-        # Check DATA type is even provided in the PROCESSES
-        if (process_df['TYPE'] == 'DATA').sum() == 0:
-            raise RuntimeError('No process of TYPE == "DATA" provided.')
-        elif (process_df['TYPE'] == 'DATA').sum() > 1:
-            raise RuntimeError('Multiple processes of TYPE == "DATA" provided in PROCESSES section.')
-        else:
-            data_key = process_df[process_df['TYPE'] == 'DATA'].index[0]
-        # Check if it's included in the regions
-        if (region_df['TYPE'] == 'DATA').sum() == 0:
-            out = data_key
-        elif ((region_df['TYPE'] == 'DATA').sum() == 1):
-            out = False
-        else:
-            raise RuntimeError('Multiple processes of TYPE == "DATA" provided in REGIONS subsection.')
-
-        return out
-
-    out_df = pandas.DataFrame(columns=['process','region'])
-    for r in config.Section('REGIONS'):
-        data_key = _data_not_included(config, r)
-        if data_key:
-            out_df = out_df.append(pandas.Series({'process':data_key,'region':r}),ignore_index=True)
-
-        for p in config.Section('REGIONS')[r]:
-            out_df = out_df.append(pandas.Series({'process':p,'region':r}),ignore_index=True)
-        
-    return out_df
-
-def _process_table(config):
-    out_df = pandas.DataFrame(columns=['color','process_type','scale','variation','source_filename','source_histname'])
-    for p in config.Section('PROCESSES'):
-        this_proc_info = config.Section('PROCESSES')[p]
-        for s in this_proc_info['SYSTEMATICS']+['nominal']:
-            out_df = out_df.append(pandas.Series(
-                            {'color': nan if 'COLOR' not in this_proc_info else this_proc_info['COLOR'],
-                             'process_type': this_proc_info['TYPE'],
-                             'scale': 1.0 if 'SCALE' not in this_proc_info else this_proc_info['SCALE'],
-                             'source_filename': this_proc_info['LOC'].split(':')[0],
-                             'source_histname': this_proc_info['LOC'].split(':')[1],
-                             'variation': s},
-                            name=p)
-                        )
-    return out_df
-
-def _systematics_table(config):
-    out_df = pandas.DataFrame(columns=_syst_col_defaults.keys())
-    for s in config.Section('SYSTEMATICS'):
-        for syst in _get_syst_attrs(s,config.Section('SYSTEMATICS')[s]):
-            out_df = out_df.append(syst)
-    return out_df
 
 def _get_syst_attrs(name,syst_dict):
     if 'VAL' in syst_dict:
@@ -381,165 +390,14 @@ def _df_condense_nameinfo(df,baseColName):
     df.drop(baseColName+'_syst',axis='columns',inplace=True)
     return df
 
-def get_hist_map(full_table):
-    hists = {}
-    for g in full_table.groupby(['source_filename']):
-        group_df = g[1]
-        group_df = group_df[(group_df.variation == 'nominal') | (group_df.syst_type == 'shapes')]
-        hists[g[0]] = group_df.source_histname.to_list()
-    return hists
+def _df_sanity_checks(df):
+    # check for duplicate process+region+variation
+    dupes = df[df.duplicated(subset=['process','region','variation','source_filename','source_histname'],keep=False)]
+    if dupes.shape[0] > 0:
+        raise RuntimeError('Duplicates exist. Printing them...\n%s'%dupes)
 
-class InputHistInfo():
-    '''Class to store access to a histogram as well as meta information
-    associated with the histogram.
 
-    Args:
-        hname (str): Input histogram name.
-        fname (str): Name of file storing the histogram.
-        proc (str): Name of process in histogram.
-        region (str): Name of region in histogram.
-        syst (str): Name of systematic variation in histogram.
-        color (int): ROOT color code to denote the color of the object for plotting.
-        scale (float): Amount to scale the histogram normalization.
-        binning (Binning): Binning object to rebin the input histogram.
-
-    Attributes:
-        info (pandas.Series): Series storing the above meta information and the histogram itself.
-        rebinned (bool): Internal flag to check if the histogram has been fetched and rebinned.
-    '''
-    def __init__(self, hname, fname, proc, region, syst, color, scale):
-        super().__init__(proc, region, syst, color, scale)
-        self.histname = hname
-        self.filename = fname
-
-    def Fetch(self,binning=None):
-        f = ROOT.TFile.Open(self.filename,'OPEN')
-        h = f.Get(self.input_hname)
-        h.SetDirectory(0)
-        if isinstance(self.scale,float):
-            h.Scale(self.scale)
-        elif isinstance(self.scale,dict) and (self.region in self.scale):
-            if 'FILE' in self.scale:
-                scale_file = ROOT.TFile.Open(self.scale['FILE'])
-            else:
-                scale_file = f
-            scale_hist = scale_file.Get(self.scale[self.region])
-            h.Multiply(scale_hist)
-        f.Close()
-
-        if binning != None:
-            if get_bins_from_hist("Y", h) != binning.ybinList:
-                h = self.Get(self.histname)
-                h = copy_hist_with_new_bins(self.histname+'_rebinY','Y',h,binning.ybinList)
-            if get_bins_from_hist("X") != binning.xbinList:
-                h = copy_hist_with_new_bins(self.histname+'_FULL','X',h,binning.xbinList)
-            else:
-                h.SetName(self.histname+'_FULL')
-
-        if h.Integral() <= 0:
-            print ('WARNING: %s, %s, %s has zero or negative events - %s'%(self.process,self.region,self.syst,h.Integral()))
-            for b in range(1,h.GetNbinsX()*h.GetNbinsY()+1):
-                h.SetBinContent(b,1e-10)
-
-        return h
-
-def organize_inputs(configObj):
-    hists = OrganizedHists(configObj)
-
-    for process,proc_info in configObj.processes.items():
-        if not is_filled_list(proc_info,'SYSTEMATICS'):
-            print ('---- No systematics for process ' + process)
-            this_proc_shape_systs = []
-        else:
-            this_proc_shape_systs = [s for s in proc_info['SYSTEMATICS'] if len(set(configObj.systematics[s]) & {'VAL','VALUP','VALDOWN'}) == 0]
-        
-        for filepath,region_pairs in _parse_file_entries(proc_info):
-            # Do Nominal
-            for region_name,hist_name in region_pairs:
-                hists.Add(HistInfo(hist_name,filepath,process,region_name,'nominal',proc_info['COLOR'],proc_info['SCALE']))
-            # Loop over systematics
-            for syst in this_proc_shape_systs:
-                if syst not in configObj.systematics:
-                    raise IndexError('No entry named "%s" exists in the SYSTEMATIC section of the input config.'%syst)
-                syst_info = configObj.systematics[syst]
-                # Get file and hist names for this syst
-                for syst_filepath,syst_region_pairs in _parse_file_entries(syst_info):
-                    if syst_filepath == None: syst_filepath = filepath
-                    syst_filepath = syst_filepath.replace('*',process)
-                    for syst_region_name,syst_hist_name in syst_region_pairs:
-                        syst_hist_name = syst_hist_name.replace('*',process)
-                        region_name    = syst_region_name.split('_')[:-1]
-                        variation      = syst_region_name.split('_')[-1]
-                        syst_name      = syst if region_name not in syst_info['UNCORRELATED'] else syst+'_'+region_name
-
-                        if variation == 'UP':      syst_name+='Up'
-                        elif variation == 'DOWN':  syst_name+='Down'
-                        else:                      raise NameError('Variation for %s, %s is %s but can only be "UP" or "DOWN".'%(process,syst_region_name,variation))
-
-                        hists.Add(InputHistInfo(syst_hist_name,syst_filepath,process,region_name,syst_name+variation,proc_info['COLOR'],proc_info['SCALE']))
-
-    return hists
-
-def _parse_file_entries(d):
-    '''Logic to parse sub-dictionaries of the JSON config containing the file and region information. 
-    A given entry in the dictionary can have two forms:
-    
-    - The file name/path is the key and the corresponding value is a new dictionary
-    with region names as keys and the sub-values are histogram names inside
-    the file specified at the first level [1].
-    
-    - There is no file name/path which can only happen in the case of looking
-    up systematic uncertainty shape variations (in SYSTEMATIC section of config).
-    This form assumes one is already nested inside the file level described above.
-    Region name as the key and histogram name as the value still applies [2].
-
-    Examples:
-    ::
-
-        {"path/to/myfile1.root":
-            {
-                "regA":"histA", "regB":"histB"
-            },
-        "path/to/myfile2.root":
-            {
-                "regC":"histC", "regD":"histD"
-            }
-        }
-    
-    ::
-
-        {"regA":"histA",
-        "regB":"histB",
-        "regC":"histC",
-        "regD":"histD"
-        }
-
-    Args:
-        d (dict): Input dictionary to parse.
-
-    Raises:
-        FileExistsError: If file specified by key does not exist.
-        ValueError: If there are duplicate regions are specified. Only one histogram per-region can be provided.
-
-    Yields:
-        tuple( str, list(tuple(str,str)) ): The first return is the file path (`None` if `d` is of form #2). The second is a list
-            of the (region name, histogram name) pairs.
-    '''
-    file_keys = [f for f in d if (f not in _protected_keys and f.endswith('.root'))]
-    if len(file_keys) > 0:
-        regions = [k for f in file_keys for k in d[f]]
-        if len(regions) != len(set(regions)):
-            raise ValueError("There are duplicated regions in this process. Printing config process entry for debug.\n\n%s\n"%{f:r for f,r in d.items() if f in file_keys})
-
-        for f in file_keys:
-            if not os.path.exists(f):
-                raise FileExistsError("Cannot access file %s"%f)
-            
-            yield f,[(rname,d[f][rname]) for rname in d[f]]
-    else:
-        region_pairs = [(rname,d[rname]) for rname in d if (rname not in _protected_keys)]
-        yield None,region_pairs
-
+      
 def config_loop_replace(config,old,new,inGLOBAL=False):
     '''Self-calling function loop to find-replace one pair (old,new)
     in a nested dictionary or list (config). If old, new, and the config entry
