@@ -165,6 +165,93 @@ class Config:
         '''
         self.organized_hists = pickle.load(open(self.projPath+'hist_map.p','rb'))
 
+    def full_table(self):
+        regions = self._region_table()
+        processes = self._process_table()
+        systematics = self._systematics_table()
+
+        proc_syst = processes.merge(systematics,right_index=True,left_on='variation',how='left',suffixes=['','_syst'])
+        proc_syst = _df_condense_nameinfo(proc_syst,'source_histname')
+        proc_syst = _df_condense_nameinfo(proc_syst,'source_filename')
+
+        final = regions.merge(proc_syst,right_index=True,left_on='process',how='left')
+        final = _keyword_replace(final, ['source_filename', 'source_histname'])
+        _df_sanity_checks(final)
+        return final
+
+    def _region_table(self):
+        def _data_not_included(region):
+            region_df = pandas.DataFrame({'process':self.Section('REGIONS')[region]})
+            process_df = pandas.DataFrame(self.Section('PROCESSES')).T[['TYPE']]
+            region_df = region_df.merge(process_df,
+                                        left_on='process',
+                                        right_index=True,
+                                        how='left')
+
+            # Check DATA type is even provided in the PROCESSES
+            if (process_df['TYPE'] == 'DATA').sum() == 0:
+                raise RuntimeError('No process of TYPE == "DATA" provided.')
+            elif (process_df['TYPE'] == 'DATA').sum() > 1:
+                raise RuntimeError('Multiple processes of TYPE == "DATA" provided in PROCESSES section.')
+            else:
+                data_key = process_df[process_df['TYPE'] == 'DATA'].index[0]
+            # Check if it's included in the regions
+            if (region_df['TYPE'] == 'DATA').sum() == 0:
+                out = data_key
+            elif ((region_df['TYPE'] == 'DATA').sum() == 1):
+                out = False
+            else:
+                raise RuntimeError('Multiple processes of TYPE == "DATA" provided in REGIONS subsection.')
+
+            return out
+
+        out_df = pandas.DataFrame(columns=['process','region'])
+        for r in self.Section('REGIONS'):
+            data_key = _data_not_included(r)
+            if data_key:
+                out_df = out_df.append(pandas.Series({'process':data_key,'region':r}),ignore_index=True)
+
+            for p in self.Section('REGIONS')[r]:
+                out_df = out_df.append(pandas.Series({'process':p,'region':r}),ignore_index=True)
+            
+        return out_df
+
+    def _process_table(self):
+        out_df = pandas.DataFrame(columns=['color','process_type','scale','variation','source_filename','source_histname'])
+        for p in self.Section('PROCESSES'):
+            this_proc_info = self.Section('PROCESSES')[p]
+            for s in this_proc_info['SYSTEMATICS']+['nominal']:
+                out_df = out_df.append(pandas.Series(
+                                {'color': nan if 'COLOR' not in this_proc_info else this_proc_info['COLOR'],
+                                'process_type': this_proc_info['TYPE'],
+                                'scale': 1.0 if 'SCALE' not in this_proc_info else this_proc_info['SCALE'],
+                                'source_filename': this_proc_info['LOC'].split(':')[0],
+                                'source_histname': this_proc_info['LOC'].split(':')[1],
+                                'variation': s},
+                                name=p)
+                            )
+        return out_df
+
+    def _systematics_table(self):
+        out_df = pandas.DataFrame(columns=_syst_col_defaults.keys())
+        for s in self.Section('SYSTEMATICS'):
+            for syst in _get_syst_attrs(s,self.Section('SYSTEMATICS')[s]):
+                out_df = out_df.append(syst)
+        return out_df
+
+    def get_hist_map(self,df=None):
+        hists = {}
+        if not isinstance(df,pandas.DataFrame):
+            df = self.df
+
+        hists = pandas.DataFrame()
+        for g in df.groupby(['source_filename']):
+            group_df = g[1]
+            group_df = group_df[(group_df.variation == 'nominal') | (group_df.syst_type == 'shapes')]
+            group_df['out_histname'] = '%s_%s_FULL_%s'%(group_df.process, group_df.cat, group_df.region)
+            hists[g[0]] = group_df[['source_histname','out_histname']]
+        return hists
+
 class OrganizedHists():
     '''Class to store histograms in a consistent data structure and with accompanying
     methods to store, manipulate, and access the histograms.
@@ -254,88 +341,6 @@ class OrganizedHists():
                         this_sub_hinfo = hinfo.Clone(region=hinfo.region+'_'+sub)
                         this_sub_hinfo.hist = copy_hist_with_new_bins(hinfo.histname+'_'+sub,'X',h,self.binning.xbinByCat[sub])
                         self.Add(this_sub_hinfo)
-
-    def full_table(self):
-        regions = self._region_table()
-        processes = self._process_table()
-        systematics = self._systematics_table()
-
-        proc_syst = processes.merge(systematics,right_index=True,left_on='variation',how='left',suffixes=['','_syst'])
-        proc_syst = _df_condense_nameinfo(proc_syst,'source_histname')
-        proc_syst = _df_condense_nameinfo(proc_syst,'source_filename')
-
-        final = regions.merge(proc_syst,right_index=True,left_on='process',how='left')
-        final = _keyword_replace(final, ['source_filename', 'source_histname'])
-        _df_sanity_checks(final)
-        return final
-
-    def _region_table(self):
-        def _data_not_included(self,region):
-            region_df = pandas.DataFrame({'process':self.Section('REGIONS')[region]})
-            process_df = pandas.DataFrame(self.Section('PROCESSES')).T[['TYPE']]
-            region_df = region_df.merge(process_df,
-                                        left_on='process',
-                                        right_index=True,
-                                        how='left')
-
-            # Check DATA type is even provided in the PROCESSES
-            if (process_df['TYPE'] == 'DATA').sum() == 0:
-                raise RuntimeError('No process of TYPE == "DATA" provided.')
-            elif (process_df['TYPE'] == 'DATA').sum() > 1:
-                raise RuntimeError('Multiple processes of TYPE == "DATA" provided in PROCESSES section.')
-            else:
-                data_key = process_df[process_df['TYPE'] == 'DATA'].index[0]
-            # Check if it's included in the regions
-            if (region_df['TYPE'] == 'DATA').sum() == 0:
-                out = data_key
-            elif ((region_df['TYPE'] == 'DATA').sum() == 1):
-                out = False
-            else:
-                raise RuntimeError('Multiple processes of TYPE == "DATA" provided in REGIONS subsection.')
-
-            return out
-
-        out_df = pandas.DataFrame(columns=['process','region'])
-        for r in self.Section('REGIONS'):
-            data_key = self._data_not_included(r)
-            if data_key:
-                out_df = out_df.append(pandas.Series({'process':data_key,'region':r}),ignore_index=True)
-
-            for p in self.Section('REGIONS')[r]:
-                out_df = out_df.append(pandas.Series({'process':p,'region':r}),ignore_index=True)
-            
-        return out_df
-
-    def _process_table(self):
-        out_df = pandas.DataFrame(columns=['color','process_type','scale','variation','source_filename','source_histname'])
-        for p in self.Section('PROCESSES'):
-            this_proc_info = self.Section('PROCESSES')[p]
-            for s in this_proc_info['SYSTEMATICS']+['nominal']:
-                out_df = out_df.append(pandas.Series(
-                                {'color': nan if 'COLOR' not in this_proc_info else this_proc_info['COLOR'],
-                                'process_type': this_proc_info['TYPE'],
-                                'scale': 1.0 if 'SCALE' not in this_proc_info else this_proc_info['SCALE'],
-                                'source_filename': this_proc_info['LOC'].split(':')[0],
-                                'source_histname': this_proc_info['LOC'].split(':')[1],
-                                'variation': s},
-                                name=p)
-                            )
-        return out_df
-
-    def _systematics_table(self):
-        out_df = pandas.DataFrame(columns=_syst_col_defaults.keys())
-        for s in self.Section('SYSTEMATICS'):
-            for syst in _get_syst_attrs(s,self.Section('SYSTEMATICS')[s]):
-                out_df = out_df.append(syst)
-        return out_df
-
-    def get_hist_map(self):
-        hists = {}
-        for g in self.df.groupby(['source_filename']):
-            group_df = g[1]
-            group_df = group_df[(group_df.variation == 'nominal') | (group_df.syst_type == 'shapes')]
-            hists[g[0]] = group_df.source_histname.to_list() # TODO: Need more than just the source histname - also want the process+region+syst so output name can be made
-        return hists
 
 
 def _keyword_replace(df,col_strs):
