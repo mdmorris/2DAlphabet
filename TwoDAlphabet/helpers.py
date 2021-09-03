@@ -20,11 +20,6 @@ def open_json(f,twoDconfig=True):
     with open(f) as fInput_config:
         input_config = json.load(fInput_config, object_hook=ascii_encode_dict)  # Converts most of the unicode to ascii
 
-        if twoDconfig:
-            for process in [proc for proc in input_config['PROCESS'].keys() if proc != 'HELP']:
-                for index,item in enumerate(input_config['PROCESS'][process]['SYSTEMATICS']):           # There's one list that also
-                    input_config['PROCESS'][process]['SYSTEMATICS'][index] = item.encode('ascii')  
-
     return input_config
 
 def ascii_encode_dict(data): 
@@ -36,7 +31,15 @@ def ascii_encode_dict(data):
     Returns:
         dict: Dict encoded with ascii instead of unicode.
     '''
-    ascii_encode = lambda x: x.encode('ascii') if isinstance(x, unicode) else x 
+    def ascii_encode(x):
+        if isinstance(x, unicode):
+            return x.encode('ascii')
+        elif isinstance(x, dict):
+            return ascii_encode_dict(x)
+        elif isinstance(x, list):
+            return [s.encode('ascii') for s in x]
+        else:
+            return x
     return dict(map(ascii_encode, pair) for pair in data.items())
 
 def arg_dict_to_list(indict):
@@ -243,3 +246,13 @@ def is_filled_list(d,key):
     if not isinstance(d, dict):
         raise TypeError('Arg d is not a dictionary.')
     return (key in d and isinstance(d[key],list) and len(d[key]) > 0)
+
+def copy_update_dict(d1,d2):
+    out = copy.deepcopy(d1)
+    out.update(d2)
+    return out
+
+def replace_multi(s,findreplace):
+    for f,r in findreplace.items():
+        s = s.replace(f,r)
+    return s

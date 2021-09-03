@@ -1,12 +1,22 @@
-import ROOT, argparse, json, pickle, os
-from TwoDAlphabet.helpers import is_filled_list, nested_dict, open_json, parse_arg_dict
+import ROOT, argparse, json, pickle, os, pandas, re
+from numpy import nan
+from TwoDAlphabet.helpers import copy_update_dict, is_filled_list, nested_dict, open_json, parse_arg_dict, replace_multi
 from TwoDAlphabet.binning import Binning, copy_hist_with_new_bins, get_bins_from_hist
 
-_protected_keys = ["PROCESS","SYSTEMATICS","SYSTEMATIC","BINNING","OPTIONS","GLOBAL","SCALE","COLOR","TYPE","X","Y","NAME","TITLE","BINS","NBINS","LOW","HIGH"]
+_protected_keys = ["PROCESSES","SYSTEMATICS","REGIONS","BINNING","OPTIONS","GLOBAL","SCALE","COLOR","TYPE","X","Y","NAME","TITLE","BINS","NBINS","LOW","HIGH"]
+_syst_col_defaults = {
+    # 'variation': nan,
+    'lnN': nan,
+    'lnN_asym': nan,
+    'shape_sigma': nan,
+    'syst_type': nan,
+    'source_filename': nan,
+    'source_histname': nan
+}
 class Config:
     '''Class to handle the reading and manipulation of data provided 
     in 2DAlphabet JSON configuration files. Constructor initializes
-    a Config object for a given JSON file and performs
+    a Config object for a given set of JSON files and performs
     all initial checks and manipulations.
 
     Args:
@@ -41,8 +51,10 @@ class Config:
         self.binning = Binning(self.Section('BINNING'))
         self.processes = self.Section('PROCESSES')
         self.systematics = self.Section('SYSTEMATICS')
-        if self.loadPrevious: self.organized_hists = self.ReadIn()
+        if self.loadPrevious: 
+            self.ReadIn()
         else:
+            self.df = full_table(self)
             self.organized_hists = organize_inputs(self)
             self.organized_hists.CreateSubRegions()
 
@@ -243,24 +255,138 @@ class OrganizedHists():
                         this_sub_hinfo.hist = copy_hist_with_new_bins(hinfo.histname+'_'+sub,'X',h,self.binning.xbinByCat[sub])
                         self.Add(this_sub_hinfo)
 
-class HistInfo():
-    def __init__(self,proc,region,syst,color,scale):
-        self.process = proc
-        self.region = region
-        self.systematic = syst
-        self.new_name = '%s_%s_%s'%(proc,region,syst) if syst != 'nominal' else '%s_%s'%(proc,region)
-        self.color = color
-        self.scale = scale
-        self.hist = None
+def _keyword_replace(df,col_strs):
+    def _batch_replace(row,s=None):
+        if pandas.isna(row[s]):
+            return nan
+        else:
+            return replace_multi(
+                row[col_str],
+                {'$process': row.process,
+                 '$region':  row.region,
+                 '$syst':    row.variation}
+            )
 
-    def Clone(self,process=None,region=None,systematic=None):
-        return HistInfo(process if process!=None else self.process,
-                        region if region!=None else self.region,
-                        systematic if systematic!=None else self.systematic,
-                        self.color,self.scale)
+    for col_str in col_strs:
+        df[col_str] = df.apply(_batch_replace, axis='columns', s=col_str)
+    return df
 
-    def Fetch(self):
-        return self.hist
+def full_table(config):
+    regions = _region_table(config)
+    processes = _process_table(config)
+    systematics = _systematics_table(config)
+
+    proc_syst = processes.merge(systematics,right_index=True,left_on='variation',how='left',suffixes=['','_syst'])
+    proc_syst = _df_condense_nameinfo(proc_syst,'source_histname')
+    proc_syst = _df_condense_nameinfo(proc_syst,'source_filename')
+
+    final = regions.merge(proc_syst,right_index=True,left_on='process',how='left')
+    final = _keyword_replace(final, ['source_filename', 'source_histname'])
+    return final
+
+def _region_table(config):
+    def _data_not_included(config,region):
+        region_df = pandas.DataFrame({'process':config.Section('REGIONS')[region]})
+        process_df = pandas.DataFrame(config.Section('PROCESSES')).T[['TYPE']]
+        region_df = region_df.merge(process_df,
+                                    left_on='process',
+                                    right_index=True,
+                                    how='left')
+
+        # Check DATA type is even provided in the PROCESSES
+        if (process_df['TYPE'] == 'DATA').sum() == 0:
+            raise RuntimeError('No process of TYPE == "DATA" provided.')
+        elif (process_df['TYPE'] == 'DATA').sum() > 1:
+            raise RuntimeError('Multiple processes of TYPE == "DATA" provided in PROCESSES section.')
+        else:
+            data_key = process_df[process_df['TYPE'] == 'DATA'].index[0]
+        # Check if it's included in the regions
+        if (region_df['TYPE'] == 'DATA').sum() == 0:
+            out = data_key
+        elif ((region_df['TYPE'] == 'DATA').sum() == 1):
+            out = False
+        else:
+            raise RuntimeError('Multiple processes of TYPE == "DATA" provided in REGIONS subsection.')
+
+        return out
+
+    out_df = pandas.DataFrame(columns=['process','region'])
+    for r in config.Section('REGIONS'):
+        data_key = _data_not_included(config, r)
+        if data_key:
+            out_df = out_df.append(pandas.Series({'process':data_key,'region':r}),ignore_index=True)
+
+        for p in config.Section('REGIONS')[r]:
+            out_df = out_df.append(pandas.Series({'process':p,'region':r}),ignore_index=True)
+        
+    return out_df
+
+def _process_table(config):
+    out_df = pandas.DataFrame(columns=['color','process_type','scale','variation','source_filename','source_histname'])
+    for p in config.Section('PROCESSES'):
+        this_proc_info = config.Section('PROCESSES')[p]
+        for s in this_proc_info['SYSTEMATICS']+['nominal']:
+            out_df = out_df.append(pandas.Series(
+                            {'color': nan if 'COLOR' not in this_proc_info else this_proc_info['COLOR'],
+                             'process_type': this_proc_info['TYPE'],
+                             'scale': 1.0 if 'SCALE' not in this_proc_info else this_proc_info['SCALE'],
+                             'source_filename': this_proc_info['LOC'].split(':')[0],
+                             'source_histname': this_proc_info['LOC'].split(':')[1],
+                             'variation': s},
+                            name=p)
+                        )
+    return out_df
+
+def _systematics_table(config):
+    out_df = pandas.DataFrame(columns=_syst_col_defaults.keys())
+    for s in config.Section('SYSTEMATICS'):
+        for syst in _get_syst_attrs(s,config.Section('SYSTEMATICS')[s]):
+            out_df = out_df.append(syst)
+    return out_df
+
+def _get_syst_attrs(name,syst_dict):
+    if 'VAL' in syst_dict:
+        out = [{
+            'lnN':syst_dict['VAL'],
+            'syst_type': 'lnN'
+        }]
+    elif 'VALUP' in syst_dict and 'VALDOWN' in syst_dict:
+        out = [{
+            'lnN_asym':[syst_dict['VALUP'], syst_dict['VALDOWN']],
+            'syst_type': 'lnN_asym'
+        }]
+    elif 'UP' in syst_dict and 'DOWN' in syst_dict:
+        out = [
+            {
+                'shape_sigma':syst_dict['SIGMA'],
+                'syst_type': 'shapes',
+                'source_filename': syst_dict['UP'].split(':')[0],
+                'source_histname': syst_dict['UP'].split(':')[1]
+            }, {
+                'shape_sigma':syst_dict['SIGMA'],
+                'syst_type': 'shapes',
+                'source_filename': syst_dict['DOWN'].split(':')[0],
+                'source_histname': syst_dict['DOWN'].split(':')[1]
+            }
+        ]
+    else:
+        raise RuntimeError('Systematic variation type could not be determined for "%s".'%name)
+
+    out = [pandas.Series(copy_update_dict(_syst_col_defaults, d), name=name) for d in out]
+    return out
+
+def _df_condense_nameinfo(df,baseColName):
+    df[baseColName] = df.apply(lambda row: row[baseColName+'_syst'] if pandas.notna(row[baseColName+'_syst']) else row[baseColName], axis='columns')
+    df.drop(baseColName+'_syst',axis='columns',inplace=True)
+    return df
+
+def get_hist_map(full_table):
+    hists = {}
+    for g in full_table.groupby(['source_filename']):
+        group_df = g[1]
+        group_df = group_df[(group_df.variation == 'nominal') | (group_df.syst_type == 'shapes')]
+        hists[g[0]] = group_df.source_histname.to_list()
+    return hists
 
 class InputHistInfo(HistInfo):
     def __init__(self, hname, fname, proc, region, syst, color, scale):
@@ -396,7 +522,7 @@ def _parse_file_entries(d):
         region_pairs = [(rname,d[rname]) for rname in d if (rname not in _protected_keys)]
         yield None,region_pairs
 
-def config_loop_replace(config,old,new):
+def config_loop_replace(config,old,new,inGLOBAL=False):
     '''Self-calling function loop to find-replace one pair (old,new)
     in a nested dictionary or list (config). If old, new, and the config entry
     examined are all strings, all instances of <old> will be replaced by <new> in the
@@ -415,16 +541,19 @@ def config_loop_replace(config,old,new):
     Returns:
         dict,list: Modified dict/list.
     '''
+    next_is_global = False
     if isinstance(config,dict):
         for k,v in config.items():
-            if old in k:
-                config[k.replace(old,new)] = config.pop(k)
-                k = k.replace(old,new)
+            if k == 'GLOBAL':
+                next_is_global = True
+            if old in k and not inGLOBAL:
+                config[re.sub(r'\b%s\b'%old,new,k)] = config.pop(k)
+                k = re.sub(r'\b%s\b'%old,new,k)
             if isinstance(v,dict) or isinstance(v,list):
-                config[k] = config_loop_replace(v,old,new)
+                config[k] = config_loop_replace(v,old,new,inGLOBAL=next_is_global)
             elif isinstance(v,str) and isinstance(old,str) and isinstance(new,str):
                 if old in v:
-                    config[k] = v.replace(old,new)
+                    config[k] = re.sub(r'\b%s\b'%old,new,v)
             else:
                 if old == v:
                     config[k] = new
@@ -434,7 +563,7 @@ def config_loop_replace(config,old,new):
                 config[i] = config_loop_replace(v,old,new)
             elif isinstance(v,str):
                 if old in v:
-                    config[i] = v.replace(old,new)
+                    config[i] = re.sub(r'\b%s\b'%old,new,v)
             else:
                 if old == v:
                     config[i] = new
