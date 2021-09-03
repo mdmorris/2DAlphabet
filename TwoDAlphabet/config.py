@@ -83,8 +83,8 @@ class Config:
         Raises:
             ValueError: If a "find" already exists in self.config['GLOBAL'].
         '''
-        for s in findreplace.keys():
-            if s in self.Section('GLOBAL').keys():
+        for s in findreplace:
+            if s in self.Section('GLOBAL'):
                 raise ValueError('A command line string replacement (%s) conflicts with one already in the configuration file. Quitting...' %(s))
             self.Section('GLOBAL')[s] = findreplace[s]
 
@@ -94,19 +94,19 @@ class Config:
         before running this function to add in external find-replace pairs.
 
         Args:
-            @param findreplace (dict): Non-nested dictionary with key-value pairs to find-replace
+            findreplace (dict): Non-nested dictionary with key-value pairs to find-replace
                 in the internal class configuration dict.
 
         Returns:
             None.
         '''
         print ("Doing GLOBAL variable replacement in input json...")
-        for old_string in self.Section('GLOBAL').keys():
+        for old_string in self.Section('GLOBAL'):
             if old_string == "HELP":
                 print ('WARNING: The HELP entry is deprecated and checking for it will be removed in the future. Please remove it from your config.')
                 continue
             new_string = self.Section('GLOBAL')[old_string]
-            self.config = self.config_loop_replace(self.config, old_string, new_string)
+            self.config = config_loop_replace(self.config, old_string, new_string)
 
     def GetOptions(self,externalOpts={}):
         '''Loads options specific to this config file (from 'OPTIONS' section).
@@ -114,7 +114,8 @@ class Config:
         the config (and modify the config in-place so that the version later saved
         reflects the conditions under which the config was used).
 
-        @param externalOpts (dict, optional): Option-value pairs. Defaults to {}.
+        Args:
+            externalOpts (dict, optional): Option-value pairs. Defaults to {}.
 
         Returns:
             ArgumentParser.Namespace
@@ -388,7 +389,24 @@ def get_hist_map(full_table):
         hists[g[0]] = group_df.source_histname.to_list()
     return hists
 
-class InputHistInfo(HistInfo):
+class InputHistInfo():
+    '''Class to store access to a histogram as well as meta information
+    associated with the histogram.
+
+    Args:
+        hname (str): Input histogram name.
+        fname (str): Name of file storing the histogram.
+        proc (str): Name of process in histogram.
+        region (str): Name of region in histogram.
+        syst (str): Name of systematic variation in histogram.
+        color (int): ROOT color code to denote the color of the object for plotting.
+        scale (float): Amount to scale the histogram normalization.
+        binning (Binning): Binning object to rebin the input histogram.
+
+    Attributes:
+        info (pandas.Series): Series storing the above meta information and the histogram itself.
+        rebinned (bool): Internal flag to check if the histogram has been fetched and rebinned.
+    '''
     def __init__(self, hname, fname, proc, region, syst, color, scale):
         super().__init__(proc, region, syst, color, scale)
         self.histname = hname
