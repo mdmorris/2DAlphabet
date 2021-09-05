@@ -1,5 +1,7 @@
 import ROOT, argparse, json, pickle, os, pandas, re
 from numpy import nan
+import pprint
+pp = pprint.PrettyPrinter(indent=4)
 from TwoDAlphabet.helpers import copy_update_dict, is_filled_list, nested_dict, open_json, parse_arg_dict, replace_multi
 from TwoDAlphabet.binning import Binning, copy_hist_with_new_bins, get_bins_from_hist
 
@@ -11,7 +13,8 @@ _syst_col_defaults = {
     'shape_sigma': nan,
     'syst_type': nan,
     'source_filename': nan,
-    'source_histname': nan
+    'source_histname': nan,
+    'direction': nan
 }
 class Config:
     '''Class to handle the reading and manipulation of data provided 
@@ -49,7 +52,6 @@ class Config:
         can be extracted for basic sanity checks before it is processed.
         '''
         self.df = self.full_table()
-        print ('%s:%s'%(self.df.iloc[0].source_filename,self.df.iloc[0].source_histname))
         template_file = ROOT.TFile.Open(self.df.iloc[0].source_filename)
         template = template_file.Get(self.df.iloc[0].source_histname)
         template.SetDirectory(0)
@@ -57,9 +59,9 @@ class Config:
         self.processes = self.Section('PROCESSES')
         self.systematics = self.Section('SYSTEMATICS')
         if self.loadPrevious: 
-            self.ReadIn()
+            self.organized_hists = OrganizedHists(self,readOnly=True)
         else:
-            self.organized_hists = OrganizedHists(self)
+            self.organized_hists = OrganizedHists(self,readOnly=False)
 
         return self
 
@@ -143,6 +145,8 @@ class Config:
             help='In the b-only post-fit plots, plot the signal normalized to its pre-fit value. Defaults to False.')
         parser.add_argument('plotEvtsPerUnit', default=False, type=bool, nargs='?',
             help='Post-fit bins are plotted as events per unit rather than events per bin. Defaults to False.')
+        parser.add_argument('overwrite', default=False, type=bool, nargs='?',
+            help='Overwrite any existing files.')
         
         parser.add_argument('ySlices', default=[], type=list, nargs='?',
             help='Manually define the slices in the y-axis for the sake of plotting. Only needed if the automated algorithm is not working as intended. Defaults to empty list.')
@@ -161,13 +165,8 @@ class Config:
         file_out = open(self.projPath+'runConfig.json', 'w')
         json.dump(self.config,file_out,indent=2,sort_keys=True)
         file_out.close()
-        pickle.dump(self.organized_hists, open(self.projPath+'hist_map.p','wb'))
+        # pickle.dump(self.organized_hists, open(self.projPath+'hist_map.p','wb'))
         # self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
-
-    def ReadIn(self): # pragma: no cover
-        '''Read the histogram map from the pickled file.
-        '''
-        self.organized_hists = pickle.load(open(self.projPath+'hist_map.p','rb'))
 
     def full_table(self):
         regions = self._region_table()
@@ -244,15 +243,20 @@ class Config:
         return out_df
 
     def get_hist_map(self,df=None):
-        hists = {}
+        def get_out_name(row):
+            if row.variation == 'nominal':
+                return row.process+'_'+row.region+'_'+row.variation+"_FULL"
+            else:
+                return row.process+'_'+row.region+'_'+row.variation+row.direction+"_FULL"
+
         if not isinstance(df,pandas.DataFrame):
             df = self.df
 
-        hists = pandas.DataFrame()
+        hists = {}
         for g in df.groupby(['source_filename']):
-            group_df = g[1]
-            group_df = group_df[(group_df.variation == 'nominal') | (group_df.syst_type == 'shapes')]
-            group_df['out_histname'] = '%s_%s_%s_FULL'%(group_df.process, group_df.cat, group_df.region)
+            group_df = g[1].copy()
+            group_df = group_df[group_df['variation'].eq('nominal') | group_df["syst_type"].eq("shapes")]
+            group_df['out_histname'] = group_df.apply(get_out_name,axis=1)
             hists[g[0]] = group_df[['source_histname','out_histname','scale','color']]
         return hists
 
@@ -266,26 +270,25 @@ class OrganizedHists():
         hists (dict): Three-level nested dictionary organized as [process][region][systematic variation].
         binning (Binning): Binning object, taken from configObj.
         rebinned (bool): Flag to denote if a rebinning has already occured.
-        openOption (str): ROOT TFile::Open option set based on whether the file exists and if the configObj requests an overwrite.
         file (ROOT.TFile): TFile to store histograms on disk.
 
     Args:
         configObj (Config): Config object.
     '''
-    def __init__(self,configObj):
+    def __init__(self,configObj,readOnly=False):
         self.name = configObj.name
         self.filename = configObj.projPath + 'organized_hists.root'
         self.binning = configObj.binning
         self.hist_map = configObj.get_hist_map()
 
-        if os.path.exists(self.filename) and not configObj.options.overwrite:
+        if os.path.exists(self.filename) and readOnly:
             self.file = ROOT.TFile.Open(self.filename,"OPEN")
         else:
             self.file = ROOT.TFile.Open(self.filename,"RECREATE")
             self.Add()
 
-    def __del__(self):
-        self.file.Close()
+    # def __del__(self):
+    #     if hasattr(self,'file'): self.file.Close()
 
     def Add(self):
         '''Add histogram and save information on it. Input is a pandas Series generated
@@ -293,13 +296,7 @@ class OrganizedHists():
 
         Args:
             info (Series): Series holding histogram information which is generated with InputHistInfo.
-
-        Raises:
-            RuntimeError: If openOption == "OPEN" in which case no new histograms can be added since this object is in read-only mode.
         '''
-        if self.openOption == "OPEN":
-            raise RuntimeError('Cannot add a histogram to OrganizedHists if an existing TFile was opened. Set OrganizedHists option "overwrite" to True if you wish to delete the existing file.')
-
         for infilename,histdf in self.hist_map.items():
             infile = ROOT.TFile.Open(infilename)
             for row in histdf.itertuples():
@@ -309,7 +306,7 @@ class OrganizedHists():
 
                 if get_bins_from_hist("Y", h) != self.binning.ybinList:
                     h = copy_hist_with_new_bins(row.out_histname+'_rebinY','Y',h,self.binning.ybinList)
-                if get_bins_from_hist("X") != self.binning.xbinList:
+                if get_bins_from_hist("X", h) != self.binning.xbinList:
                     h = copy_hist_with_new_bins(row.out_histname,'X',h,self.binning.xbinList)
                 else:
                     h.SetName(self.info['new_name']+'_FULL')
@@ -352,8 +349,7 @@ class OrganizedHists():
             hsub = h.Clone()
             hsub = copy_hist_with_new_bins(h.GetName().replace('_FULL','_'+sub),'X',h,self.binning.xbinByCat[sub])
             hsub.SetTitle(hsub.GetName())
-            self.file.WriteObject(h, hsub.GetName())
-
+            self.file.WriteObject(hsub, hsub.GetName())
 
 def _keyword_replace(df,col_strs):
     def _batch_replace(row,s=None):
@@ -388,12 +384,14 @@ def _get_syst_attrs(name,syst_dict):
                 'shape_sigma':syst_dict['SIGMA'],
                 'syst_type': 'shapes',
                 'source_filename': syst_dict['UP'].split(':')[0],
-                'source_histname': syst_dict['UP'].split(':')[1]
+                'source_histname': syst_dict['UP'].split(':')[1],
+                'direction': 'Up'
             }, {
                 'shape_sigma':syst_dict['SIGMA'],
                 'syst_type': 'shapes',
                 'source_filename': syst_dict['DOWN'].split(':')[0],
-                'source_histname': syst_dict['DOWN'].split(':')[1]
+                'source_histname': syst_dict['DOWN'].split(':')[1],
+                'direction': 'Down'
             }
         ]
     else:
