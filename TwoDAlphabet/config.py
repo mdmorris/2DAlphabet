@@ -51,7 +51,7 @@ class Config:
         save outputs, etc. Separated from the constructor so information from the config
         can be extracted for basic sanity checks before it is processed.
         '''
-        self.df = self.full_table()
+        self.df = self.FullTable()
         template_file = ROOT.TFile.Open(self.df.iloc[0].source_filename)
         template = template_file.Get(self.df.iloc[0].source_histname)
         template.SetDirectory(0)
@@ -168,10 +168,17 @@ class Config:
         # pickle.dump(self.organized_hists, open(self.projPath+'hist_map.p','wb'))
         # self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
 
-    def full_table(self):
-        regions = self._region_table()
-        processes = self._process_table()
-        systematics = self._systematics_table()
+    def FullTable(self):
+        '''Generate full table of processes, regions, and systematic variations
+        to account for, including relevant information for each. The table is
+        returned as a pandas DataFrame for convenient manipulation.
+
+        Returns:
+            pandas.DataFrame: Table
+        '''
+        regions = self._regionTable()
+        processes = self._processTable()
+        systematics = self._systematicsTable()
 
         proc_syst = processes.merge(systematics,right_index=True,left_on='variation',how='left',suffixes=['','_syst'])
         proc_syst = _df_condense_nameinfo(proc_syst,'source_histname')
@@ -182,8 +189,32 @@ class Config:
         _df_sanity_checks(final)
         return final
 
-    def _region_table(self):
+    def _regionTable(self):
+        '''Generate the table of region information based on the JSON config.
+        Columns are `process` and `region`.
+
+        Returns:
+            pandas.DataFrame
+        '''
         def _data_not_included(region):
+            '''Check if the list of processes associated with a region
+            includes the one marked as `type` `DATA` in the `PROCESSES`
+            section of the config. If it doesn't included it but it exists,
+            return the name so it can be added to the list of processes
+            for the region.
+
+            Args:
+                region (str): Name of region to check.
+
+            Raises:
+                RuntimeError: No process of TYPE == "DATA" provided.
+                RuntimeError: Multiple processes of TYPE == "DATA" provided in PROCESSES section.
+                RuntimeError: Multiple processes of TYPE == "DATA" provided in REGIONS subsection.
+
+            Returns:
+                str: The name of the data key if it's not already included in the list of processes
+                for the region.
+            '''
             region_df = pandas.DataFrame({'process':self.Section('REGIONS')[region]})
             process_df = pandas.DataFrame(self.Section('PROCESSES')).T[['TYPE']]
             region_df = region_df.merge(process_df,
@@ -219,7 +250,14 @@ class Config:
             
         return out_df
 
-    def _process_table(self):
+    def _processTable(self):
+        '''Generate the table of process information based on the JSON config.
+        Columns are `color`, `process_type`, `scale`, `variation`, `source_filename`,
+        and `source_histname`.
+
+        Returns:
+            pandas.DataFrame
+        '''
         out_df = pandas.DataFrame(columns=['color','process_type','scale','variation','source_filename','source_histname'])
         for p in self.Section('PROCESSES'):
             this_proc_info = self.Section('PROCESSES')[p]
@@ -235,7 +273,14 @@ class Config:
                             )
         return out_df
 
-    def _systematics_table(self):
+    def _systematicsTable(self):
+        '''Generate the table of process information based on the JSON config.
+        Columns are  'lnN', 'lnN_asym', 'shape_sigma', 'syst_type', 'source_filename',
+        'source_histname', and 'direction' (ie. NaN, 'Up', or 'Down').
+
+        Returns:
+            pandas.DataFrame
+        '''
         out_df = pandas.DataFrame(columns=_syst_col_defaults.keys())
         for s in self.Section('SYSTEMATICS'):
             for syst in _get_syst_attrs(s,self.Section('SYSTEMATICS')[s]):
@@ -243,7 +288,26 @@ class Config:
         return out_df
 
     def get_hist_map(self,df=None):
-        def get_out_name(row):
+        '''Collect information on the histograms to extract, manipulate, and save
+        into organized_hists.root and store it inside a `dict` where the key is the
+        filename and the value is a DataFrame with columns `source_histname`, `out_histname`,
+        `scale`, and `color`.
+
+        Args:
+            df (pandas.DataFrame, optional): pandas.DataFrame to groupby. Defaults to None in which case self.df is used.
+
+        Returns:
+            dict(str:pandas.DataFrame): Map of file name to DataFrame with information on histogram name, scale factor, fill color, and output name.
+        '''
+        def _get_out_name(row):
+            '''Per-row processing to create the output histogram name.
+
+            Args:
+                row (pandas.Series): Row to process.
+
+            Returns:
+                str: New name.
+            '''
             if row.variation == 'nominal':
                 return row.process+'_'+row.region+'_'+row.variation+"_FULL"
             else:
@@ -256,7 +320,7 @@ class Config:
         for g in df.groupby(['source_filename']):
             group_df = g[1].copy()
             group_df = group_df[group_df['variation'].eq('nominal') | group_df["syst_type"].eq("shapes")]
-            group_df['out_histname'] = group_df.apply(get_out_name,axis=1)
+            group_df['out_histname'] = group_df.apply(_get_out_name,axis=1)
             hists[g[0]] = group_df[['source_histname','out_histname','scale','color']]
         return hists
 
@@ -287,15 +351,11 @@ class OrganizedHists():
             self.file = ROOT.TFile.Open(self.filename,"RECREATE")
             self.Add()
 
-    # def __del__(self):
-    #     if hasattr(self,'file'): self.file.Close()
-
     def Add(self):
-        '''Add histogram and save information on it. Input is a pandas Series generated
-        with InputHistInfo().
+        '''Manipulate all histograms in self.hist_map and save them to organized_hists.root.
 
-        Args:
-            info (Series): Series holding histogram information which is generated with InputHistInfo.
+        Returns:
+            None
         '''
         for infilename,histdf in self.hist_map.items():
             infile = ROOT.TFile.Open(infilename)
@@ -342,8 +402,11 @@ class OrganizedHists():
         return self.file.Get(histname if histname != '' else '_'.join(process,region,systematic))
 
     def CreateSubRegions(self,h):
-        '''Sub-divide all histograms along the X axis into the regions specified in the config
-        and add the new histograms to the object for tracking.
+        '''Sub-divide input histogram along the X axis into the regions specified in the config
+        and write the new histogram to organized_hists.root.
+
+        Returns:
+            None
         '''
         for sub in self.binning.xbinByCat.keys():
             hsub = h.Clone()
@@ -352,6 +415,17 @@ class OrganizedHists():
             self.file.WriteObject(hsub, hsub.GetName())
 
 def _keyword_replace(df,col_strs):
+    '''Given a DataFrame and list of column names,
+    find and replace the three keywords ("$process", "$region$", "$syst") with their
+    respective values in the row for the DataFrame.
+
+    Args:
+        df (pandas.DataFrame): DataFrame in which to do the find-replace and to find the per-row keyword matches.
+        col_strs (list(str)): List of column names to consider for the find-replace.
+
+    Returns:
+        pandas.DataFrame: The manipulated DataFrame copy.
+    '''
     def _batch_replace(row,s=None):
         if pandas.isna(row[s]):
             return nan
@@ -368,6 +442,20 @@ def _keyword_replace(df,col_strs):
     return df
 
 def _get_syst_attrs(name,syst_dict):
+    '''Parse an entry in the `"SYSTEMATICS"` section of the JSON config and
+    generate the row(s) to append to the systematics DataFrame based on
+    that information.
+
+    Args:
+        name (str): Name of the systematic variation.
+        syst_dict (dict): Dictionary of the config["SYSTEMATICS"][name] section of the JSON config.
+
+    Raises:
+        RuntimeError: Systematic variation type could not be determined.
+
+    Returns:
+        list(pands.Series): List of new rows to append to the main systematics DataFrame.
+    '''
     if 'VAL' in syst_dict:
         out = [{
             'lnN':syst_dict['VAL'],
@@ -401,11 +489,31 @@ def _get_syst_attrs(name,syst_dict):
     return out
 
 def _df_condense_nameinfo(df,baseColName):
+    '''Condense information after the left-join of the process and systematics DataFrames which creates duplicates
+    of the `source_*` columns. Manipulate `df` and return it so that `baseColName+"_syst"` replaces `baseColName`
+    and is then dropped.
+
+    Args:
+        df (pandas.DataFrame): Input DataFrame to condense.
+        baseColName (str): Name of column to condense into.
+
+    Returns:
+        pandas.DataFrame: Condensed DataFrame.
+    '''
     df[baseColName] = df.apply(lambda row: row[baseColName+'_syst'] if pandas.notna(row[baseColName+'_syst']) else row[baseColName], axis='columns')
     df.drop(baseColName+'_syst',axis='columns',inplace=True)
     return df
 
 def _df_sanity_checks(df):
+    '''Check for duplicated (process,region,variation,source_filename,source_histname).
+    Prints any duplicate rows if they exist (and raises RuntimeError).
+
+    Args:
+        df (pandas.DataFrame): DataFrame to check.
+
+    Raises:
+        RuntimeError: Duplicates exist (duplicated rows are printed).
+    '''
     # check for duplicate process+region+variation
     dupes = df[df.duplicated(subset=['process','region','variation','source_filename','source_histname'],keep=False)]
     if dupes.shape[0] > 0:
