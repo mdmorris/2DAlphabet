@@ -12,7 +12,8 @@ test_dict = {
         "test": 1,
         "dictionary": False
     },
-    "OPTIONS": {}
+    "OPTIONS": {},
+    "GLOBAL": {}
 }
 
 test_dict_zeros = {
@@ -22,11 +23,12 @@ test_dict_zeros = {
         'test': 0,
         'dictionary': 0
     },
-    "OPTIONS": {}
+    "OPTIONS": {},
+    "GLOBAL": {}
 }
 
 def test__open_json():
-    assert (open_json("test/testjson.json",False) == test_dict)
+    assert (open_json("test/testjson.json") == test_dict)
     open_json('test/twoDtest.json')
 
 def test__arg_dict_to_list():

@@ -1,42 +1,40 @@
 {
     "GLOBAL": {
-        "FILE": "$process.root",
-        "FILE_UP": "$process_$systUp.root",
-        "FILE_DOWN": "$process_$systDown.root",
-        "HIST": "$region",
-        "HIST_UP": "$region_$systup",
-        "HIST_DOWN": "$region_$systdown",
-        "path": "myPath"
+        "FILE": "THselection_$process.root",
+        "FILE_UP": "THselection_$process_$syst_up.root",
+        "FILE_DOWN": "THselection_$process_$syst_down.root",
+        "HIST": "MthvMh_particleNet_$region__nominal",
+        "HIST_UP": "MthvMh_particleNet_$region__$syst_up",
+        "HIST_DOWN": "MthvMh_particleNet_$region__$syst_down",
+        "path": "test/data"
     },
-    "NAME": "SR",
+    "NAME": "CR",
     "OPTIONS": {
         "blindedFit":false,
         "blindedPlots":false,
         "plotUncerts":false,
         "plotTitles":false,
-        "fitGuesses":false,
-        "prerun":false,
         "year":2
     },
 
     "PROCESSES": {
-        "data_obs": {
+        "Data_Run2": {
             "SYSTEMATICS":[],
             "SCALE": 1.0,
             "COLOR": 0,
             "TYPE": "DATA",
-            "ALIAS": "data",
+            "ALIAS": "data_obs",
             "LOC": "path/FILE:HIST"
         },
-        "bkg": {
-            "SYSTEMATICS":["lumi","TT_xsec"],
-            "SCALE": 1.5,
+        "ttbar_16": {
+            "SYSTEMATICS":["lumi","TT_xsec","TptReweight"],
+            "SCALE": 1.0,
             "COLOR": 2,
             "TYPE": "BKG",
             "LOC": "path/FILE:HIST"
         },
-        "signal": {
-            "SYSTEMATICS":["lumi","TT_xsec","topsf-merged_16"],
+        "TprimeB-1800_16": {
+            "SYSTEMATICS":["lumi","JER"],
             "SCALE": 1.0,
             "COLOR": 0,
             "TYPE": "SIGNAL",
@@ -45,8 +43,8 @@
     },
 
     "REGIONS": {
-        "pass": ["bkg","signal"],
-        "fail": ["bkg","signal"]
+        "CR_pass": ["ttbar_16","TprimeB-1800_16","Data_Run2"],
+        "CR_fail": ["ttbar_16","TprimeB-1800_16","Data_Run2"]
     },
 
     "SYSTEMATICS": {
@@ -57,13 +55,13 @@
             "VALUP": 1.20,
             "VALDOWN": 0.8
         },
-        "topsf-merged_16":{
+        "TptReweight":{
             "ALIAS": "Top3",
             "UP": "path/FILE:HIST_UP",
             "DOWN": "path/FILE:HIST_DOWN",
             "SIGMA": 1.0
         },
-        "jer_16": {
+        "JER": {
             "ALIAS": "JER",
             "UP": "path/FILE_UP:HIST",
             "DOWN": "path/FILE_DOWN:HIST",
@@ -76,18 +74,18 @@
         "X": {
             "NAME": "xaxis",
             "TITLE": "X",
-            "MIN": 0,
-            "MAX": 24,
-            "NBINS": 12,
-            "SIGSTART": 14,
-            "SIGEND": 16
+            "MIN": 60,
+            "MAX": 260,
+            "NBINS": 10,
+            "SIGSTART": 100,
+            "SIGEND": 140
         },
         "Y": {
             "NAME": "yaxis",
             "TITLE": "Y",
-            "MIN": 0, 
-            "MAX": 20,
-            "NBINS": 10
+            "MIN": 800, 
+            "MAX": 3000,
+            "NBINS": 22
         }
     }
 }

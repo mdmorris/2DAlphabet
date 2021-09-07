@@ -1,8 +1,8 @@
-import ROOT, argparse, json, pickle, os, pandas, re
+import ROOT, argparse, json, os, pandas, re
 from numpy import nan
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
-from TwoDAlphabet.helpers import copy_update_dict, is_filled_list, nested_dict, open_json, parse_arg_dict, replace_multi
+from TwoDAlphabet.helpers import copy_update_dict, open_json, parse_arg_dict, replace_multi
 from TwoDAlphabet.binning import Binning, copy_hist_with_new_bins, get_bins_from_hist
 
 _protected_keys = ["PROCESSES","SYSTEMATICS","REGIONS","BINNING","OPTIONS","GLOBAL","SCALE","COLOR","TYPE","X","Y","NAME","TITLE","BINS","NBINS","LOW","HIGH"]
@@ -90,8 +90,8 @@ class Config:
         '''
         for s in findreplace:
             if s in self.Section('GLOBAL'):
-                raise ValueError('A command line string replacement (%s) conflicts with one already in the configuration file. Quitting...' %(s))
-            self.Section('GLOBAL')[s] = findreplace[s]
+                raise ValueError('A command line string replacement (%s) conflicts with one already in the configuration file.' %(s))
+            self.config['GLOBAL'][s] = findreplace[s]
 
     def _varReplacement(self):
         '''Do string substitution for config entries based on the dictionary of find
@@ -113,19 +113,19 @@ class Config:
             new_string = self.Section('GLOBAL')[old_string]
             self.config = config_loop_replace(self.config, old_string, new_string)
 
-    def GetOptions(self,externalOpts={}):
+    def GetOptions(self,externalOptions={}):
         '''Loads options specific to this config file (from 'OPTIONS' section).
-        External options (externalOpts) can be provided but will overwrite those in
+        External options (externalOptions) can be provided but will overwrite those in
         the config (and modify the config in-place so that the version later saved
         reflects the conditions under which the config was used).
 
         Args:
-            externalOpts (dict, optional): Option-value pairs. Defaults to {}.
+            externalOptions (dict, optional): Option-value pairs. Defaults to {}.
 
         Returns:
             ArgumentParser.Namespace
         '''
-        self.config['OPTIONS'].update(externalOpts)
+        self.config['OPTIONS'].update(externalOptions)
         parser = argparse.ArgumentParser()
 
         parser.add_argument('blindedPlots', default=True, type=bool, nargs='?',
@@ -185,7 +185,7 @@ class Config:
         proc_syst = _df_condense_nameinfo(proc_syst,'source_filename')
 
         final = regions.merge(proc_syst,right_index=True,left_on='process',how='left')
-        final = _keyword_replace(final, ['source_filename', 'source_histname'])
+        final = _keyword_replace(final, ['source_filename', 'source_histname']).reset_index().drop(columns='index')
         _df_sanity_checks(final)
         return final
 
@@ -232,7 +232,7 @@ class Config:
             # Check if it's included in the regions
             if (region_df['TYPE'] == 'DATA').sum() == 0:
                 out = data_key
-            elif ((region_df['TYPE'] == 'DATA').sum() == 1):
+            elif (region_df['TYPE'] == 'DATA').sum() == 1:
                 out = False
             else:
                 raise RuntimeError('Multiple processes of TYPE == "DATA" provided in REGIONS subsection.')
@@ -246,6 +246,8 @@ class Config:
                 out_df = out_df.append(pandas.Series({'process':data_key,'region':r}),ignore_index=True)
 
             for p in self.Section('REGIONS')[r]:
+                if p not in self.Section('PROCESSES'):
+                    raise RuntimeError('Process "%s" listed for region "%s" not defined in PROCESSES section.'%(p,r))
                 out_df = out_df.append(pandas.Series({'process':p,'region':r}),ignore_index=True)
             
         return out_df
@@ -287,7 +289,7 @@ class Config:
                 out_df = out_df.append(syst)
         return out_df
 
-    def get_hist_map(self,df=None):
+    def GetHistMap(self,df=None):
         '''Collect information on the histograms to extract, manipulate, and save
         into organized_hists.root and store it inside a `dict` where the key is the
         filename and the value is a DataFrame with columns `source_histname`, `out_histname`,
@@ -343,7 +345,7 @@ class OrganizedHists():
         self.name = configObj.name
         self.filename = configObj.projPath + 'organized_hists.root'
         self.binning = configObj.binning
-        self.hist_map = configObj.get_hist_map()
+        self.hist_map = configObj.GetHistMap()
 
         if os.path.exists(self.filename) and readOnly:
             self.file = ROOT.TFile.Open(self.filename,"OPEN")
@@ -380,12 +382,11 @@ class OrganizedHists():
                         h.SetBinContent(b,1e-10)
 
                 self.file.WriteObject(h, row.out_histname)
-
                 self.CreateSubRegions(h)
 
             infile.Close()
 
-    def Get(self,histname='',process='',region='',systematic=''):
+    def Get(self,histname='',process='',region='',systematic='',subspace='FULL'):
         '''Get histogram from the opened TFile. Specify the histogram
         you want via `histname` or by the combination of `process`, `region`,
         and `systematic` options. The `histname` option will take priority.
@@ -395,11 +396,17 @@ class OrganizedHists():
             process (str, optional): Name of process to search for. Must be used in conjunction with `region` and `systematic` options. Overridden by `histname`. Defaults to ''.
             region (str, optional): Name of region to search for. Must be used in conjunction with `process` and `systematic` options. Overridden by `histname`. Defaults to ''.
             systematic (str, optional): Name of systematic to search for. Must be used in conjunction with `process` and `region` options. Overridden by `histname`. Defaults to ''.
+            subspace (str, optional): Name of subspace. Default is 'FULL' with other options being 'LOW', 'SIG', and 'HIGH'.
+
+        Raises:
+            NameError: If subspace option is not 'FULL','LOW','SIG', or 'HIGH'.
 
         Returns:
             TH2F: Histogram from file.
         '''
-        return self.file.Get(histname if histname != '' else '_'.join(process,region,systematic))
+        if subspace not in ['FULL','LOW','SIG','HIGH']:
+            raise NameError("Subspace '%s' not accepted. Options are 'FULL','LOW','SIG','HIGH'.")
+        return self.file.Get(histname if histname != '' else '_'.join([process,region,systematic,subspace]))
 
     def CreateSubRegions(self,h):
         '''Sub-divide input histogram along the X axis into the regions specified in the config
