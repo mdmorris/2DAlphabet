@@ -1,4 +1,4 @@
-import ROOT, argparse, json, os, pandas, re
+import ROOT, argparse, json, os, pandas, re, warnings
 from numpy import nan
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
@@ -40,18 +40,20 @@ class Config:
     def __init__(self,json,projPath,findreplace={},externalOptions={},loadPrevious=False):
         self.config = open_json(json)
         self._addFindReplace(findreplace)
-        self._varReplacement()
+        if 'GLOBAL' in self.config.keys(): self._varReplacement()
         self.name = self.config['NAME']
         self.projPath = projPath+'/'+self.name+'/'
         self.options = self.GetOptions(externalOptions)
         self.loadPrevious = loadPrevious
+        self.df = self.FullTable()
+        self.constructed = False
 
     def Construct(self):
         '''Uses the config as instructions to setup binning, manipulate histograms,
         save outputs, etc. Separated from the constructor so information from the config
         can be extracted for basic sanity checks before it is processed.
         '''
-        self.df = self.FullTable()
+        self.constructed = True
         template_file = ROOT.TFile.Open(self.df.iloc[0].source_filename)
         template = template_file.Get(self.df.iloc[0].source_histname)
         template.SetDirectory(0)
@@ -125,7 +127,9 @@ class Config:
         Returns:
             ArgumentParser.Namespace
         '''
-        self.config['OPTIONS'].update(externalOptions)
+        if 'OPTIONS' in self.config.keys():
+            self.config['OPTIONS'].update(externalOptions)
+
         parser = argparse.ArgumentParser()
 
         parser.add_argument('blindedPlots', default=True, type=bool, nargs='?',
@@ -155,7 +159,10 @@ class Config:
         parser.add_argument('recycle', default=[], type=list, nargs='?',
             help='List of items to recycle. Not currently working.')
         
-        return parse_arg_dict(parser,self.Section('OPTIONS'))
+        if 'OPTIONS' in self.config.keys():
+            return parse_arg_dict(parser,self.Section('OPTIONS'))
+        else:
+            return parser.parse_args([])
 
     def SaveOut(self): # pragma: no cover
         '''Save two objects to the <self.projPath> directory:
@@ -185,7 +192,7 @@ class Config:
         proc_syst = _df_condense_nameinfo(proc_syst,'source_filename')
 
         final = regions.merge(proc_syst,right_index=True,left_on='process',how='left')
-        final = _keyword_replace(final, ['source_filename', 'source_histname']).reset_index().drop(columns='index')
+        final = _keyword_replace(final, ['source_filename', 'source_histname']).reset_index(drop=True)
         _df_sanity_checks(final)
         return final
 
@@ -224,7 +231,8 @@ class Config:
 
             # Check DATA type is even provided in the PROCESSES
             if (process_df['TYPE'] == 'DATA').sum() == 0:
-                raise RuntimeError('No process of TYPE == "DATA" provided.')
+                warnings.warn('No process of TYPE == "DATA" provided. Ignoring...', RuntimeWarning)
+                data_key = False
             elif (process_df['TYPE'] == 'DATA').sum() > 1:
                 raise RuntimeError('Multiple processes of TYPE == "DATA" provided in PROCESSES section.')
             else:

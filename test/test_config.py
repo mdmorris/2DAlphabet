@@ -10,18 +10,18 @@ class TestConfig():
                              findreplace={},
                              externalOptions={}
                              )
-        cls.objBare = Config('test/testjson.json','test/unit_test',
-                             findreplace={"this":"THIS","is":"IS"},
-                             externalOptions={"blindedPlots":False}
+        cls.objBare = Config('test/twoDtest.json','test/unit_test',
+                             findreplace={"ttbar_16":"THIS","lumi":"IS"},
+                             externalOptions={"blindedPlots":True}
                              )
         cls.objBase.Construct()
 
     def test__init(self):
-        assert "THIS" in self.objBare.config
-        assert self.objBare.config["THIS"] == "IS"
-        assert self.objBare.config["OPTIONS"] == {'blindedPlots': False}
-        assert self.objBare.options.blindedPlots == False
-        assert self.objBare.options.blindedFit == True
+        assert "THIS" in self.objBare.config["PROCESSES"].keys()
+        assert "IS" in self.objBare.config["SYSTEMATICS"].keys()
+        assert self.objBare.config["OPTIONS"]["blindedPlots"] == True
+        assert self.objBare.options.blindedPlots == True
+        assert self.objBare.options.blindedFit == False
 
     def test_Construct(self):
         assert os.path.exists('test/unit_test/CR/organized_hists.root')
@@ -34,7 +34,7 @@ class TestConfig():
 
     def test__addFindReplace(self):
         with pytest.raises(ValueError):
-            self.objBare._addFindReplace({'this':'THIS'})
+            self.objBare._addFindReplace({'path':'anotherPath/'})
 
     def test__varReplacement(self):
         pass # Done in init
@@ -120,13 +120,13 @@ class TestConfig():
         c = Config('test/twoDtest.json','test/unit_test')
         c.config['REGIONS']['CR_pass'].append('FAKEPROC')
         with pytest.raises(RuntimeError):
-            c.Construct()
+            c.FullTable()
     
     def test__data_not_included(self):
         c = Config('test/twoDtest.json','test/unit_test')
         del c.config['PROCESSES']['Data_Run2']
         with pytest.raises(RuntimeError):
-            c.Construct()
+            c.FullTable()
         c = Config('test/twoDtest.json','test/unit_test')
         c.config['PROCESSES']['DataFAKE'] = {
             "SYSTEMATICS":[],
@@ -137,7 +137,7 @@ class TestConfig():
             "LOC": "path/FILE:HIST"
         }
         with pytest.raises(RuntimeError):
-            c.Construct()
+            c.FullTable()
 
     def test__processTable(self):
         pass # tested in test__FullTable
