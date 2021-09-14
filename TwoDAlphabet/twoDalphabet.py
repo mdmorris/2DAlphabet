@@ -1,4 +1,4 @@
-import argparse, os, json
+import argparse, os, warnings, itertools
 from TwoDAlphabet.config import Config
 from TwoDAlphabet.helpers import execute_cmd, get_config_dirs, parse_arg_dict
 import ROOT
@@ -15,22 +15,29 @@ class TwoDAlphabet:
 
         Args:
             tag (str): Tag used to identify the outputs and create a project directory of the same name.
-            jsons (list(str), optional): List of JSON configuration file paths. Defaults to [].
+            jsons (list(str), optional): List of JSON configuration file paths. Defaults to [] in which case
+                the tag is assumed to already exist and the existing runConfig.json is grabbed.
             findreplace (dict, optional):  Non-nested dictionary with key-value pairs to find-replace
                 in the internal class configuration dict. Defaults to {}.
             externalOpts (dict, optional): Option-value pairs. Defaults to {}.
         '''
         self.tag = tag
-        self.configs = {}
+        self.config = None
         self.options = self.GetOptions(externalOpts)
-        if jsons == []:
+        if jsons == [] and os.path.isdir(self.tag+'/'):
+            print ('Attempting to grab existing runConfig ...')
             jsons = [d+'/runConfig.json' for d in get_config_dirs(self.tag+'/')]
+        if jsons == []:
+            raise RuntimeError('No jsons were input and no existing ones could be found.')
         for j in jsons:
             self.AddConfig(j,findreplace)
 
+        self.config.Construct()
         self.SetupProjDir()
         if self.options.draw == False:
             ROOT.gROOT.SetBatch(True)
+
+        # self.tf = 
 
     def GetOptions(self,externalOpts):
         '''General arguments passed to the project. Options specified in 
@@ -51,22 +58,21 @@ class TwoDAlphabet:
             help="Draw all canvases while running for the sake of debugging. Useful for developers only. Defaults to False.")
         return parse_arg_dict(parser,externalOpts)
 
-    def AddConfig(self,jsonFileName,findreplace):
+    def AddConfig(self,jsonFileName,findreplace,onlyOn=['process','region']):
         '''Add a json configuration to process and track.
 
         Args:
             jsonFileName (str): JSON configuration file name/path.
             findreplace (dict): Non-nested dictionary with key-value pairs to find-replace
                 in the internal class configuration dict.
-
-        Raises:
-            KeyError: If configuration with same name has already been added.
+            onlyOn (list(str),str): Column name or list of columns to match for determining duplicates.
+                Options are either 'process' or 'region'. Defaults is ['process','region'] and both are considered.
         '''
         inputConfig = Config(jsonFileName,findreplace,externalOptions=vars(self.options))
-        if inputConfig.name in self.configs.keys():
-            raise KeyError("Key %s already exists."%(inputConfig.name))
+        if self.configs == None:
+            self.config == inputConfig
         else:
-            self.configs[inputConfig.name] = inputConfig.Construct()
+            self.config.Add(inputConfig,onlyOn)
 
     def SetupProjDir(self):
         '''Create the directory structure where results will be stored.
@@ -92,6 +98,8 @@ class TwoDAlphabet:
                     os.mkdir(d)
 
     def SaveOut(self):
+        '''Save individual configs to project directory.
+        '''
         for c in self.configs.values():
             c.SaveOut()
 
