@@ -2,7 +2,7 @@ import ROOT, argparse, json, os, pandas, re, warnings
 from numpy import nan
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
-from TwoDAlphabet.helpers import copy_update_dict, open_json, parse_arg_dict, replace_multi
+from TwoDAlphabet.helpers import copy_update_dict, open_json, parse_arg_dict, replace_multi, colliMate
 from TwoDAlphabet.binning import Binning, copy_hist_with_new_bins, get_bins_from_hist
 
 _protected_keys = ["PROCESSES","SYSTEMATICS","REGIONS","BINNING","OPTIONS","GLOBAL","SCALE","COLOR","TYPE","X","Y","NAME","TITLE","BINS","NBINS","LOW","HIGH"]
@@ -333,6 +333,53 @@ class Config:
             group_df['out_histname'] = group_df.apply(_get_out_name,axis=1)
             hists[g[0]] = group_df[['source_histname','out_histname','scale','color']]
         return hists
+
+    def Add(self,c_new,onlyOn=['process','region']):
+        def _drop(row,dupes_list):
+            drop = False
+            for d in dupes_list:
+                to_compare = []
+                for i,c in enumerate(onlyOn): # build bool from onlyOn cols
+                    to_compare.append(row[c] == d[i])
+                drop = pandas.Series(to_compare).all()
+
+                if drop == True: # if we found a match to a
+                    break
+            return drop
+
+        if self.constructed == True:
+            raise RuntimeError('This config (%s) has already been constructed so no additions can be made.'%(self.name))
+        if isinstance(onlyOn,str):
+            if onlyOn not in ['process','region']:
+                raise RuntimeError('Can only add configs together on the "process" or "region" information.')
+            onlyOn = [onlyOn]
+        elif onlyOn != ['process','region']:
+            raise RuntimeError('Can only add configs together on the "process" or "region" information.')
+        
+        df_modified_base =         self.df.append(c_new.df).reset_index()
+        df_modified_nominal_only = df_modified_base[df_modified_base.variation.eq('nominal')]
+        df_modified_dupes =        df_modified_nominal_only[
+                                        df_modified_nominal_only.duplicated(subset=onlyOn,keep='first')
+                                    ]
+        dupes_list = set(zip(*(df_modified_dupes[k] for k in onlyOn)))
+        if len(dupes_list) > 0: # if duplicates, replace old with new
+            print ('Found duplicates in attempting to modify base Config. Replacing...')
+            for d in dupes_list:
+                print('\t(%s)'%(','.join(d)))
+            df_final = self.df.loc[
+                            ~self.df.apply(_drop,args=[dupes_list],axis='columns')
+                        ].append(c_new.df).reset_index(drop=True)
+
+        else: # if no duplicates, just use the appended df
+            df_final = df_modified_base
+
+        self.df = df_final
+
+    def GetNregions(self):
+        return self.df.regions.unique().size
+
+    def GetNsystematics(self):
+        return len(self.Section('SYSTEMATIC').keys())
 
 class OrganizedHists():
     '''Class to store histograms in a consistent data structure and with accompanying
