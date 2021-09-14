@@ -569,6 +569,7 @@ def config_loop_replace(config,old,new,inGLOBAL=False):
             else:
                 if old == v:
                     config[k] = new
+            next_is_global = False # never consider next k to be GLOBAL
     elif isinstance(config,list):
         for i,v in enumerate(config):
             if isinstance(v,dict) or isinstance(v,list):
