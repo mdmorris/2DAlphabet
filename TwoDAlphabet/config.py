@@ -64,6 +64,7 @@ class Config:
             self.organized_hists = OrganizedHists(self,readOnly=True)
         else:
             self.organized_hists = OrganizedHists(self,readOnly=False)
+        # self.MakeCard()
 
         return self
 
