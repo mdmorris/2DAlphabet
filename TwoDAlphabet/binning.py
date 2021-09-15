@@ -84,6 +84,16 @@ class Binning:
         '''
         return self.xbinList.index(self.xbinByCat[c][xbin])
 
+    def xcatFromGlobal(self,xbin):
+        n_low_bins = len(self.xbinByCat['LOW'])-1
+        n_sig_bins = len(self.xbinByCat['SIG'])-1
+        if xbin < n_low_bins+1:
+            return xbin,'LOW'
+        elif xbin < n_low_bins+n_sig_bins+1:
+            return xbin-n_low_bins,'SIG'
+        else:
+            return xbin-n_low_bins-n_sig_bins,'HIGH'
+
     @property
     def xbinList(self):
         '''
@@ -92,6 +102,24 @@ class Binning:
             a continuous list of bin edges for the full X axis.
         '''
         return concat_bin_dicts(self.xbinByCat)
+
+    def GetBinCenterBase(self,ibin,binlist):
+        if ibin < 1: raise ValueError('Binning is indexed at 1 for compatibility with ROOT.')
+        return (binlist[ibin]+binlist[ibin-1])/2
+
+    def GetBinCenterX(self,ibin):
+        return self.GetBinCenterBase(ibin,self.xbinList)
+
+    def GetBinCenterY(self,ibin):
+        return self.GetBinCenterBase(ibin,self.ybinList)
+
+    def CreateHist(self,name):
+        return ROOT.TH2F(name,name,
+                         len(self.xbinList),
+                         array.array('d',self.xbinList),
+                         len(self.ybinList),
+                         array.array('d',self.ybinList)
+        )
 
 def create_RRV_base(name,title,bins):
     '''Generically create a RooRealVar with the specified bin edges.
@@ -288,8 +316,6 @@ def stitch_hists_in_x(template,histList,blinded=[]):
     Returns:
         TH2: Output stitched histograms.
     '''
-    axbins = array.array('d',get_bins_from_hist('X',template))
-    aybins = array.array('d',get_bins_from_hist('Y',template))
     stitched_hist = template.Clone()
     stitched_hist.Reset()
     # Sanity checks

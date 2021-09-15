@@ -1,4 +1,4 @@
-import argparse, os, warnings, itertools
+import argparse, os, itertools, pandas
 from TwoDAlphabet.config import Config
 from TwoDAlphabet.helpers import execute_cmd, get_config_dirs, parse_arg_dict
 import ROOT
@@ -37,7 +37,8 @@ class TwoDAlphabet:
         if self.options.draw == False:
             ROOT.gROOT.SetBatch(True)
 
-        # self.tf = 
+        self.alphaObjs = pandas.DataFrame(columns=['process','region','nuisances','obj'],index=['process','region'])
+        self.alphaParams = pandas.DataFrame(columns=['name','obj','constraint'],index='name') # "name":"constraint"
 
     def GetOptions(self,externalOpts):
         '''General arguments passed to the project. Options specified in 
@@ -74,6 +75,19 @@ class TwoDAlphabet:
         else:
             self.config.Add(inputConfig,onlyOn)
 
+    def AddAlphaObj(self,process,region,obj):
+        for cat in ['LOW','SIG','HIGH']:
+            model_obj_row = {
+                "process": process,
+                "region": region+'_'+cat,
+                "obj": obj.rph[cat]
+            }
+            self.alphaObjs.append(model_obj_row,verify_integrity=True)
+        
+        nuis_obj_cols = ['name','obj','constraint']
+        for n in obj.nuisances:
+            self.alphaParams.append({c:n[c] for c in nuis_obj_cols},verify_integrity=True)
+
     def SetupProjDir(self):
         '''Create the directory structure where results will be stored.
         '''
@@ -104,56 +118,43 @@ class TwoDAlphabet:
             c.SaveOut()
 
     def MakeCard(self):
-        card_new = open(self.projPath+'card_'+self.name+'.txt','w')
+        card_new = open(self.config.projPath+'card_'+self.tag+'.txt','w')
 
         # imax (bins), jmax (backgrounds), kmax (systematics) 
-        imax = '6'                      # pass, fail for each 'X' axis category
-        channels = []
-        for r in ['pass', 'fail']:
-            for c in ['LOW','SIG','HIGH']:
-                channels.append(r+'_'+c+'_'+self.name)                
-
-        # Get the length of the list of all process that have CODE 2 (and ignore "HELP" key) and add 1 for qcd (which won't be in the inputConfig)
-        jmax = str(len([proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and self.inputConfig['PROCESS'][proc]['CODE'] == 2]) + 1)
-        # Get the length of the lsit of all systematics (and ignore "HELP" key)
-        n_uncorr_systs = len([syst for syst in self.inputConfig['SYSTEMATIC'].keys() if syst != 'HELP' and 'UNCORRELATED' in self.inputConfig['SYSTEMATIC'][syst] and self.inputConfig['SYSTEMATIC'][syst]['UNCORRELATED']])
-        kmax = str(len([syst for syst in self.inputConfig['SYSTEMATIC'].keys() if syst != 'HELP' and syst != 'KDEbandwidth'])+n_uncorr_systs)
-        if self.rpfRatioVariations != False: kmax = str(int(kmax)+1)
+        imax = str(3*self.GetNregions()) # pass, fail for each 'X' axis category           
+        jmax = self.df.loc[self.df.process_type.eq('BKG')].process.unique().size() + 1
+        kmax = self.GetNsystematics() # does not include alphaParams
 
         card_new.write('imax '+imax+'\n')      
         card_new.write('jmax '+jmax+'\n')
         card_new.write('kmax '+kmax+'\n')
         card_new.write('-'*120+'\n')
 
+        channels = ['_'.join(r)+'_'+self.name for r in itertools.product(self.df.regions.unique(),['LOW','SIG','HIGH'])]
+
         ##########
         # Shapes #
         ##########
-        procs_with_systs = [proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and len(self.inputConfig['PROCESS'][proc]['SYSTEMATICS']) != 0]
-        procs_without_systs = [proc for proc in self.inputConfig['PROCESS'].keys() if proc != 'HELP' and len(self.inputConfig['PROCESS'][proc]['SYSTEMATICS']) == 0]
+        procs_with_systs = [proc for proc in self.Section('PROCESS') and len(self.inputConfig['PROCESS'][proc]['SYSTEMATICS']) != 0]
+        procs_without_systs = [proc for proc in self.Section('PROCESS') and len(self.inputConfig['PROCESS'][proc]['SYSTEMATICS']) == 0]
         if self.rpfRatioVariations == False: procs_without_systs.append('qcd')   # Again, qcd not in the input JSON but needs to be in the combine card!
         else: procs_with_systs.append('qcd')
 
-        for proc in procs_without_systs:
-            card_new.write(header.colliMate('shapes  '+proc+' * base_'+self.name+'.root w_'+self.name+':'+proc+'_$CHANNEL\n'))
-        for proc in procs_with_systs:
-            card_new.write(header.colliMate('shapes  '+proc+' * base_'+self.name+'.root w_'+self.name+':'+proc+'_$CHANNEL w_'+self.name+':'+proc+'_$CHANNEL_$SYSTEMATIC\n'))
+        for proc in self.df.process.unique():
+            card_new.write('shapes  {0:20} * base_{1}.root w_{1}:{0}_$CHANNEL w_{1}:{0}_$CHANNEL_$SYSTEMATIC\n'.format(proc,self.name))
+        # for proc in procs_with_systs:
+        #     card_new.write(header.colliMate('shapes  '+proc+' * base_'+self.name+'.root w_'+self.name+':'+proc+'_$CHANNEL w_'+self.name+':'+proc+'_$CHANNEL_$SYSTEMATIC\n'))
 
         card_new.write('-'*120+'\n')
 
         ####################################
         # Set bin observation values to -1 #
         ####################################
-        tempString = 'bin  '
-        for chan in channels:
-            tempString += (chan+' ')
-        tempString += '\n'
-        card_new.write(header.colliMate(tempString,column_width))
+        tempString = ' '.join(['{'+i+':20}' for i in range(len(channels))])
+        card_new.write(('bin %s'%(tempString)).format(*channels))
 
-        tempString = 'observation  '
-        for ichan in range(int(imax)):
-            tempString += '-1 '
-        tempString += '\n'
-        card_new.write(header.colliMate(tempString,column_width))
+        tempString = ' '.join(['{'+i+':20}' for i in range(imax)])
+        card_new.write(('observation %s'%(tempString)).format(*['-1' for i in range(imax)]))
 
         card_new.write('-'*120+'\n')
 
