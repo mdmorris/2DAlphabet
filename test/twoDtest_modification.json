@@ -1,0 +1,49 @@
+{
+    "NAME": "CR_modification",
+    "PROCESSES": {
+        "TprimeB-1800_16": {
+            "SYSTEMATICS":["lumi","JES"],
+            "SCALE": 1.0,
+            "COLOR": 0,
+            "TYPE": "SIGNAL",
+            "LOC": "path/FILE:HIST"
+        }
+    },
+
+    "REGIONS": {
+        "CR_pass": ["TprimeB-1800_16"],
+        "CR_fail": ["TprimeB-1800_16"]
+    },
+
+    "SYSTEMATICS": {
+        "lumi": {
+            "VAL": 1.018
+        },
+        "JES": {
+            "ALIAS": "JES",
+            "UP": "path/FILE_UP:HIST",
+            "DOWN": "path/FILE_DOWN:HIST",
+            "SIGMA": 1.0
+        }
+    },
+
+    "BINNING": {
+        "HELP": "The binning of the x and y axes should be configured here",
+        "X": {
+            "NAME": "xaxis",
+            "TITLE": "X",
+            "MIN": 60,
+            "MAX": 260,
+            "NBINS": 10,
+            "SIGSTART": 100,
+            "SIGEND": 140
+        },
+        "Y": {
+            "NAME": "yaxis",
+            "TITLE": "Y",
+            "MIN": 800, 
+            "MAX": 3000,
+            "NBINS": 22
+        }
+    }
+}

@@ -6,5 +6,8 @@
         "dictionary": false
     },
     "OPTIONS": {},
-    "GLOBAL": {}
+    "GLOBAL": {},
+    "REGIONS": {},
+    "PROCESSES": {},
+    "SYSTEMATICS": {}
 }
