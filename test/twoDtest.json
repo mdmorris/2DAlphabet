@@ -43,8 +43,14 @@
     },
 
     "REGIONS": {
-        "CR_pass": ["ttbar_16","TprimeB-1800_16","Data_Run2"],
-        "CR_fail": ["ttbar_16","TprimeB-1800_16","Data_Run2"]
+        "CR_pass": {
+            "PROCESSES": ["ttbar_16","TprimeB-1800_16","Data_Run2"],
+            "BINNING": "default"
+        },
+        "CR_fail": {
+            "PROCESSES": ["ttbar_16","TprimeB-1800_16","Data_Run2"],
+            "BINNING": "default"
+        }
     },
 
     "SYSTEMATICS": {
@@ -70,22 +76,23 @@
     },
 
     "BINNING": {
-        "HELP": "The binning of the x and y axes should be configured here",
-        "X": {
-            "NAME": "xaxis",
-            "TITLE": "X",
-            "MIN": 60,
-            "MAX": 260,
-            "NBINS": 10,
-            "SIGSTART": 100,
-            "SIGEND": 140
-        },
-        "Y": {
-            "NAME": "yaxis",
-            "TITLE": "Y",
-            "MIN": 800, 
-            "MAX": 3000,
-            "NBINS": 22
+        "default": {
+            "X": {
+                "NAME": "xaxis",
+                "TITLE": "X",
+                "MIN": 60,
+                "MAX": 260,
+                "NBINS": 10,
+                "SIGSTART": 100,
+                "SIGEND": 140
+            },
+            "Y": {
+                "NAME": "yaxis",
+                "TITLE": "Y",
+                "MIN": 800, 
+                "MAX": 3000,
+                "NBINS": 22
+            }
         }
     }
 }
