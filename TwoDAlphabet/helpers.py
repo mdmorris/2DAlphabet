@@ -256,3 +256,6 @@ def replace_multi(s,findreplace):
     for f,r in findreplace.items():
         s = s.replace(f,r)
     return s
+
+def unpack_to_line(toUnpack):
+    return ' '.join(['{'+i+':20}' for i in range(toUnpack)]).format(*toUnpack)

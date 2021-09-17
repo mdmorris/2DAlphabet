@@ -1,3 +1,4 @@
+from pandas._config import config
 import ROOT, argparse, json, os, pandas, re, warnings
 from numpy import nan
 import pprint
@@ -9,8 +10,7 @@ _protected_keys = ["PROCESSES","SYSTEMATICS","REGIONS","BINNING","OPTIONS","GLOB
 _syst_col_defaults = {
     # 'variation': nan,
     'lnN': nan,
-    'lnN_asym': nan,
-    'shape_sigma': nan,
+    'shapes': nan, # shape sigma
     'syst_type': nan,
     'source_filename': nan,
     'source_histname': nan,
@@ -23,7 +23,7 @@ class Config:
     all initial checks and manipulations.
 
     Args:
-        json (str): File name and path.
+        jsonPath (str): File name and path.
         projPath (str): Project path.
         findreplace (dict, optional): Find-replace pairs. Defaults to {}.
         externalOptions (dict, optional): Extra key-value pairs to add to the OPTIONS
@@ -36,17 +36,23 @@ class Config:
         projPath (str): The project path + self.name.
         options (Namespace): Final set of options to use.
         loadPrevious (bool): Equal to the constructor arg of the same name.
+        nsignals (int): Number of signal processes. Zero before running Construct().
+        nbkgs (int): Number of signal processes. Zero before running Construct().
+        constructed (bool): Whether Construct() has been called yet or not.
+        binning (Binning): Binning object. Only exists after Construct().
+        organizedHists (OrganizedHists): Object for storing, manipulating, and accessing histograms for fit.
     '''
-    def __init__(self,json,projPath,findreplace={},externalOptions={},loadPrevious=False):
-        self.config = open_json(json)
+    def __init__(self,jsonPath,projPath,findreplace={},externalOptions={},loadPrevious=False):
+        self.config = open_json(jsonPath)
         self._addFindReplace(findreplace)
         if 'GLOBAL' in self.config.keys(): self._varReplacement()
         self.name = self.config['NAME']
-        self.projPath = projPath+'/'+self.name+'/'
+        self.projPath = projPath+'/'
         self.options = self.GetOptions(externalOptions)
         self.loadPrevious = loadPrevious
         self.df = self.FullTable()
         self.constructed = False
+        self.nsignals, self.nbkgs = 0, 0
 
     def Construct(self):
         '''Uses the config as instructions to setup binning, manipulate histograms,
@@ -57,18 +63,15 @@ class Config:
         template_file = ROOT.TFile.Open(self.df.iloc[0].source_filename)
         template = template_file.Get(self.df.iloc[0].source_histname)
         template.SetDirectory(0)
-        self.binning = Binning(self.name, self.Section('BINNING'), template)
-        self.processes = self.Section('PROCESSES')
-        self.systematics = self.Section('SYSTEMATICS')
+        self.binning = Binning(self.name, self._section('BINNING'), template)
         if self.loadPrevious: 
-            self.organized_hists = OrganizedHists(self,readOnly=True)
+            self.organizedHists = OrganizedHists(self,readOnly=True)
         else:
-            self.organized_hists = OrganizedHists(self,readOnly=False)
-        # self.MakeCard()
+            self.organizedHists = OrganizedHists(self,readOnly=False)
 
         return self
 
-    def Section(self,key):
+    def _section(self,key):
         '''Derive the dictionary for a given section of the configuration file
         with HELP keys removed.
 
@@ -92,7 +95,7 @@ class Config:
             ValueError: If a "find" already exists in self.config['GLOBAL'].
         '''
         for s in findreplace:
-            if s in self.Section('GLOBAL'):
+            if s in self._section('GLOBAL'):
                 raise ValueError('A command line string replacement (%s) conflicts with one already in the configuration file.' %(s))
             self.config['GLOBAL'][s] = findreplace[s]
 
@@ -109,11 +112,11 @@ class Config:
             None.
         '''
         print ("Doing GLOBAL variable replacement in input json...")
-        for old_string in self.Section('GLOBAL'):
+        for old_string in self._section('GLOBAL'):
             if old_string == "HELP":
                 print ('WARNING: The HELP entry is deprecated and checking for it will be removed in the future. Please remove it from your config.')
                 continue
-            new_string = self.Section('GLOBAL')[old_string]
+            new_string = self._section('GLOBAL')[old_string]
             self.config = config_loop_replace(self.config, old_string, new_string)
 
     def GetOptions(self,externalOptions={}):
@@ -161,20 +164,20 @@ class Config:
             help='List of items to recycle. Not currently working.')
         
         if 'OPTIONS' in self.config.keys():
-            return parse_arg_dict(parser,self.Section('OPTIONS'))
+            return parse_arg_dict(parser,self._section('OPTIONS'))
         else:
             return parser.parse_args([])
 
     def SaveOut(self): # pragma: no cover
-        '''Save two objects to the <self.projPath> directory:
-        - a copy of the manipulated config (runConfig.json)
-        - the pickled histogram map (hist_map.p)
+        '''Save the histogram table to the <self.projPath> directory in csv
+        and markdown formats. No copy of the input JSONs is saved since multiple
+        could be provided with the only final combination making it to the histogram table.
         '''
-        file_out = open(self.projPath+'runConfig.json', 'w')
+        file_out = open(self.projPath+'runConfig_%s.json'%self.name, 'w')
         json.dump(self.config,file_out,indent=2,sort_keys=True)
         file_out.close()
-        # pickle.dump(self.organized_hists, open(self.projPath+'hist_map.p','wb'))
-        # self.workspace.writeToFile(self.projPath+'base_'+self.name+'.root',True)  
+        self.df.to_csv(self.projPath+'hist_table.csv')
+        self.df.to_markdown(self.projPath+'hist_table.md')
 
     def FullTable(self):
         '''Generate full table of processes, regions, and systematic variations
@@ -223,8 +226,8 @@ class Config:
                 str: The name of the data key if it's not already included in the list of processes
                 for the region.
             '''
-            region_df = pandas.DataFrame({'process':self.Section('REGIONS')[region]})
-            process_df = pandas.DataFrame(self.Section('PROCESSES')).T[['TYPE']]
+            region_df = pandas.DataFrame({'process':self._section('REGIONS')[region]})
+            process_df = pandas.DataFrame(self._section('PROCESSES')).T[['TYPE']]
             region_df = region_df.merge(process_df,
                                         left_on='process',
                                         right_index=True,
@@ -249,13 +252,13 @@ class Config:
             return out
 
         out_df = pandas.DataFrame(columns=['process','region'])
-        for r in self.Section('REGIONS'):
+        for r in self._section('REGIONS'):
             data_key = _data_not_included(r)
             if data_key:
                 out_df = out_df.append(pandas.Series({'process':data_key,'region':r}),ignore_index=True)
 
-            for p in self.Section('REGIONS')[r]:
-                if p not in self.Section('PROCESSES'):
+            for p in self._section('REGIONS')[r]:
+                if p not in self._section('PROCESSES'):
                     raise RuntimeError('Process "%s" listed for region "%s" not defined in PROCESSES section.'%(p,r))
                 out_df = out_df.append(pandas.Series({'process':p,'region':r}),ignore_index=True)
             
@@ -269,9 +272,10 @@ class Config:
         Returns:
             pandas.DataFrame
         '''
-        out_df = pandas.DataFrame(columns=['color','process_type','scale','variation','source_filename','source_histname'])
-        for p in self.Section('PROCESSES'):
-            this_proc_info = self.Section('PROCESSES')[p]
+        out_df = pandas.DataFrame(columns=['color','process_type','scale','variation','source_filename','source_histname','combine_idx'])
+        for p in self._section('PROCESSES'):
+            this_proc_info = self._section('PROCESSES')[p]
+            combine_idx = self._getCombineIdx(this_proc_info)
             for s in this_proc_info['SYSTEMATICS']+['nominal']:
                 out_df = out_df.append(pandas.Series(
                                 {'color': nan if 'COLOR' not in this_proc_info else this_proc_info['COLOR'],
@@ -279,24 +283,36 @@ class Config:
                                 'scale': 1.0 if 'SCALE' not in this_proc_info else this_proc_info['SCALE'],
                                 'source_filename': this_proc_info['LOC'].split(':')[0],
                                 'source_histname': this_proc_info['LOC'].split(':')[1],
-                                'variation': s},
+                                'variation': s,
+                                'combine_idx':combine_idx},
                                 name=p)
                             )
         return out_df
 
     def _systematicsTable(self):
         '''Generate the table of process information based on the JSON config.
-        Columns are  'lnN', 'lnN_asym', 'shape_sigma', 'syst_type', 'source_filename',
+        Columns are  'lnN', 'shapes', 'syst_type', 'source_filename',
         'source_histname', and 'direction' (ie. NaN, 'Up', or 'Down').
+
+        Note that 'shapes' is short for 'shape sigma'.
 
         Returns:
             pandas.DataFrame
         '''
         out_df = pandas.DataFrame(columns=_syst_col_defaults.keys())
-        for s in self.Section('SYSTEMATICS'):
-            for syst in _get_syst_attrs(s,self.Section('SYSTEMATICS')[s]):
+        for s in self._section('SYSTEMATICS'):
+            for syst in _get_syst_attrs(s,self._section('SYSTEMATICS')[s]):
                 out_df = out_df.append(syst)
         return out_df
+
+    def _getCombineIdx(self,procdict):
+        if procdict['TYPE'] == 'SIGNAL':
+            combine_idx = '-%s'%self.nsignals # first signal idxed at 0 so set it *before* incrementing
+            self.nsignals += 1
+        else:
+            self.nbkgs += 1
+            combine_idx = '%s'%self.nbkgs # first signal idxed at 0 so set it *before* incrementing
+        return combine_idx
 
     def GetHistMap(self,df=None):
         '''Collect information on the histograms to extract, manipulate, and save
@@ -335,7 +351,7 @@ class Config:
             hists[g[0]] = group_df[['source_histname','out_histname','scale','color']]
         return hists
 
-    def Add(self,c_new,onlyOn=['process','region']):
+    def Add(self,cNew,onlyOn=['process','region']):
         def _drop(row,dupes_list):
             drop = False
             for d in dupes_list:
@@ -357,11 +373,10 @@ class Config:
         elif onlyOn != ['process','region']:
             raise RuntimeError('Can only add configs together on the "process" or "region" information.')
         
-        df_modified_base =         self.df.append(c_new.df).reset_index()
+        df_modified_base         = self.df.append(cNew.df).reset_index()
         df_modified_nominal_only = df_modified_base[df_modified_base.variation.eq('nominal')]
-        df_modified_dupes =        df_modified_nominal_only[
-                                        df_modified_nominal_only.duplicated(subset=onlyOn,keep='first')
-                                    ]
+        df_modified_dupes        = df_modified_nominal_only[ df_modified_nominal_only.duplicated(subset=onlyOn,keep='first') ]
+
         dupes_list = set(zip(*(df_modified_dupes[k] for k in onlyOn)))
         if len(dupes_list) > 0: # if duplicates, replace old with new
             print ('Found duplicates in attempting to modify base Config. Replacing...')
@@ -369,18 +384,19 @@ class Config:
                 print('\t(%s)'%(','.join(d)))
             df_final = self.df.loc[
                             ~self.df.apply(_drop,args=[dupes_list],axis='columns')
-                        ].append(c_new.df).reset_index(drop=True)
+                        ].append(cNew.df).reset_index(drop=True)
 
         else: # if no duplicates, just use the appended df
             df_final = df_modified_base
 
+        cNew.SaveOut()
         self.df = df_final
 
     def GetNregions(self):
-        return self.df.regions.unique().size
+        return self.df.regions.nunique()
 
     def GetNsystematics(self):
-        return len(self.Section('SYSTEMATIC').keys())
+        return self.df.variations.nunique()-1
 
 class OrganizedHists():
     '''Class to store histograms in a consistent data structure and with accompanying
@@ -464,6 +480,9 @@ class OrganizedHists():
             raise NameError("Subspace '%s' not accepted. Options are 'FULL','LOW','SIG','HIGH'.")
         return self.file.Get(histname if histname != '' else '_'.join([process,region,systematic,subspace]))
 
+    def GetHistNames(self):
+        return [hkey.GetName() for hkey in self.file.GetListOfKeys()]
+
     def CreateSubRegions(self,h):
         '''Sub-divide input histogram along the X axis into the regions specified in the config
         and write the new histogram to organized_hists.root.
@@ -521,24 +540,24 @@ def _get_syst_attrs(name,syst_dict):
     '''
     if 'VAL' in syst_dict:
         out = [{
-            'lnN':syst_dict['VAL'],
+            'lnN':str(syst_dict['VAL']),
             'syst_type': 'lnN'
         }]
     elif 'VALUP' in syst_dict and 'VALDOWN' in syst_dict:
         out = [{
-            'lnN_asym':[syst_dict['VALUP'], syst_dict['VALDOWN']],
-            'syst_type': 'lnN_asym'
+            'lnN':'%s/%s'%(syst_dict['VALDOWN'], syst_dict['VALUP']),
+            'syst_type': 'lnN'
         }]
     elif 'UP' in syst_dict and 'DOWN' in syst_dict:
         out = [
             {
-                'shape_sigma':syst_dict['SIGMA'],
+                'shapes':syst_dict['SIGMA'],
                 'syst_type': 'shapes',
                 'source_filename': syst_dict['UP'].split(':')[0],
                 'source_histname': syst_dict['UP'].split(':')[1],
                 'direction': 'Up'
             }, {
-                'shape_sigma':syst_dict['SIGMA'],
+                'shapes':syst_dict['SIGMA'],
                 'syst_type': 'shapes',
                 'source_filename': syst_dict['DOWN'].split(':')[0],
                 'source_histname': syst_dict['DOWN'].split(':')[1],
