@@ -112,7 +112,7 @@ class TwoDAlphabet:
             self.alphaParams.append({c:n[c] for c in nuis_obj_cols},verify_integrity=True)
 
     def _checkAgainstConfig(self,process,region):
-        all_pairs = [g[0] for g in self.config.df.groupby(['p','r'])]
+        all_pairs = self.GetProcRegPairs()
         if (process,region) not in all_pairs:
             raise RuntimeError('Attempting to track an object for process "%s" and region "%s" but that pair does not exist among those defined in the config:\n\t%s'%(process,region,all_pairs))
 
@@ -138,6 +138,32 @@ class TwoDAlphabet:
             for d in dirs_to_make:
                 if not os.path.isdir(d):
                     os.mkdir(d)
+
+    def GetRegions(self):
+        return self.config.df.region.unique()
+
+    def GetProcesses(self):
+        return self.config.df.process.unique()+self.alphaObjs.process.unique()
+
+    def GetProcRegPairs(self):
+        return [g[0] for g in self.config.df.groupby(['process','region'])]+[g[0] for g in self.alphaObjs.groupby(['process','region'])]
+
+    def GetShapeSystematics(self):
+        return self.config.df.variation.unique()
+
+    def GetAlphaSystematics(self):
+        return self.alphaParams.name.unique()
+
+    def GetAllSystematics(self):
+        return self.GetShapeSystematics()+self.GetAlphaSystematics()
+
+    def GetBinningFor(self,region):
+        pairs = [g[0] for g in self.config.df.groupby(['region','binning'])]
+        for p in pairs:
+            if p[0] == region:
+                return self.binnings[p[1]], p[1]
+        
+        raise RuntimeError('Cannot find region (%s) in config:\n\t%s'%(region,pairs))
 
     def _saveOut(self):
         '''Save individual configs to project directory.
