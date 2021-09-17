@@ -7,3 +7,4 @@ cov.xml
 .coverage
 *.egg-info
 tests_unfinished
+.vscode/
