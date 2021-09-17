@@ -398,6 +398,37 @@ class Config:
     def GetNsystematics(self):
         return self.df.variations.nunique()-1
 
+    def InitQCDHists(self):
+        '''Loop over all regions and for a given region's data histogram, subtract the list of background histograms,
+        and return data-bkgList.
+
+        Returns:
+            dict(region,TH2): Dictionary with regions as keys and values as histograms of data-bkgList.
+        '''
+        out = {}
+        for region,group in self.df.regions.groupby():
+            data_sources = group.loc[group.process_type.eq('DATA')][['source_filename','source_histname']]
+            if data_sources > 1:
+                raise RuntimeError('More than one data source found in\n%s'%group)
+
+            data_file = ROOT.TFile.Open(data_sources.loc[0,'source_filename'])
+            data_hist = data_file.Get(data_sources.loc[0,'source_histname'])
+            qcd = data_hist.Clone(data_hist.GetName().replace('data_obs','qcd'))
+            qcd.SetDirectory(0)
+
+            bkg_sources = set(group.loc[group.process_type.eq('BKG')][['source_filename','source_histname']])
+            for bkg_file_name,bkg_hist_names in bkg_sources.groupby('source_filename'):
+                if bkg_file_name == data_file.GetName():
+                    bkg_file = data_file
+                else:
+                    bkg_file = ROOT.TFile.Open(bkg_file_name)
+                bkg_hist = bkg_file.Get(bkg_hist_names)
+                qcd.Add(bkg_hist,'-1')
+
+            out[region] = qcd
+
+        return out
+
 class OrganizedHists():
     '''Class to store histograms in a consistent data structure and with accompanying
     methods to access the histograms.
