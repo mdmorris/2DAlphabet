@@ -36,7 +36,7 @@ class TwoDAlphabet:
 
         self.config.Construct()
         self.nbkgs, self.nsignals = self.config.nbkgs, self.config.nsignals
-        self.SetupProjDir()
+        self._setupProjDir()
         if self.options.draw == False:
             ROOT.gROOT.SetBatch(True)
 
@@ -116,7 +116,7 @@ class TwoDAlphabet:
         if (process,region) not in all_pairs:
             raise RuntimeError('Attempting to track an object for process "%s" and region "%s" but that pair does not exist among those defined in the config:\n\t%s'%(process,region,all_pairs))
 
-    def SetupProjDir(self):
+    def _setupProjDir(self):
         '''Create the directory structure where results will be stored.
         '''
         if not os.path.isdir(self.tag+'/'):

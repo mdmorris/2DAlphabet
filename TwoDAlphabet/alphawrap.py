@@ -268,7 +268,7 @@ class ParametricFunction(Generic2D):
         out = []
         for i in range(self.getNparams()):
             name = '%s_par%s'%(self.name,i)
-            constraint = 'flatParam'; MIN = -1000; MAX = 1000; NOM = 0, ERROR = 0.1
+            constraint = 'flatParam'; MIN = -1000; MAX = 1000; NOM = 0; ERROR = 0.1
             if i in constraints:
                 constraint = constraints['constraint']
                 MIN = constraints['MIN']
@@ -405,22 +405,6 @@ class BinnedDistribution(Generic2D):
 
     def KDESmooth(self):
         raise NotImplementedError()
-
-def InitQCDHist(data,bkgList):
-    '''For a given data histogram and list of background histograms,
-    produce a histogram of data-bkgList.
-
-    Args:
-        data (TH2): Data histogram to subtract from.
-        bkgList (list(TH2s)): List of background histograms to subtract with.
-
-    Returns:
-        TH2: Histogram of data-bkgList.
-    '''
-    qcd = data.Clone(data.GetName().replace('data_obs','qcd'))
-    for bkg in bkgList:
-        qcd.Add(bkg,-1)
-    return qcd
 
 def singleBinInterp(name, nuis, binVar, upVal, downVal, forcePositive):
     '''Create a RooFormulaVar containing the nuisance parameter that can

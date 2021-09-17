@@ -1,9 +1,8 @@
-from pandas._config import config
 import ROOT, argparse, json, os, pandas, re, warnings
 from numpy import nan
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
-from TwoDAlphabet.helpers import copy_update_dict, open_json, parse_arg_dict, replace_multi, colliMate
+from TwoDAlphabet.helpers import copy_update_dict, open_json, parse_arg_dict, replace_multi
 from TwoDAlphabet.binning import Binning, copy_hist_with_new_bins, get_bins_from_hist
 
 _protected_keys = ["PROCESSES","SYSTEMATICS","REGIONS","BINNING","OPTIONS","GLOBAL","SCALE","COLOR","TYPE","X","Y","NAME","TITLE","BINS","NBINS","LOW","HIGH"]
@@ -50,9 +49,9 @@ class Config:
         self.projPath = projPath+'/'
         self.options = self.GetOptions(externalOptions)
         self.loadPrevious = loadPrevious
+        self.nsignals, self.nbkgs = 0, 0
         self.df = self.FullTable()
         self.constructed = False
-        self.nsignals, self.nbkgs = 0, 0
 
     def Construct(self):
         '''Uses the config as instructions to setup binning, manipulate histograms,
@@ -63,7 +62,8 @@ class Config:
         template_file = ROOT.TFile.Open(self.df.iloc[0].source_filename)
         template = template_file.Get(self.df.iloc[0].source_histname)
         template.SetDirectory(0)
-        self.binning = Binning(self.name, self._section('BINNING'), template)
+        for kbinning in self._section('BINNING').keys():
+            self.binnings[kbinning] = Binning(self.name, self._section('BINNING')[kbinning], template)
         if self.loadPrevious: 
             self.organizedHists = OrganizedHists(self,readOnly=True)
         else:
@@ -202,7 +202,7 @@ class Config:
 
     def _regionTable(self):
         '''Generate the table of region information based on the JSON config.
-        Columns are `process` and `region`.
+        Columns are `process`, `region`, and `binning`.
 
         Returns:
             pandas.DataFrame
@@ -226,7 +226,7 @@ class Config:
                 str: The name of the data key if it's not already included in the list of processes
                 for the region.
             '''
-            region_df = pandas.DataFrame({'process':self._section('REGIONS')[region]})
+            region_df = pandas.DataFrame({'process':self._section('REGIONS')[region]['PROCESSES']})
             process_df = pandas.DataFrame(self._section('PROCESSES')).T[['TYPE']]
             region_df = region_df.merge(process_df,
                                         left_on='process',
@@ -251,16 +251,16 @@ class Config:
 
             return out
 
-        out_df = pandas.DataFrame(columns=['process','region'])
+        out_df = pandas.DataFrame(columns=['process','region','binning'])
         for r in self._section('REGIONS'):
             data_key = _data_not_included(r)
             if data_key:
-                out_df = out_df.append(pandas.Series({'process':data_key,'region':r}),ignore_index=True)
+                out_df = out_df.append(pandas.Series({'process':data_key,'region':r, 'binning':self._section('REGIONS')[r]['BINNING']}),ignore_index=True)
 
-            for p in self._section('REGIONS')[r]:
+            for p in self._section('REGIONS')[r]['PROCESSES']:
                 if p not in self._section('PROCESSES'):
                     raise RuntimeError('Process "%s" listed for region "%s" not defined in PROCESSES section.'%(p,r))
-                out_df = out_df.append(pandas.Series({'process':p,'region':r}),ignore_index=True)
+                out_df = out_df.append(pandas.Series({'process':p,'region':r,'binning':self._section('REGIONS')[r]['BINNING']}),ignore_index=True)
             
         return out_df
 
@@ -416,7 +416,7 @@ class OrganizedHists():
     def __init__(self,configObj,readOnly=False):
         self.name = configObj.name
         self.filename = configObj.projPath + 'organized_hists.root'
-        self.binning = configObj.binning
+        self.binnings = configObj.binnings
         self.hist_map = configObj.GetHistMap()
 
         if os.path.exists(self.filename) and readOnly:
@@ -437,11 +437,12 @@ class OrganizedHists():
                 h = infile.Get(row.source_histname)
                 h.SetDirectory(0)
                 h.Scale(row.scale)
+                binning = self.binnings[row.binning]
 
-                if get_bins_from_hist("Y", h) != self.binning.ybinList:
-                    h = copy_hist_with_new_bins(row.out_histname+'_rebinY','Y',h,self.binning.ybinList)
-                if get_bins_from_hist("X", h) != self.binning.xbinList:
-                    h = copy_hist_with_new_bins(row.out_histname,'X',h,self.binning.xbinList)
+                if get_bins_from_hist("Y", h) != binning.ybinList:
+                    h = copy_hist_with_new_bins(row.out_histname+'_rebinY','Y',h,binning.ybinList)
+                if get_bins_from_hist("X", h) != binning.xbinList:
+                    h = copy_hist_with_new_bins(row.out_histname,'X',h,binning.xbinList)
                 else:
                     h.SetName(self.info['new_name']+'_FULL')
 
@@ -454,7 +455,7 @@ class OrganizedHists():
                         h.SetBinContent(b,1e-10)
 
                 self.file.WriteObject(h, row.out_histname)
-                self.CreateSubRegions(h)
+                self.CreateSubRegions(h, binning)
 
             infile.Close()
 
@@ -483,16 +484,16 @@ class OrganizedHists():
     def GetHistNames(self):
         return [hkey.GetName() for hkey in self.file.GetListOfKeys()]
 
-    def CreateSubRegions(self,h):
+    def CreateSubRegions(self,h,binning):
         '''Sub-divide input histogram along the X axis into the regions specified in the config
         and write the new histogram to organized_hists.root.
 
         Returns:
             None
         '''
-        for sub in self.binning.xbinByCat.keys():
+        for sub in binning.xbinByCat.keys():
             hsub = h.Clone()
-            hsub = copy_hist_with_new_bins(h.GetName().replace('_FULL','_'+sub),'X',h,self.binning.xbinByCat[sub])
+            hsub = copy_hist_with_new_bins(h.GetName().replace('_FULL','_'+sub),'X',h,binning.xbinByCat[sub])
             hsub.SetTitle(hsub.GetName())
             self.file.WriteObject(hsub, hsub.GetName())
 
