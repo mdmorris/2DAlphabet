@@ -6,7 +6,7 @@ from binning import copy_hist_with_new_bins
 # from numpy.lib.function_base import piecewise
 
 _subspace = ['LOW','SIG','HIGH']
-class Generic2D:
+class Generic2D(object):
     '''Wraps binned distributions in a common type so that
     distributions can easily be manipulated and compared. While a full distribution
     is always input, this class will actually store three sets of bins, one each
@@ -206,7 +206,7 @@ class ParametricFunction(Generic2D):
                 and the range of the parameter will be [-1000,1000]. 
             forcePositive (bool, optional). Defaults to True in which case the bin values will be lower bound by 1e-9.
         '''
-        super().__init__(name,binning,forcePositive)
+        super(ParametricFunction,self).__init__(name,binning,forcePositive)
         self.formula = formula
         self.nuisances = self._createFuncVars(constraints)
 
@@ -341,7 +341,7 @@ class BinnedDistribution(Generic2D):
             forcePositive (bool, optional). Defaults to True in which case the bin values will be lower bound by 1e-9
                 and any shape templates will asymptotically approach zero as the associated nuisance increases/decreases.
         '''
-        super().__init__(name,binning,forcePositive=forcePositive)
+        super(BinnedDistribution,self).__init__(name,binning,forcePositive=forcePositive)
         for cat in _subspace:
             cat_name = name+'_'+cat
             cat_hist = copy_hist_with_new_bins(cat_name,'X',inhist,self.binning.xbinByCat[cat])
