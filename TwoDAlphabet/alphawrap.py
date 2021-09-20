@@ -129,7 +129,7 @@ class Generic2D(object):
         out_add = {}
         for cat in _subspace:
             cat_name = self.name+'_'+cat
-            cat_hist = self.binning.CreatHist(cat_name+'_temp')
+            cat_hist = self.binning.CreateHist(cat_name+'_temp',cat)
 
             self.binArgLists[cat] = RooArgList()
             for ybin in range(1,len(self.binning.ybinList)):
@@ -221,7 +221,7 @@ class ParametricFunction(Generic2D):
             for ybin in range(1,len(self.binning.ybinList)):
                 for xbin in range(1,len(self.binning.xbinByCat[cat])):
                     bin_name = '%s_bin_%s-%s'%(cat_name,xbin,ybin)
-                    xConst,yConst = self.mappedBinCenter(xbin,ybin)
+                    xConst,yConst = self.mappedBinCenter(xbin,ybin,cat)
                     if forcePositive: final_formula = "max(1e-9,%s)"%(self._replaceXY(xConst,yConst))
                     else:             final_formula = self._replaceXY(xConst,yConst)
 
@@ -288,7 +288,7 @@ class ParametricFunction(Generic2D):
             out.append(this_out)
         return out
     
-    def mappedBinCenter(self,xbin,ybin):
+    def mappedBinCenter(self,xbin,ybin,cat):
         '''Convert global x and y bin to values in center of bins
         where the axis has been mapped to range [0,1].
 
@@ -299,8 +299,8 @@ class ParametricFunction(Generic2D):
         Returns:
             tuple of floats: x and y values, respectively.
         '''
-        x_center = self.binning.GetBinCenterX(xbin)
-        y_center = self.binning.GetBinCenterX(ybin)
+        x_center = self.binning.GetBinCenterX(xbin,cat)
+        y_center = self.binning.GetBinCenterY(ybin)
 
         x_min = self.binning.xbinList[0]
         y_min = self.binning.ybinList[0]

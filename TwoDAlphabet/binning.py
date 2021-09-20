@@ -107,18 +107,23 @@ class Binning:
         if ibin < 1: raise ValueError('Binning is indexed at 1 for compatibility with ROOT.')
         return (binlist[ibin]+binlist[ibin-1])/2
 
-    def GetBinCenterX(self,ibin):
-        return self.GetBinCenterBase(ibin,self.xbinList)
+    def GetBinCenterX(self,ibin,cat):
+        return self.GetBinCenterBase(ibin,self.xbinByCat[cat])
 
     def GetBinCenterY(self,ibin):
         return self.GetBinCenterBase(ibin,self.ybinList)
 
-    def CreateHist(self,name):
+    def CreateHist(self,name,cat=''):
+        if cat != '':
+            xbins = self.xbinByCat[cat]
+        else:
+            xbins = self.xbinList
+
         return ROOT.TH2F(name,name,
-                         len(self.xbinList),
-                         array.array('d',self.xbinList),
-                         len(self.ybinList),
-                         array.array('d',self.ybinList)
+                        len(xbins)-1,
+                        array.array('d',xbins),
+                        len(self.ybinList)-1,
+                        array.array('d',self.ybinList)
         )
 
 def create_RRV_base(name,title,bins):
