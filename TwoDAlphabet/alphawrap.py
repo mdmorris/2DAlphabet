@@ -51,7 +51,7 @@ class Generic2D(object):
         Returns:
             Generic2D: Object containing the combination of `self` and `other`.
         '''
-        out = Generic2D(name,self.binning)
+        out = Generic2D(name,self.binning,self.forcePositive)
         for cat in _subspace:
             new_cat_name = name+'_'+cat
             for ybin in range(1,len(self.binning.ybinList)):
@@ -65,7 +65,11 @@ class Generic2D(object):
                                                         self.binVars[self_bin_name],
                                                         other.binVars[other_bin_name]))
 
-        for nuisance in set(self.nuisances+other.nuisances):
+        all_nuisances = self.nuisances+other.nuisances
+        for nuisance in all_nuisances:
+            if nuisance['name'] in [n['name'] for n in out.nuisances]:
+                raise RuntimeError('Already tracking nuisance %s. Printing all nuisances...\n\t'%(nuisance['name'],all_nuisances))
+
             out.nuisances.append(nuisance)
 
         return out
@@ -209,6 +213,8 @@ class ParametricFunction(Generic2D):
         super(ParametricFunction,self).__init__(name,binning,forcePositive)
         self.formula = formula
         self.nuisances = self._createFuncVars(constraints)
+        self.arglist = RooArgList()
+        for n in self.nuisances: self.arglist.add(n['obj'])
 
         for cat in _subspace:
             cat_name = name+'_'+cat
@@ -218,10 +224,11 @@ class ParametricFunction(Generic2D):
                     xConst,yConst = self.mappedBinCenter(xbin,ybin)
                     if forcePositive: final_formula = "max(1e-9,%s)"%(self._replaceXY(xConst,yConst))
                     else:             final_formula = self._replaceXY(xConst,yConst)
+
                     self.binVars[bin_name] = RooFormulaVar(
                         bin_name, bin_name,
                         final_formula,
-                        RooArgList([self.nuisances[n]['obj'] for n in self.nuisances])
+                        self.arglist
                     )
 
     def _replaceXY(self,x,y):
@@ -251,7 +258,7 @@ class ParametricFunction(Generic2D):
         Returns:
             int: Number of parameters in the fit (not counting "x" or "y").
         '''
-        return TFormula('t',roofit_form_to_TF1(self.formula)).GetNpars()
+        return TFormula('tempFormula',roofit_form_to_TF1(self.formula)).GetNpar()
 
     def _createFuncVars(self,constraints):
         '''Creates the nuisances list of the function variables (RooRealVars)
@@ -277,7 +284,7 @@ class ParametricFunction(Generic2D):
                 ERROR = constraints['ERROR']
 
             this_out = {'name':name, 'obj': RooRealVar(name,name,NOM,MIN,MAX), 'constraint': constraint}
-            this_out.setError(ERROR)
+            this_out['obj'].setError(ERROR)
             out.append(this_out)
         return out
     
