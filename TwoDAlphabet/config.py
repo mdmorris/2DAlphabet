@@ -1,4 +1,4 @@
-import ROOT, argparse, json, os, pandas, re, warnings
+import ROOT, argparse, json, os, pandas, re, warnings, sys
 from numpy import nan
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
@@ -32,7 +32,7 @@ class Config:
     Attributes:
         config (dict): JSON config opened as a dict.
         name (str): Name, inherited from the input JSON config.
-        projPath (str): The project path + self.name.
+        projPath (str): The project path (`tag` attribute in `TwoDAlphabet()`).
         options (Namespace): Final set of options to use.
         loadPrevious (bool): Equal to the constructor arg of the same name.
         nsignals (int): Number of signal processes. Zero before running Construct().
@@ -52,6 +52,7 @@ class Config:
         self.nsignals, self.nbkgs = 0, 0
         self.df = self.FullTable()
         self.constructed = False
+        self._addedConfigs = []
 
     def Construct(self):
         '''Uses the config as instructions to setup binning, manipulate histograms,
@@ -62,8 +63,9 @@ class Config:
         template_file = ROOT.TFile.Open(self.df.iloc[0].source_filename)
         template = template_file.Get(self.df.iloc[0].source_histname)
         template.SetDirectory(0)
+        self.binnings = {}
         for kbinning in self._section('BINNING').keys():
-            self.binnings[kbinning] = Binning(self.name, self._section('BINNING')[kbinning], template)
+            self.binnings[kbinning] = Binning(kbinning, self._section('BINNING')[kbinning], template)
         if self.loadPrevious: 
             self.organizedHists = OrganizedHists(self,readOnly=True)
         else:
@@ -173,11 +175,16 @@ class Config:
         and markdown formats. No copy of the input JSONs is saved since multiple
         could be provided with the only final combination making it to the histogram table.
         '''
-        file_out = open(self.projPath+'runConfig_%s.json'%self.name, 'w')
-        json.dump(self.config,file_out,indent=2,sort_keys=True)
-        file_out.close()
+        for c in self._addedConfigs+[self]:
+            file_out = open(c.projPath+'runConfig_%s.json'%c.name, 'w')
+            json.dump(c.config,file_out,indent=2,sort_keys=True)
+            file_out.close()
+
+        if 'index' in self.df.columns:
+            self.df = self.df.reset_index(drop=True).drop('index',axis=1)
+
         self.df.to_csv(self.projPath+'hist_table.csv')
-        self.df.to_markdown(self.projPath+'hist_table.md')
+        if sys.version_info.major == 3: self.df.to_markdown(self.projPath+'hist_table.md')
 
     def FullTable(self):
         '''Generate full table of processes, regions, and systematic variations
@@ -240,7 +247,7 @@ class Config:
             elif (process_df['TYPE'] == 'DATA').sum() > 1:
                 raise RuntimeError('Multiple processes of TYPE == "DATA" provided in PROCESSES section.')
             else:
-                data_key = process_df[process_df['TYPE'] == 'DATA'].index[0]
+                data_key = 'data_obs'
             # Check if it's included in the regions
             if (region_df['TYPE'] == 'DATA').sum() == 0:
                 out = data_key
@@ -272,10 +279,12 @@ class Config:
         Returns:
             pandas.DataFrame
         '''
-        out_df = pandas.DataFrame(columns=['color','process_type','scale','variation','source_filename','source_histname','combine_idx'])
+        out_df = pandas.DataFrame(columns=['color','process_type','scale','variation','source_filename','source_histname','alias','combine_idx'])
         for p in self._section('PROCESSES'):
             this_proc_info = self._section('PROCESSES')[p]
             combine_idx = self._getCombineIdx(this_proc_info)
+            if this_proc_info['TYPE'] == 'DATA' and p != 'data_obs':
+                raise RuntimeError('Any process of type DATA must have section key "data_obs".')
             for s in this_proc_info['SYSTEMATICS']+['nominal']:
                 out_df = out_df.append(pandas.Series(
                                 {'color': nan if 'COLOR' not in this_proc_info else this_proc_info['COLOR'],
@@ -283,6 +292,7 @@ class Config:
                                 'scale': 1.0 if 'SCALE' not in this_proc_info else this_proc_info['SCALE'],
                                 'source_filename': this_proc_info['LOC'].split(':')[0],
                                 'source_histname': this_proc_info['LOC'].split(':')[1],
+                                'alias': p if 'ALIAS' not in this_proc_info.keys() else this_proc_info['ALIAS'],
                                 'variation': s,
                                 'combine_idx':combine_idx},
                                 name=p)
@@ -318,7 +328,8 @@ class Config:
         '''Collect information on the histograms to extract, manipulate, and save
         into organized_hists.root and store it inside a `dict` where the key is the
         filename and the value is a DataFrame with columns `source_histname`, `out_histname`,
-        `scale`, and `color`.
+        `scale`, `color`, and `binning`. Only accounts for "FULL" category and does not 
+        contain information on subspaces.
 
         Args:
             df (pandas.DataFrame, optional): pandas.DataFrame to groupby. Defaults to None in which case self.df is used.
@@ -336,10 +347,9 @@ class Config:
                 str: New name.
             '''
             if row.variation == 'nominal':
-                return row.process+'_'+row.region+'_'+row.variation+"_FULL"
+                return row.process+'_'+row.region+'_FULL'
             else:
-                return row.process+'_'+row.region+'_'+row.variation+row.direction+"_FULL"
-
+                return row.process+'_'+row.region+'_FULL_'+row.variation+row.direction
         if not isinstance(df,pandas.DataFrame):
             df = self.df
 
@@ -348,7 +358,7 @@ class Config:
             group_df = g[1].copy()
             group_df = group_df[group_df['variation'].eq('nominal') | group_df["syst_type"].eq("shapes")]
             group_df['out_histname'] = group_df.apply(_get_out_name,axis=1)
-            hists[g[0]] = group_df[['source_histname','out_histname','scale','color']]
+            hists[g[0]] = group_df[['source_histname','out_histname','scale','color','binning']]
         return hists
 
     def Add(self,cNew,onlyOn=['process','region']):
@@ -365,7 +375,7 @@ class Config:
             return drop
 
         if self.constructed == True:
-            raise RuntimeError('This config (%s) has already been constructed so no additions can be made.'%(self.name))
+            raise RuntimeError('This config has already been constructed so no additions can be made.')
         if isinstance(onlyOn,str):
             if onlyOn not in ['process','region']:
                 raise RuntimeError('Can only add configs together on the "process" or "region" information.')
@@ -373,7 +383,7 @@ class Config:
         elif onlyOn != ['process','region']:
             raise RuntimeError('Can only add configs together on the "process" or "region" information.')
         
-        df_modified_base         = self.df.append(cNew.df).reset_index()
+        df_modified_base         = self.df.append(cNew.df).reset_index(drop=True)
         df_modified_nominal_only = df_modified_base[df_modified_base.variation.eq('nominal')]
         df_modified_dupes        = df_modified_nominal_only[ df_modified_nominal_only.duplicated(subset=onlyOn,keep='first') ]
 
@@ -389,14 +399,14 @@ class Config:
         else: # if no duplicates, just use the appended df
             df_final = df_modified_base
 
-        cNew.SaveOut()
+        self._addedConfigs.append(cNew)
         self.df = df_final
 
     def GetNregions(self):
-        return self.df.regions.nunique()
+        return self.df.region.nunique()
 
     def GetNsystematics(self):
-        return self.df.variations.nunique()-1
+        return self.df.variation.nunique()-1
 
     def InitQCDHists(self):
         '''Loop over all regions and for a given region's data histogram, subtract the list of background histograms,
@@ -406,24 +416,28 @@ class Config:
             dict(region,TH2): Dictionary with regions as keys and values as histograms of data-bkgList.
         '''
         out = {}
-        for region,group in self.df.regions.groupby():
+        for region,group in self.df.groupby('region'):
             data_sources = group.loc[group.process_type.eq('DATA')][['source_filename','source_histname']]
-            if data_sources > 1:
-                raise RuntimeError('More than one data source found in\n%s'%group)
+            if data_sources.shape[0] > 1:
+                raise RuntimeError('More than one data source found in\n%s'%data_sources)
 
-            data_file = ROOT.TFile.Open(data_sources.loc[0,'source_filename'])
-            data_hist = data_file.Get(data_sources.loc[0,'source_histname'])
+            data_file = ROOT.TFile.Open(data_sources.iloc[0]['source_filename'])
+            data_hist = data_file.Get(data_sources.iloc[0]['source_histname'])
             qcd = data_hist.Clone(data_hist.GetName().replace('data_obs','qcd'))
             qcd.SetDirectory(0)
 
-            bkg_sources = set(group.loc[group.process_type.eq('BKG')][['source_filename','source_histname']])
+            bkg_sources = group.loc[group.process_type.eq('BKG') & group.variation.eq('nominal')][['source_filename','source_histname']]
             for bkg_file_name,bkg_hist_names in bkg_sources.groupby('source_filename'):
                 if bkg_file_name == data_file.GetName():
                     bkg_file = data_file
                 else:
                     bkg_file = ROOT.TFile.Open(bkg_file_name)
-                bkg_hist = bkg_file.Get(bkg_hist_names)
-                qcd.Add(bkg_hist,'-1')
+
+                if bkg_hist_names.shape[0] > 1:
+                    raise RuntimeError('More than one bkg histogram found in %s\n%s'%(bkg_file_name,bkg_hist_names))
+
+                bkg_hist = bkg_file.Get(bkg_hist_names.iloc[0].source_histname)
+                qcd.Add(bkg_hist,-1)
 
             out[region] = qcd
 
@@ -445,7 +459,6 @@ class OrganizedHists():
         configObj (Config): Config object.
     '''
     def __init__(self,configObj,readOnly=False):
-        self.name = configObj.name
         self.filename = configObj.projPath + 'organized_hists.root'
         self.binnings = configObj.binnings
         self.hist_map = configObj.GetHistMap()
@@ -475,7 +488,7 @@ class OrganizedHists():
                 if get_bins_from_hist("X", h) != binning.xbinList:
                     h = copy_hist_with_new_bins(row.out_histname,'X',h,binning.xbinList)
                 else:
-                    h.SetName(self.info['new_name']+'_FULL')
+                    h.SetName(row.out_histname)
 
                 h.SetTitle(row.out_histname)
                 h.SetFillColor(row.color)
@@ -510,10 +523,14 @@ class OrganizedHists():
         '''
         if subspace not in ['FULL','LOW','SIG','HIGH']:
             raise NameError("Subspace '%s' not accepted. Options are 'FULL','LOW','SIG','HIGH'.")
-        return self.file.Get(histname if histname != '' else '_'.join([process,region,systematic,subspace]))
+        return self.file.Get(histname if histname != '' else '_'.join([process,region,subspace,systematic]))
 
     def GetHistNames(self):
         return [hkey.GetName() for hkey in self.file.GetListOfKeys()]
+
+    def BinningLookup(self,histname):
+        all_hists = pandas.concat([v[['out_histname','binning']] for v in self.hist_map.values()])
+        return all_hists.loc[all_hists.out_histname.eq(histname)].iloc[0].binning
 
     def CreateSubRegions(self,h,binning):
         '''Sub-divide input histogram along the X axis into the regions specified in the config
@@ -546,7 +563,7 @@ def _keyword_replace(df,col_strs):
         else:
             return replace_multi(
                 row[col_str],
-                {'$process': row.process,
+                {'$process': row.alias,
                  '$region':  row.region,
                  '$syst':    row.variation}
             )

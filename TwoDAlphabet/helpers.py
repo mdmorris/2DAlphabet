@@ -219,17 +219,17 @@ def set_hist_maximums(histList,factor=1.1):
         out.append(h)
     return out
 
-def get_config_dirs(projPath):
-    '''Get the sub-directories in the project directory
-    that correspond to the configs used.
+# def get_config_dirs(projPath):
+#     '''Get the sub-directories in the project directory
+#     that correspond to the configs used.
 
-    Args:
-        projPath (str): Path to project directory.
+#     Args:
+#         projPath (str): Path to project directory.
 
-    Returns:
-        list(str): List of sub-directories.
-    '''
-    return [f.path for f in os.scandir(projPath) if f.is_dir()]
+#     Returns:
+#         list(str): List of sub-directories.
+#     '''
+#     return [f.path for f in os.scandir(projPath) if f.is_dir()]
 
 def is_filled_list(d,key):
     '''Checks if the dictionary (`d`) entry at `key` is
@@ -258,4 +258,4 @@ def replace_multi(s,findreplace):
     return s
 
 def unpack_to_line(toUnpack):
-    return ' '.join(['{'+i+':20}' for i in range(toUnpack)]).format(*toUnpack)
+    return ' '.join(['{%s:20}'%i for i in range(len(toUnpack))]).format(*toUnpack)
