@@ -18,12 +18,12 @@
     },
 
     "PROCESSES": {
-        "Data_Run2": {
+        "data_obs": {
             "SYSTEMATICS":[],
             "SCALE": 1.0,
             "COLOR": 0,
             "TYPE": "DATA",
-            "ALIAS": "data_obs",
+            "ALIAS": "Data_Run2",
             "LOC": "path/FILE:HIST"
         },
         "ttbar_16": {
@@ -44,11 +44,11 @@
 
     "REGIONS": {
         "CR_pass": {
-            "PROCESSES": ["ttbar_16","TprimeB-1800_16","Data_Run2"],
+            "PROCESSES": ["ttbar_16","TprimeB-1800_16"],
             "BINNING": "default"
         },
         "CR_fail": {
-            "PROCESSES": ["ttbar_16","TprimeB-1800_16","Data_Run2"],
+            "PROCESSES": ["ttbar_16","TprimeB-1800_16","data_obs"],
             "BINNING": "default"
         }
     },
