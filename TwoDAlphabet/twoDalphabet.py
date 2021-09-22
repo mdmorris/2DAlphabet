@@ -1,8 +1,9 @@
 import argparse, os, itertools, pandas, glob
 from collections import OrderedDict
 from TwoDAlphabet.config import Config
-from TwoDAlphabet.helpers import execute_cmd, parse_arg_dict, unpack_to_line, make_RDH
+from TwoDAlphabet.helpers import execute_cmd, parse_arg_dict, unpack_to_line, make_RDH, cd, executeCmd
 from TwoDAlphabet.alphawrap import Generic2D
+from TwoDAlphabet import plot
 import ROOT
 
 class TwoDAlphabet:
@@ -36,11 +37,12 @@ class TwoDAlphabet:
 
         self._setupProjDir()
         self.config.Construct()
+        self.df = self.config.df
         self.nbkgs, self.nsignals = self.config.nbkgs, self.config.nsignals
         if self.options.debugDraw == False:
             ROOT.gROOT.SetBatch(True)
 
-        self.alphaObjs = pandas.DataFrame(columns=['process','region','obj','norm','process_type','combine_idx'])
+        self.alphaObjs = pandas.DataFrame(columns=['process','region','obj','norm','process_type','color','combine_idx'])
         self.alphaParams = pandas.DataFrame(columns=['name','obj','constraint']) # "name":"constraint"
 
     def GetOptions(self,externalOpts):
@@ -78,7 +80,7 @@ class TwoDAlphabet:
         else:
             self.config.Add(inputConfig,onlyOn)
 
-    def AddAlphaObj(self,process,region,obj,ptype='BKG'):
+    def AddAlphaObj(self,process,region,obj,ptype='BKG',color=ROOT.kYellow):
         '''Start
 
         Args:
@@ -101,6 +103,7 @@ class TwoDAlphabet:
             "obj": rph,
             "norm": norm,
             "process_type": ptype,
+            "color": color,
             "combine_idx": self.nbkgs+1 if ptype == 'BKG' else -1*self.nsignals
         }
         self.alphaObjs = self.alphaObjs.append(model_obj_row,ignore_index=True)
@@ -140,19 +143,21 @@ class TwoDAlphabet:
                 os.mkdir(d)
 
     def GetRegions(self):
-        return self.config.df.region.unique()
+        return self.df.region.unique()
 
-    def GetProcesses(self,includeNonConfig=True):
-        proc_list = list(self.config.df.process.unique())
+    def GetProcesses(self,includeNonConfig=True,onlyNonConfig=False):
+        proc_list = []
+        if not onlyNonConfig:
+            proc_list.extend(list(self.df.process.unique()))
         if includeNonConfig and self.alphaObjs.process.unique().size > 0:
             proc_list.extend(list(self.alphaObjs.process.unique()))
         return proc_list
 
     def GetProcRegPairs(self):
-        return [g[0] for g in self.config.df.groupby(['process','region'])]+[g[0] for g in self.alphaObjs.groupby(['process','region'])]
+        return [g[0] for g in self.df.groupby(['process','region'])]+[g[0] for g in self.alphaObjs.groupby(['process','region'])]
 
     def GetShapeSystematics(self):
-        return self.config.df.variation.unique()
+        return self.df.variation.unique()
 
     def GetAlphaSystematics(self):
         return self.alphaParams.name.unique()
@@ -161,12 +166,40 @@ class TwoDAlphabet:
         return self.GetShapeSystematics()+self.GetAlphaSystematics()
 
     def GetBinningFor(self,region):
-        pairs = [g[0] for g in self.config.df.groupby(['region','binning'])]
+        pairs = [g[0] for g in self.df.groupby(['region','binning'])]
         for p in pairs:
             if p[0] == region:
                 return self.config.binnings[p[1]], p[1]
         
         raise RuntimeError('Cannot find region (%s) in config:\n\t%s'%(region,pairs))
+
+    def _getProcessAttrBase(self,procName,attrName):
+        if procName in self.df.process.unique():
+            df = self.df
+        elif procName in self.alphaObjs.process.unique():
+            df = self.alphaObjs
+        else:
+            raise NameError('Process "%s" does not exist.'%procName)
+
+        return df.loc[df.process.eq(procName)].iloc[0,attrName]
+
+    def GetProcessColor(self,procName):
+        return self._getProcessAttrBase(procName,'color')
+
+    def GetProcessType(self,procName):
+        return self._getProcessAttrBase(procName,'process_type')
+
+    def GetProcessTitle(self,procName):
+        return self._getProcessAttrBase(procName,'title')
+
+    def IsSignal(self,procName):
+        return self.GetProcessType(procName) == 'SIGNAL'
+
+    def IsBackground(self,procName):
+        return self.GetProcessType(procName) == 'BKG'
+
+    def IsData(self,procName):
+        return self.GetProcessType(procName) == 'DATA'
 
     def _saveOut(self):
         '''Save individual configs to project directory.
@@ -217,13 +250,13 @@ class TwoDAlphabet:
         syst_lines = OrderedDict()
 
         # Fill syst_lines with keys to initialized strings
-        for syst,syst_group in self.config.df.groupby(by='variation',sort=True):
+        for syst,syst_group in self.df.groupby(by='variation',sort=True):
             if syst == 'nominal': continue
             syst_type = syst_group.iloc[0].syst_type
             syst_lines[syst] = '{0:20} {1:20} '.format(syst, syst_type)
 
         # Work with template bkgs first
-        for pair,group in self.config.df.groupby(['process','region']):
+        for pair,group in self.df.groupby(['process','region']):
             proc,region = pair
             combine_idx = group.iloc[0].combine_idx
             for cat in ['LOW','SIG','HIGH']:
@@ -331,6 +364,16 @@ class TwoDAlphabet:
         self._makeCard()
         self._makeWorkspace()
         self._saveOut()
+        self.Load()
+
+    def Load(self):
+        '''Loads partially saved results of a previous run.
+        Will not make anything from scratch and only has access to
+        the base DataFrame, output histograms, the card, and the 
+        RooWorkspace.
+        '''
+        self.df = pandas.read_csv(self.tag+'/hist_table.csv')
+        self.hists_file = ROOT.TFile.Open(self.tag+'/organized_hists.root')
 
     def plot(self):
         # plotter.methodA()
@@ -342,6 +385,11 @@ class TwoDAlphabet:
         with cd(self.tag):
             _runMLfit(self.options.config.options.blindedFit, self.options.verbosity, rMin, rMax, extraParams)
             plot.NuisPulls()
+            plot.SavePostFitParametricFuncVals()
+            plot.GenPostFitShapes()
+            plot.plotFitResults()
+            # systematic_analyzer_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py card.txt --all -f html > systematics_table.html'
+            # executeCmd(systematic_analyzer_cmd)    
 
     def GoodnessOfFit(self):
         pass

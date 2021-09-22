@@ -3,21 +3,24 @@ from math import sqrt
 
 class Binning:
     '''Class to handle information on and manipulations of binning schemes.'''
-    def __init__(self, config_name, binning_dict, start_template):
+    def __init__(self, name, binning_dict, start_template):
         '''Initialize Binning object.
 
         Args:
-            config_name (str): Config name to create unique objects owned by Binning.
+            name (str): Name to create unique objects owned by Binning.
             binning_dict (dict): "BINNING" section of configuration json which specifies the X and Y binning schemes.
             start_template (TH2): Histogram to compare against when doing sanity checks.
         '''
-        self.configName = config_name
+        self.name = name
         self.startTemplate = start_template.Clone()
         self.startTemplate.Reset()
         
         self.sigStart = binning_dict['X']['SIGSTART']
         self.sigEnd = binning_dict['X']['SIGEND']
+        self.xtitle = binning_dict['X']['TITLE']
+        self.ytitle = binning_dict['Y']['TITLE']
         self.xbinByCat, self.ybinList = parse_binning_info(binning_dict)
+        self.ySlices,self.ySliceIdx = self._getYslices(binning_dict) # x slices defined as properties
         self._checkBinning('X')
         self._checkBinning('Y')
         self.xVars, self.yVar = self.CreateRRVs(binning_dict['X'], binning_dict['Y']) 
@@ -34,12 +37,12 @@ class Binning:
         Returns:
             tuple: (0) dict of X axis RooRealVars and (1) Y axis RooRealVar.
         '''
-        yRRV = create_RRV_base(ydict['NAME']+'_'+self.configName,
+        yRRV = create_RRV_base(ydict['NAME']+'_'+self.name,
                           ydict['TITLE'],
                           self.ybinList)
         xRRVs = {}
         for c in ['LOW','SIG','HIGH']:
-            xRRVs[c] = create_RRV_base(xdict['NAME']+'_'+c+'_'+self.configName,
+            xRRVs[c] = create_RRV_base(xdict['NAME']+'_'+c+'_'+self.name,
                                   xdict['TITLE'],
                                   self.xbinByCat[c])
         return xRRVs,yRRV
@@ -69,6 +72,39 @@ class Binning:
                 prev = b
             else:
                 raise ValueError('%s axis bin edges must be in increasing order!'%axis)
+
+    def _getYslices(self,binning_dict):
+        if 'SLICES' in binning_dict['Y']:
+            if len(binning_dict['Y']['SLICES']) != 4:
+                raise RuntimeError('Must define Y SLICES as a list of four values which represent the edges of the continuous slices.')
+            elif binning_dict['Y']['SLICES'][0] != self.ybinList[0]:
+                raise ValueError('First edge of Y SLICES does not match axis (%s vs %s)'%(binning_dict['Y']['SLICES'][0], self.ybinList[0]))
+            elif binning_dict['Y']['SLICES'][-1] != self.ybinList[-1]:
+                raise ValueError('Last edges of Y SLICES does not match axis (%s vs %s)'%(binning_dict['Y']['SLICES'][-1], self.ybinList[-1]))
+            slices = binning_dict['Y']['SLICES']
+            idxs = [0, self.ybinList.index(slices[1]), self.ybinList.index(slices[2]), len(self.ybinList)-1]
+        else:
+            slices, idxs = self._autoYslices()
+
+        print ('DEBUG Yslices idxs: %s'%idxs)
+        print ('DEBUG Yslices vals: %s'%slices)
+
+        return slices, idxs
+
+    def _autoYslices(self):
+        nbins = len(self.ybinList)-1
+        idxs = [0, int(nbins/4), int(nbins/4)+int(nbins/3), nbins]
+        slices = [self.ybinList[i] for i in idxs]
+
+        return slices, idxs
+
+    @property
+    def xSlices(self):
+        return [self.xbinList[i] for i in self.xSlice_idxs]
+
+    @property
+    def xSlices_idxs(self):
+        return [0,self.GlobalXbinIdx(0,'SIG'),self.GlobalXbinIdx(-1,'SIG'),len(self.xbinList)-1]
 
     def GlobalXbinIdx(self,xbin,c):
         '''Evaluate for the bin - a bit tricky since it was built with separate categories.
@@ -306,12 +342,13 @@ def histlist_to_binlist(XYZ,histList):
     binList = [get_bins_from_hist(XYZ,h) for h in histList]
     return concat_bin_lists(binList)
 
-def stitch_hists_in_x(template,histList,blinded=[]):
+def stitch_hists_in_x(name,binning,histList,blinded=[]):
     '''Required that histList be in order of desired stitching
     `blinded` is a list of the index of regions you wish to skip/blind.
 
     Args:
-        template (TH2): Template histogram which will be cloned and the clone filled.
+        name (str): Name of output histogram.
+        binning (Binning): Binning storage object.
         histList (list(TH2)): List of histograms to stitch together. Binning must be continious.
         blinded (list(int), optional): List of indexes of histList which should be dropped/blinded. Defaults to [].
 
@@ -321,7 +358,7 @@ def stitch_hists_in_x(template,histList,blinded=[]):
     Returns:
         TH2: Output stitched histograms.
     '''
-    stitched_hist = template.Clone()
+    stitched_hist = binning.CreateHist()
     stitched_hist.Reset()
     # Sanity checks
     histListBins = histlist_to_binlist("X",histList)

@@ -137,38 +137,31 @@ class Config:
             self.config['OPTIONS'].update(externalOptions)
 
         parser = argparse.ArgumentParser()
-
-        parser.add_argument('blindedPlots', default=True, type=bool, nargs='?',
-            help='Blind plots to SIG region. Does not blind fit. Defaults to True.')
-        parser.add_argument('blindedFit', default=True, type=bool, nargs='?',
-            help='Blind fit to SIG region. Does not blind plots. Defaults to True.')
+        # Blinding
+        parser.add_argument('blindedPlots', type=list, nargs='?', required=True,
+            help='List of regions in which to blind plots of x-axis SIG. Does not blind fit.')
+        parser.add_argument('blindedFit', type=list, nargs='?', required=True,
+            help='List of regions in which to blind fit of x-axis SIG. Does not blind plots.')
+        # Plotting
         parser.add_argument('haddSignals', default=True, type=bool, nargs='?',
             help='Combine signals into one histogram for the sake of plotting. Still treated as separate in fit. Defaults to True.')
-
         parser.add_argument('plotTitles', default=False, type=bool, nargs='?',
             help='Include titles in plots. Defaults to False.')
-        parser.add_argument('freezeFail', default=False, type=bool, nargs='?',
-            help='Freeze the QCD failing bins to their pre-fit values. Defaults to False.')
         parser.add_argument('plotUncerts', default=False, type=bool, nargs='?',
             help='Plot comparison of pre-fit uncertainty shape templates in 1D projections. Defaults to False.')
         parser.add_argument('plotPrefitSigInFitB', default=False, type=bool, nargs='?',
             help='In the b-only post-fit plots, plot the signal normalized to its pre-fit value. Defaults to False.')
         parser.add_argument('plotEvtsPerUnit', default=False, type=bool, nargs='?',
             help='Post-fit bins are plotted as events per unit rather than events per bin. Defaults to False.')
-        parser.add_argument('overwrite', default=False, type=bool, nargs='?',
-            help='Overwrite any existing files.')
-        
-        parser.add_argument('ySlices', default=[], type=list, nargs='?',
-            help='Manually define the slices in the y-axis for the sake of plotting. Only needed if the automated algorithm is not working as intended. Defaults to empty list.')
         parser.add_argument('year', default=1, type=int, nargs='?',
             help='Year information used for the sake of plotting text. Defaults to 1 which indicates that the full Run 2 is being analyzed.')
-        parser.add_argument('recycle', default=[], type=list, nargs='?',
-            help='List of items to recycle. Not currently working.')
         
         if 'OPTIONS' in self.config.keys():
-            return parse_arg_dict(parser,self._section('OPTIONS'))
+            out = parse_arg_dict(parser,self._section('OPTIONS'))
         else:
-            return parser.parse_args([])
+            out = parser.parse_args([])
+
+        return out
 
     def SaveOut(self): # pragma: no cover
         '''Save the histogram table to the <self.projPath> directory in csv
@@ -292,7 +285,8 @@ class Config:
                                 'scale': 1.0 if 'SCALE' not in this_proc_info else this_proc_info['SCALE'],
                                 'source_filename': this_proc_info['LOC'].split(':')[0],
                                 'source_histname': this_proc_info['LOC'].split(':')[1],
-                                'alias': p if 'ALIAS' not in this_proc_info.keys() else this_proc_info['ALIAS'],
+                                'alias': p if 'ALIAS' not in this_proc_info.keys() else this_proc_info['ALIAS'], #in file name
+                                'title': p if 'TITLE' not in this_proc_info.keys() else this_proc_info['TITLE'], #in legend entry
                                 'variation': s,
                                 'combine_idx':combine_idx},
                                 name=p)
