@@ -338,8 +338,10 @@ class TwoDAlphabet:
         # ...
         pass
 
-    def MLfit(self):
-        pass
+    def MLfit(self,rMin=-10,rMax=10,extraParams={}):
+        with cd(self.tag):
+            _runMLfit(self.options.config.options.blindedFit, self.options.verbosity, rMin, rMax, extraParams)
+            plot.NuisPulls()
 
     def GoodnessOfFit(self):
         pass
@@ -352,6 +354,32 @@ class TwoDAlphabet:
 
     def Impacts(self):
         pass
+
+def _runMLfit(blinding,verbosity,rMin,rMax,extraParams):
+    param_options = '--text2workspace "--channel-masks" --setParameters '
+    blinded_fit_masks = ['mask_%s_SIG=1'%r for r in blinding]
+    param_options+= ','.join(blinded_fit_masks)
+    
+    # Determine if any nuisance/sysetmatic parameters should be set before fitting
+    more_params = ['%s=%s'%(p,v) for p,v in extraParams.items()]+['r=1'] # Always set r to start at 1
+    if param_options != '': param_options += ','.join(more_params)
+    else: param_options = '--setParameters '+','.join(more_params)
+
+    fit_cmd = 'combine -M FitDiagnostics -d card.txt {param_options} --saveWorkspace --cminDefaultMinimizerStrategy 0 --rMin {rmin} --rMax {rmax} -v {verbosity}'
+    fit_cmd.format(
+        param_options=param_options,
+        rmin=rMin,
+        rmax=rMax,
+        verbosity=verbosity
+    )
+
+    with open('FitDiagnostics_command.txt','w') as out:
+        out.write(fit_cmd)
+
+    if os.path.isfile('fitDiagnostics.root'):
+        executeCmd('rm fitDiagnostics.root')
+
+    executeCmd(fit_cmd)
 
 def SetSnapshot(d=''):
     w_f = ROOT.TFile.Open(d+'higgsCombineTest.FitDiagnostics.mH120.root')
