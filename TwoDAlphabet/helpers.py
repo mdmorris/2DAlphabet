@@ -210,14 +210,18 @@ def set_hist_maximums(histList,factor=1.1):
     '''
     # Set the max of the range so we can see all three histograms on the same plot
     out = []
-    yMax = histList[0].GetMaximum()
-    for h in range(1,len(histList)):
-        if histList[h].GetMaximum() > yMax:
-            yMax = histList[h].GetMaximum()
+    yMax = get_hist_maximum(histList)
     for h in histList:
         h.SetMaximum(yMax*factor)
         out.append(h)
     return out
+
+def get_hist_maximum(histList):
+    yMax = histList[0].GetMaximum()
+    for h in range(1,len(histList)):
+        if histList[h].GetMaximum() > yMax:
+            yMax = histList[h].GetMaximum()
+    return yMax
 
 # def get_config_dirs(projPath):
 #     '''Get the sub-directories in the project directory
