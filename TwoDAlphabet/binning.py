@@ -86,25 +86,22 @@ class Binning:
         else:
             slices, idxs = self._autoYslices()
 
-        print ('DEBUG Yslices idxs: %s'%idxs)
-        print ('DEBUG Yslices vals: %s'%slices)
-
         return slices, idxs
 
     def _autoYslices(self):
         nbins = len(self.ybinList)-1
         idxs = [0, int(nbins/4), int(nbins/4)+int(nbins/3), nbins]
-        slices = [self.ybinList[i] for i in idxs]
+        slices = [int(self.ybinList[i]) for i in idxs]
 
         return slices, idxs
 
     @property
-    def xSlices(self):
-        return [self.xbinList[i] for i in self.xSlice_idxs]
+    def xSliceIdx(self):
+        return [0,self.GlobalXbinIdx(0,'SIG'),self.GlobalXbinIdx(-1,'SIG'),len(self.xbinList)-1]
 
     @property
-    def xSlices_idxs(self):
-        return [0,self.GlobalXbinIdx(0,'SIG'),self.GlobalXbinIdx(-1,'SIG'),len(self.xbinList)-1]
+    def xSlices(self):
+        return [int(self.xbinList[i]) for i in self.xSliceIdx]
 
     def GlobalXbinIdx(self,xbin,c):
         '''Evaluate for the bin - a bit tricky since it was built with separate categories.
@@ -358,7 +355,7 @@ def stitch_hists_in_x(name,binning,histList,blinded=[]):
     Returns:
         TH2: Output stitched histograms.
     '''
-    stitched_hist = binning.CreateHist()
+    stitched_hist = binning.CreateHist(name)
     stitched_hist.Reset()
     # Sanity checks
     histListBins = histlist_to_binlist("X",histList)

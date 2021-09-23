@@ -13,7 +13,8 @@ _syst_col_defaults = {
     'syst_type': nan,
     'source_filename': nan,
     'source_histname': nan,
-    'direction': nan
+    'direction': nan,
+    'variation_alias': nan
 }
 class Config:
     '''Class to handle the reading and manipulation of data provided 
@@ -138,9 +139,9 @@ class Config:
 
         parser = argparse.ArgumentParser()
         # Blinding
-        parser.add_argument('blindedPlots', type=list, nargs='?', required=True,
+        parser.add_argument('blindedPlots', type=list, nargs='?',
             help='List of regions in which to blind plots of x-axis SIG. Does not blind fit.')
-        parser.add_argument('blindedFit', type=list, nargs='?', required=True,
+        parser.add_argument('blindedFit', type=list, nargs='?',
             help='List of regions in which to blind fit of x-axis SIG. Does not blind plots.')
         # Plotting
         parser.add_argument('haddSignals', default=True, type=bool, nargs='?',
@@ -190,6 +191,11 @@ class Config:
         regions = self._regionTable()
         processes = self._processTable()
         systematics = self._systematicsTable()
+
+        for syst in list(processes.variation.unique()):
+            if syst not in list(systematics.index.unique())+['nominal']:
+                raise NameError('Systematic variation %s does not exist among possible systematics:\n\t%s\nIs there a typo in the JSON?'
+                                %(syst,list(systematics.index.unique())))
 
         proc_syst = processes.merge(systematics,right_index=True,left_on='variation',how='left',suffixes=['','_syst'])
         proc_syst = _df_condense_nameinfo(proc_syst,'source_histname')
@@ -272,10 +278,10 @@ class Config:
         Returns:
             pandas.DataFrame
         '''
-        out_df = pandas.DataFrame(columns=['color','process_type','scale','variation','source_filename','source_histname','alias','combine_idx'])
+        out_df = pandas.DataFrame(columns=['color','process_type','scale','variation','source_filename','source_histname','alias','title','combine_idx'])
         for p in self._section('PROCESSES'):
             this_proc_info = self._section('PROCESSES')[p]
-            combine_idx = self._getCombineIdx(this_proc_info)
+            combine_idx = nan if p == 'data_obs' else self._getCombineIdx(this_proc_info)
             if this_proc_info['TYPE'] == 'DATA' and p != 'data_obs':
                 raise RuntimeError('Any process of type DATA must have section key "data_obs".')
             for s in this_proc_info['SYSTEMATICS']+['nominal']:
@@ -311,8 +317,8 @@ class Config:
 
     def _getCombineIdx(self,procdict):
         if procdict['TYPE'] == 'SIGNAL':
-            combine_idx = '-%s'%self.nsignals # first signal idxed at 0 so set it *before* incrementing
-            self.nsignals += 1
+            combine_idx = '%s'%self.nsignals # first signal idxed at 0 so set it *before* incrementing
+            self.nsignals -= 1
         else:
             self.nbkgs += 1
             combine_idx = '%s'%self.nbkgs # first signal idxed at 0 so set it *before* incrementing
@@ -356,6 +362,7 @@ class Config:
         return hists
 
     def Add(self,cNew,onlyOn=['process','region']):
+        raise NotImplementedError('Work in progress.')
         def _drop(row,dupes_list):
             drop = False
             for d in dupes_list:
@@ -462,6 +469,8 @@ class OrganizedHists():
         else:
             self.file = ROOT.TFile.Open(self.filename,"RECREATE")
             self.Add()
+            self.file.Close()
+            self.file = ROOT.TFile.Open(self.filename,"OPEN")
 
     def Add(self):
         '''Manipulate all histograms in self.hist_map and save them to organized_hists.root.
@@ -472,6 +481,8 @@ class OrganizedHists():
         for infilename,histdf in self.hist_map.items():
             infile = ROOT.TFile.Open(infilename)
             for row in histdf.itertuples():
+                if row.source_histname not in [k.GetName() for k in infile.GetListOfKeys()]:
+                    raise NameError('Histogram name %s does not exist in file %s.'%(row.source_histname,infile.GetName()))
                 h = infile.Get(row.source_histname)
                 h.SetDirectory(0)
                 h.Scale(row.scale)
@@ -559,7 +570,7 @@ def _keyword_replace(df,col_strs):
                 row[col_str],
                 {'$process': row.alias,
                  '$region':  row.region,
-                 '$syst':    row.variation}
+                 '$syst':    row.variation_alias}
             )
 
     for col_str in col_strs:
@@ -598,13 +609,15 @@ def _get_syst_attrs(name,syst_dict):
                 'syst_type': 'shapes',
                 'source_filename': syst_dict['UP'].split(':')[0],
                 'source_histname': syst_dict['UP'].split(':')[1],
-                'direction': 'Up'
+                'direction': 'Up',
+                'variation_alias': name if 'ALIAS' not in syst_dict else syst_dict['ALIAS']
             }, {
                 'shapes':syst_dict['SIGMA'],
                 'syst_type': 'shapes',
                 'source_filename': syst_dict['DOWN'].split(':')[0],
                 'source_histname': syst_dict['DOWN'].split(':')[1],
-                'direction': 'Down'
+                'direction': 'Down',
+                'variation_alias': name if 'ALIAS' not in syst_dict else syst_dict['ALIAS']
             }
         ]
     else:

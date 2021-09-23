@@ -1,7 +1,7 @@
-import argparse, os, itertools, pandas, glob
+import argparse, os, itertools, pandas, glob, warnings
 from collections import OrderedDict
 from TwoDAlphabet.config import Config
-from TwoDAlphabet.helpers import execute_cmd, parse_arg_dict, unpack_to_line, make_RDH, cd, executeCmd
+from TwoDAlphabet.helpers import execute_cmd, parse_arg_dict, unpack_to_line, make_RDH, cd
 from TwoDAlphabet.alphawrap import Generic2D
 from TwoDAlphabet import plot
 import ROOT
@@ -34,6 +34,8 @@ class TwoDAlphabet:
             raise RuntimeError('No jsons were input and no existing ones could be found.')
         for j in jsons:
             self.AddConfig(j,findreplace)
+            warnings.warn('Multiple config support is currently a work in progress. Only the first config will be used.',RuntimeWarning)
+            break
 
         self._setupProjDir()
         self.config.Construct()
@@ -42,7 +44,7 @@ class TwoDAlphabet:
         if self.options.debugDraw == False:
             ROOT.gROOT.SetBatch(True)
 
-        self.alphaObjs = pandas.DataFrame(columns=['process','region','obj','norm','process_type','color','combine_idx'])
+        self.alphaObjs = pandas.DataFrame(columns=['process','region','obj','norm','process_type','color','combine_idx','title'])
         self.alphaParams = pandas.DataFrame(columns=['name','obj','constraint']) # "name":"constraint"
 
     def GetOptions(self,externalOpts):
@@ -97,6 +99,7 @@ class TwoDAlphabet:
 
         # for cat in ['LOW','SIG','HIGH']:
         rph,norm = obj.RooParametricHist()
+        combine_idx = self._getCombineIdx(process,ptype)
         model_obj_row = {
             "process": process,
             "region": region,
@@ -104,16 +107,28 @@ class TwoDAlphabet:
             "norm": norm,
             "process_type": ptype,
             "color": color,
-            "combine_idx": self.nbkgs+1 if ptype == 'BKG' else -1*self.nsignals
+            'title': process,
+            "combine_idx": combine_idx
         }
+
         self.alphaObjs = self.alphaObjs.append(model_obj_row,ignore_index=True)
-        
-        if ptype == 'BKG': self.nbkgs+=1
-        elif ptype == 'SIGNAL': self.nsignals+=1
 
         nuis_obj_cols = ['name','obj','constraint']
         for n in obj.nuisances:
             self.alphaParams = self.alphaParams.append({c:n[c] for c in nuis_obj_cols},ignore_index=True)
+
+    def _getCombineIdx(self,process,ptype):
+        if process in self.GetProcesses():
+            out = self._getProcessAttrBase(process,'combine_idx')
+        else:
+            if ptype == 'BKG':
+                self.nbkgs+=1
+                out = self.nbkgs
+            elif ptype == 'SIGNAL':
+                out = self.nsignals
+                self.nsignals-=1
+        
+        return out
 
     def _checkAgainstConfig(self,process,region):
         if (process,region) in self.GetProcRegPairs():
@@ -145,12 +160,26 @@ class TwoDAlphabet:
     def GetRegions(self):
         return self.df.region.unique()
 
-    def GetProcesses(self,includeNonConfig=True,onlyNonConfig=False):
+    def GetProcesses(self,ptype='',includeNonConfig=True,onlyNonConfig=False):
+        if ptype not in ['','SIGNAL','BKG','DATA']:
+            raise ValueError('Process type "%s" not accepted. Must be empty string or one of "SIGNAL","BKG","DATA".'%ptype)
+
         proc_list = []
         if not onlyNonConfig:
-            proc_list.extend(list(self.df.process.unique()))
+            if ptype == '':
+                to_add = self.df.process.unique()
+            else:
+                to_add = self.df[self.df.process_type.eq(ptype)].process.unique()
+            
+            proc_list.extend(list(to_add))
+
         if includeNonConfig and self.alphaObjs.process.unique().size > 0:
-            proc_list.extend(list(self.alphaObjs.process.unique()))
+            if ptype == '':
+                to_add = self.alphaObjs.process.unique()
+            else:
+                to_add = self.alphaObjs[self.alphaObjs.process_type.eq(ptype)].process.unique()
+
+            proc_list.extend(list(to_add))
         return proc_list
 
     def GetProcRegPairs(self):
@@ -181,7 +210,7 @@ class TwoDAlphabet:
         else:
             raise NameError('Process "%s" does not exist.'%procName)
 
-        return df.loc[df.process.eq(procName)].iloc[0,attrName]
+        return df.loc[df.process.eq(procName)][attrName].iloc[0]
 
     def GetProcessColor(self,procName):
         return self._getProcessAttrBase(procName,'color')
@@ -211,8 +240,8 @@ class TwoDAlphabet:
     def _makeCard(self):
         card_new = open(self.tag+'/card.txt','w')
         # imax (bins), jmax (backgrounds+signals), kmax (systematics) 
-        imax = 3*len(self.GetRegions()) # pass, fail for each 'X' axis category           
-        jmax = self.nbkgs + self.nsignals
+        imax = 3*len(self.GetRegions()) # pass, fail for each 'X' axis category    
+        jmax = self.nbkgs + -1*self.nsignals -1
         kmax = len(self.GetShapeSystematics())-1 # -1 for nominal, does not include alphaParams
         channels = ['_'.join(r) for r in itertools.product(self.GetRegions(),['LOW','SIG','HIGH'])]
         
@@ -258,6 +287,7 @@ class TwoDAlphabet:
         # Work with template bkgs first
         for pair,group in self.df.groupby(['process','region']):
             proc,region = pair
+            if proc == 'data_obs': continue
             combine_idx = group.iloc[0].combine_idx
             for cat in ['LOW','SIG','HIGH']:
                 chan = '%s_%s'%(region,cat)
@@ -381,15 +411,16 @@ class TwoDAlphabet:
         # ...
         pass
 
-    def MLfit(self,rMin=-10,rMax=10,extraParams={}):
+    def MLfit(self,rMin=-1,rMax=10,extraParams={},verbosity=0):
         with cd(self.tag):
-            _runMLfit(self.options.config.options.blindedFit, self.options.verbosity, rMin, rMax, extraParams)
+            _runMLfit(self.config.options.blindedFit, verbosity, rMin, rMax, extraParams)
             plot.NuisPulls()
             plot.SavePostFitParametricFuncVals()
             plot.GenPostFitShapes()
-            plot.plotFitResults()
+            plot.plotAllFitResults(self,'b')
+            plot.plotAllFitResults(self,'s')
             # systematic_analyzer_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py card.txt --all -f html > systematics_table.html'
-            # executeCmd(systematic_analyzer_cmd)    
+            # execute_cmd(systematic_analyzer_cmd)    
 
     def GoodnessOfFit(self):
         pass
@@ -414,7 +445,7 @@ def _runMLfit(blinding,verbosity,rMin,rMax,extraParams):
     else: param_options = '--setParameters '+','.join(more_params)
 
     fit_cmd = 'combine -M FitDiagnostics -d card.txt {param_options} --saveWorkspace --cminDefaultMinimizerStrategy 0 --rMin {rmin} --rMax {rmax} -v {verbosity}'
-    fit_cmd.format(
+    fit_cmd = fit_cmd.format(
         param_options=param_options,
         rmin=rMin,
         rmax=rMax,
@@ -424,10 +455,10 @@ def _runMLfit(blinding,verbosity,rMin,rMax,extraParams):
     with open('FitDiagnostics_command.txt','w') as out:
         out.write(fit_cmd)
 
-    if os.path.isfile('fitDiagnostics.root'):
-        executeCmd('rm fitDiagnostics.root')
+    if os.path.isfile('fitDiagnosticsTest.root'):
+        execute_cmd('rm fitDiagnosticsTest.root')
 
-    executeCmd(fit_cmd)
+    execute_cmd(fit_cmd)
 
 def SetSnapshot(d=''):
     w_f = ROOT.TFile.Open(d+'higgsCombineTest.FitDiagnostics.mH120.root')

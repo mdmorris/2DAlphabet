@@ -258,7 +258,8 @@ def copy_update_dict(d1,d2):
 
 def replace_multi(s,findreplace):
     for f,r in findreplace.items():
-        s = s.replace(f,r)
+        if f in s:
+            s = s.replace(f,r)
     return s
 
 def unpack_to_line(toUnpack):

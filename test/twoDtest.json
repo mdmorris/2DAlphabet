@@ -10,8 +10,8 @@
     },
     "NAME": "CR",
     "OPTIONS": {
-        "blindedFit":false,
-        "blindedPlots":false,
+        "blindedFit":[],
+        "blindedPlots":[],
         "plotUncerts":false,
         "plotTitles":false,
         "year":2
@@ -21,9 +21,10 @@
         "data_obs": {
             "SYSTEMATICS":[],
             "SCALE": 1.0,
-            "COLOR": 0,
+            "COLOR": 1,
             "TYPE": "DATA",
-            "ALIAS": "Data_Run2",
+            "ALIAS": "Data_16",
+            "TITLE": "Data",
             "LOC": "path/FILE:HIST"
         },
         "ttbar_16": {
@@ -31,13 +32,15 @@
             "SCALE": 1.0,
             "COLOR": 2,
             "TYPE": "BKG",
+            "TITLE": "t#bar{t}",
             "LOC": "path/FILE:HIST"
         },
         "TprimeB-1800_16": {
             "SYSTEMATICS":["lumi","JER"],
             "SCALE": 1.0,
-            "COLOR": 0,
+            "COLOR": 1,
             "TYPE": "SIGNAL",
+            "TITLE": "b+T 1800 GeV",
             "LOC": "path/FILE:HIST"
         }
     },

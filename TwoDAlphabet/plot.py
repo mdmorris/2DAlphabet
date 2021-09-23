@@ -1,5 +1,5 @@
 import ROOT, os, warnings, pandas, collections, math
-from TwoDAlphabet.helpers import get_hist_maximum, set_hist_maximums, executeCmd
+from TwoDAlphabet.helpers import get_hist_maximum, set_hist_maximums, execute_cmd
 from TwoDAlphabet.binning import stitch_hists_in_x, convert_to_events_per_unit, get_min_bin_width
 from TwoDAlphabet.ext import tdrstyle, CMS_lumi
 
@@ -17,36 +17,36 @@ class Plotter(object):
         fd_file = ROOT.TFile.Open('fitDiagnosticsTest.root')
         self.fittag = fittag
         self.fit_results = fd_file.Get('fit_'+fittag)
-        self.signal_strength = _get_signal_strength(self.fd_file)
+        self.signal_strength = _get_signal_strength(fd_file)
         self.twoD = twoD
         self.yaxis1D_title = 'Events / bin'
         self.df = pandas.DataFrame(columns=columns)
-        self.dir = '{t}/plots_fit_{f}'.format(t=self.twoD.tag,f=self.fittag)
+        self.dir = 'plots_fit_{f}'.format(f=self.fittag)
         self.slices = {'x': {}, 'y': {}}
 
         if not loadExisting:
-            self._make(fittag)
+            self._make()
         else:
             self._load()
 
     def __del__(self):
-        self.df.to_csv('{t}/plots_fit_{f}/df.csv'.format(t=self.twoD.tag,f=self.fittag))
+        self.df.to_csv('%s/df.csv'%self.dir)
         self.root_out.Close()
 
     class _entryTracker(object):
-        def __init__(self,plotter,p,r,t):
-            self.entry = {'process': p, 'region': r, 'type': t, 'title': self.plotter.twoD.GetProcessTitle(p)}
+        def __init__(self,plotter,p,r,t,title):
             self.plotter = plotter
+            self.entry = {'process': p, 'region': r, 'type': t, 'title': title}
 
         def track(self,k,h):
             self.entry[k] = h.GetName()
-            self.plotter.root_out.WriteTObject(h.GetName(),h)
+            self.plotter.root_out.WriteTObject(h,h.GetName())
 
     def _load(self):
         # open pickled dataframe and root_out
         root_out_name = '%s/all_plots.root'%self.dir
         self.root_out = ROOT.TFile.Open(root_out_name)
-        self.df = pandas.read_csv('%s/df.csv'%self.dir)
+        self.df = pandas.read_csv('df.csv')
 
     def _make(self):
         # make root_out and fill dataframe
@@ -58,9 +58,9 @@ class Plotter(object):
 
         for region in self.twoD.GetRegions():
             binning,_ = self.twoD.GetBinningFor(region)
-            blinding = [1] if region in self.twoD.options.blindedPlots else []
-            self.slices['x'][region] = {'vals': binning.xSlices,'idxs':binning.xSlices_idxs}
-            self.slices['y'][region] = {'vals': binning.ySlices,'idxs':binning.ySlices_idxs}
+            blinding = [1] if region in self.twoD.config.options.blindedPlots else []
+            self.slices['x'][region] = {'vals': binning.xSlices,'idxs':binning.xSliceIdx}
+            self.slices['y'][region] = {'vals': binning.ySlices,'idxs':binning.ySliceIdx}
             
             for process in self.twoD.GetProcesses()+['TotalBkg']:
                 if process != 'TotalBkg':
@@ -72,7 +72,7 @@ class Plotter(object):
                     proc_type = 'TOTAL'
                     proc_title = 'TotalBkg'
 
-                entry = self._entryTracker(self, process, region, proc_type)
+                entry = self._entryTracker(self, process, region, proc_type, proc_title)
                 for time in ['prefit','postfit']:
                     # 2D distributions first
                     out2d_name = '%s_%s_%s_2D'%(process,region,time)
@@ -80,7 +80,7 @@ class Plotter(object):
                     sig  = shapes_file.Get(loc_base.format(r=region, c='SIG', t=time, p=process))
                     high = shapes_file.Get(loc_base.format(r=region, c='HIGH',t=time, p=process))
 
-                    full = stitch_hists_in_x(out2d_name, binning, [low,sig,high], blinded=blinding)
+                    full = stitch_hists_in_x(out2d_name, binning, [low,sig,high], blinded=blinding if process == 'data_obs' else [])
                     full.SetMinimum(0)
                     full.SetTitle('%s, %s, %s'%(process,region,time))
                     # if self.twoD.IsSignal(process) and fittag == 's' and time == 'postfit':
@@ -90,31 +90,33 @@ class Plotter(object):
                     # Now do projections using the 2D
                     out_proj_name = '{p}_{r}_{t}_proj{x}{i}'
                     for proj in ['X','Y']:
-                        slices = self.slices[proj.lower()][region]
+                        slices = self.slices['x' if proj == 'Y' else 'y'][region]
 
                         for islice in range(3):
                             hname = out_proj_name.format(p=process,r=region,t=time,x=proj,i=islice)
-                            start,stop = self._get_start_stop(islice,slices['idx'])
+                            start,stop = _get_start_stop(islice,slices['idxs'])
                             
                             hslice = getattr(full,'Projection'+proj)(hname,start,stop,'e')
-                            #hslice_title = '%s, %s, %s, %s-%s'%(process,region,time,slices['val'][islice],slices['val'][islice+1])
-                            self._format_hist(
-                                hslice, proc_title,
+                            hslice_title = '%s, %s, %s, %s-%s'%(proc_title,region,time,slices['vals'][islice],slices['vals'][islice+1])
+                            hslice = self._format_hist(
+                                hslice, hslice_title,
                                 binning.xtitle, binning.ytitle,
                                 color, proc_type)
 
                             # TRACK
-                            col_name = '{t}_proj{x}{i}'.format(t=time,x=proj.lower(),i=islice+1)
+                            col_name = '{t}_proj{x}{i}'.format(t=time,x=proj.lower(),i=islice)
                             entry.track(col_name, hslice)
 
-                    self.df = self.df.append(entry.entry,ignore_index=True)
+                self.df = self.df.append(entry.entry,ignore_index=True)
 
         shapes_file.Close()
+        self.root_out.Close()
+        self.root_out = ROOT.TFile.Open(root_out_name)
 
-    def _get_start_stop(i,slice_idxs):
-        start = slice_idxs[i]+1
-        stop  = slice_idxs[i+1]
-        return start, stop
+    def Get(self,hname):
+        if hname not in [k.GetName() for k in self.root_out.GetListOfKeys()]:
+            raise LookupError('Histogram %s not found in %s'%(hname,self.root_out.GetName()))
+        return self.root_out.Get(hname).Clone()
 
     def _format_hist(self, hslice, title, xtitle, ytitle, color, proc_type):
         if not isinstance(hslice,ROOT.TH2):
@@ -129,18 +131,21 @@ class Plotter(object):
 
         if proc_type == 'BKG':
             hslice.SetFillColor(color)
+            hslice.SetLineColorAlpha(0,0)
         elif proc_type == 'SIGNAL' or proc_type == 'TOTAL':
             hslice.SetLineColor(color)
         elif proc_type == 'DATA':
             hslice.SetLineColor(color)
             hslice.SetMarkerColor(color)
 
-    def _order_df_on_proc_list(self,df,proclist=[],alphaBottom=True):
-        if self.proclist == []:
+        return hslice
+
+    def _order_df_on_proc_list(self,df,proc_type,proclist=[],alphaBottom=True):
+        if proclist == []:
             if alphaBottom:
-                process_order = self.twoD.GetProcesses(onlyNonConfig=True) + self.twoD.GetProcesses(includeNonConfig=False)
+                process_order = self.twoD.GetProcesses(ptype=proc_type,onlyNonConfig=True) + self.twoD.GetProcesses(ptype=proc_type,includeNonConfig=False)
             else:
-                process_order = self.twoD.GetProcesses(includeNonConfig=False) + self.twoD.GetProcesses(onlyNonConfig=True)
+                process_order = self.twoD.GetProcesses(ptype=proc_type,includeNonConfig=False) + self.twoD.GetProcesses(ptype=proc_type,onlyNonConfig=True)
         else:
             process_order = proclist
 
@@ -152,52 +157,55 @@ class Plotter(object):
             out_file_name = 'plots_fit_{f}/{p}_2D'.format(f=self.fittag,p=process)
             hist_list = []
             for _,subgroup in group.groupby('region'):
-                hist_list.append(subgroup.iloc[0,'prefit_2D'])
-                hist_list.append(subgroup.iloc[0,'postfit_2D'])
+                hist_list.append( self.Get(subgroup.prefit_2D.iloc[0]) )
+                hist_list.append( self.Get(subgroup.postfit_2D.iloc[0]) )
             
             out_file_name = 'plots_fit_{f}/{p}_2D'.format(f=self.fittag,p=process)
-            MakeCan(out_file_name,hist_list,year=self.twoD.options.year)
+            MakeCan(name=out_file_name,histlist=hist_list,year=self.twoD.config.options.year)
 
-    def plot_projections(self, logyFlag):
+    def plot_projections(self,logyFlag):
         for proj in ['postfit_projx','postfit_projy']:
-            for _, group in self.df.groupby('region'):
-                data, bkgs, totalbkgs, signals = [], [], [], []
+            data, bkgs, totalbkgs, signals, slices = [], [], [], [], []
+            for region, group in self.df.groupby('region'):
                 ordered_bkgs = self._order_df_on_proc_list(
                                     group.loc[group.type.eq('BKG')],
+                                    proc_type='BKG',
                                     alphaBottom=(not logyFlag))
                 ordered_signals = self._order_df_on_proc_list(
                                     group.loc[group.type.eq('SIGNAL')],
+                                    proc_type='SIGNAL',
                                     alphaBottom=(not logyFlag))
-                bkgNames =  ordered_bkgs.title.to_list()
-                signalNames = ordered_signals.title.to_list()
+
                 for islice in range(3):
                     projn = proj+str(islice)
-                    this_data = group.loc[group.type.eq('DATA')][projn].iloc[0]
-                    this_totalbkg = group.loc[group.type.eq('TOTAL')][projn].iloc[0]
-                    these_bkgs = ordered_bkgs[projn].to_list()
+                    this_data = self.Get( group.loc[group.type.eq('DATA')][projn].iloc[0] )
+                    this_totalbkg = self.Get( group.loc[group.type.eq('TOTAL')][projn].iloc[0] )
+                    these_bkgs = [self.Get(hname) for hname in ordered_bkgs[projn].to_list()]
                     if self.twoD.config.options.plotPrefitSigInFitB and self.fittag == 'b':
-                        projn = projn.replace('postfit','prefit')
-                    these_signals = ordered_signals[projn].to_list()
+                        these_signals = [self.Get(hname) for hname in ordered_signals[projn.replace('postfit','prefit')].to_list()]
+                    else:
+                        these_signals = [self.Get(hname) for hname in ordered_signals[projn].to_list()]
 
                     # Add everything to track
                     data.append(this_data)
                     totalbkgs.append(this_totalbkg)
                     bkgs.append(these_bkgs)
                     signals.append(these_signals)
+                    slices.append('%s-%s'%(
+                        self.slices['x' if 'y' in proj else 'y'][region]['vals'][islice],
+                        self.slices['x' if 'y' in proj else 'y'][region]['vals'][islice+1]
+                        )
+                    )
                 
-                slices = [h.GetName().split(',')[-1].lstrip() for h in data]
-                titles = [', '.join(h.GetName().split(', ')[1:]) for h in data]
-
-                out_file_name = 'plots_fit_{f}/{proj}%s'.format(f=self.fittag,proj=proj)
-                log_str = '' if logyFlag == False else '_logy'
-                MakeCan(
-                    out_file_name%log_str,
-                    histlist=data,      bkglist=bkgs,
-                    totalBkg=totalbkgs, signals=signals,
-                    titles=titles,      subtitles=slices,
-                    bkgNames=bkgNames,  signalNames=signalNames,
-                    addSignals=self.twoD.config.options.haddSignals
-                )
+            out_file_name = 'plots_fit_{f}/{proj}%s'.format(f=self.fittag,proj=proj)
+            log_str = '' if logyFlag == False else '_logy'
+            MakeCan(
+                out_file_name%log_str,
+                histlist=data,      bkglist=bkgs,
+                totalBkg=totalbkgs, signals=signals,
+                subtitles=slices, bkgNames=list(ordered_bkgs.title),
+                addSignals=self.twoD.config.options.haddSignals, logy=logyFlag
+            )
 
     def plot_pre_vs_post(self):
         # Make comparisons for each background process of pre and post fit projections
@@ -207,21 +215,25 @@ class Plotter(object):
                 for region, subgroup in group.groupby('region'):
                     for islice in range(3):
                         projn = proj+str(islice)
-                        slices = self.slices[proj.replace('proj','')]
-                        post = subgroup['postfit_'+projn].iloc[0]
+                        slices = self.slices['x' if 'y' in proj else 'y'][region]
+
+                        post = self.Get( subgroup['postfit_'+projn].iloc[0] )
                         post.SetLineColor(ROOT.kBlack)
-                        post.SetLineStyle(9)
-                        pre_list.append([subgroup['prefit_'+projn].iloc[0]])  # in terms of makeCan these are "bkg hists"
+                        post.SetTitle('          Postfit, '+process)
+
+                        pre = self.Get( subgroup['prefit_'+projn].iloc[0] )
+                        pre.SetTitle('Prefit, '+process)
+
+                        pre_list.append([pre])  # in terms of makeCan these are "bkg hists"
                         post_list.append(post)   # and these are "data hists"
-                        titleList.append('Pre vs Postfit - %s - %s - [%s,%s]'%(process,region,slices['val'][islice],slices['val'][islice+1]))
+                        titleList.append('%s-%s'%(slices['vals'][islice],slices['vals'][islice+1]))
 
                 MakeCan(
-                    'plots_fit_{f}/{p}_{proj}%s'.format(f=self.fittag,p=process,proj=proj),
+                    'plots_fit_{f}/{p}_{proj}'.format(f=self.fittag,p=process,proj=proj),
                     histlist=post_list, bkglist=pre_list,
-                    totalBkg=[b[0] for b in pre_list],
-                    titles=titleList,   bkgNames=['Prefit, '+process],
-                    dataName='Postfit, '+process,
-                    datastyle='histe', year=self.twoD.options.year
+                    totalBkg=[b[0] for b in pre_list], bkgNames=['Prefit, '+process],
+                    subtitles=titleList, dataName=post.GetTitle(),
+                    datastyle='histe', year=self.twoD.config.options.year
                 )
 
     def plot_transfer_funcs(self):
@@ -328,6 +340,11 @@ class Plotter(object):
         # rpf_final.Write()
         # rpf_file.Close()
 
+def _get_start_stop(i,slice_idxs):
+    start = slice_idxs[i]+1
+    stop  = slice_idxs[i+1]
+    return start, stop
+
 def plotAllFitResults(twoD,fittag):
     plotter = Plotter(twoD,fittag)
     plotter.plot_2D_distributions()
@@ -337,9 +354,9 @@ def plotAllFitResults(twoD,fittag):
     # plotter.plot_transfer_funcs()
 
 
-def MakeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],
-            titles=[],subtitles=[],sliceVar='X',dataName='Data',bkgNames=[],
-            signalNames=[],logy=False,rootfile=False,dataOff=False,
+def MakeCan(name, histlist, bkglist=[],totalBkg=None,signals=[],
+            titles=[],subtitles=[],sliceVar='X',dataName='Data',
+            logy=False,rootfile=False,dataOff=False, bkgNames=[],
             datastyle='pe',year=1, addSignals=True, extraText=''):
     '''histlist is just the generic list but if bkglist is specified (non-empty)
     then this function will stack the backgrounds and compare against histlist as if 
@@ -383,9 +400,9 @@ def MakeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],
     elif len(histlist) == 4:
         width = 1200; height = 1000; padx = 2; pady = 2
     elif len(histlist) <= 6:
-        height = 1600; width = 1200; padx = 2; pady = 3
+        width = 1600; height = 1000; padx = 3; pady = 2
     elif len(histlist) <= 9:
-        height = 1600; width = 1600; padx = 3; pady = 3
+        width = 1600; height = 1600; padx = 3; pady = 3
     else:
         raise RuntimeError('histlist of size %s not currently supported'%(len(histlist),histlist))
 
@@ -394,7 +411,8 @@ def MakeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],
     ROOT.gStyle.SetTitleBorderSize(0)
     ROOT.gStyle.SetTitleAlign(33)
     ROOT.gStyle.SetTitleX(.77)
-    myCan = ROOT.TCanvas(name,name,width,height)
+    myCanName = '_'.join(name.split('/'))
+    myCan = ROOT.TCanvas(myCanName,myCanName,width,height)
     myCan.Divide(padx,pady)
 
     # A bunch of empty lists for storage if needed
@@ -404,7 +422,7 @@ def MakeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],
     for hist_index, hist in enumerate(histlist):
         # Grab the pad we want to draw in
         myCan.cd(hist_index+1)
-        thisPad = myCan.GetPrimitive(name+'_'+str(hist_index+1))
+        thisPad = myCan.GetPrimitive(myCanName+'_'+str(hist_index+1))
         thisPad.cd(); thisPad.SetRightMargin(0.0); thisPad.SetTopMargin(0.0); thisPad.SetBottomMargin(0.0)
 
         # If this is a TH2, just draw the lego
@@ -480,7 +498,7 @@ def MakeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],
                 else:
                     tot_hist = totalBkg[hist_index]
 
-                tot_hist.SetTitle(hist.GetName()+'_tot')
+                tot_hist.SetTitle(hist.GetTitle())
                 tot_hist.SetMarkerStyle(0)
                 tot_hists.append(tot_hist)
                 tot_hists_err.append(tot_hist.Clone())
@@ -489,7 +507,7 @@ def MakeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],
                 tot_hists_err[hist_index].SetLineWidth(0)
                 tot_hists_err[hist_index].SetFillColor(ROOT.kBlack)
                 tot_hists_err[hist_index].SetFillStyle(3354)
-                legends[hist_index].AddEntry(tot_hists_err[hist_index],'Total bkg unc.','F')
+                if 'Postfit' not in dataName: legends[hist_index].AddEntry(tot_hists_err[hist_index],'Total bkg unc.','F')
 
                 # Set margins and make these two pads primitives of the division, thisPad
                 mains[hist_index].SetBottomMargin(0.04)
@@ -506,14 +524,14 @@ def MakeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],
                 
                 # Build the stack
                 legend_info = collections.OrderedDict()
-                for bkg in bkglist[hist_index]:     # Won't loop if bkglist is empty
+                for ibkg,bkg in enumerate(bkglist[hist_index]):     # Won't loop if bkglist is empty
                     if totalBkg == None:
                         tot_hists[hist_index].Add(bkg)
                     if logy:
                         bkg.SetMinimum(1e-3)
 
                     stacks[hist_index].Add(bkg)
-                    legend_info[bkg.GetTitle()] = bkg
+                    legend_info[bkgNames[ibkg]] = bkg
 
                 # Deal with legend which needs ordering reversed from stack build
                 legend_duplicates = []
@@ -535,9 +553,8 @@ def MakeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],
                         h.SetMaximum(yMax*10**(2.5-legend_topY+0.1))
 
                 # Now draw the main pad
-                data_leg_title = hist.GetTitle()
-                if len(titles) > 0:
-                    hist.SetTitle(titles[hist_index])
+                # if len(titles) > 0:
+                hist.SetTitle('')#titles[hist_index])
                 hist.SetTitleOffset(1.15,"xy")
                 hist.GetYaxis().SetTitleOffset(1.04)
                 hist.GetYaxis().SetLabelSize(0.07)
@@ -549,9 +566,10 @@ def MakeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],
                     hist.SetMinimum(1e-3)
                 
                 hist.GetYaxis().SetNdivisions(508)
-                hist.Draw(datastyle+' X0')
+                if datastyle == 'pe': datastyle = 'pe X0'
+                hist.Draw(datastyle)
 
-                if logy == True:stacks[hist_index].SetMinimum(1e-3) 
+                if logy == True: stacks[hist_index].SetMinimum(1e-3) 
                 
                 stacks[hist_index].Draw('same hist') # need to draw twice because the axis doesn't exist for modification until drawing
                 try:
@@ -581,7 +599,7 @@ def MakeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],
                         if logy == True:
                             sig.SetMinimum(1e-3)
 
-                        legends[hist_index].AddEntry(sig,sig.GetTitle(),'L')
+                        legends[hist_index].AddEntry(sig,sig.GetTitle().split(',')[0],'L')
                         sig.Draw('hist same')
 
                 # Draw total hist and error
@@ -595,7 +613,7 @@ def MakeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],
                 legends[hist_index].Draw()
 
                 if not dataOff:
-                    hist.Draw(datastyle+' X0 same')
+                    hist.Draw(datastyle+' same')
 
                 ROOT.gPad.RedrawAxis()
 
@@ -651,10 +669,10 @@ def MakeCan(name, tag, histlist, bkglist=[],totalBkg=None,signals=[],
                     subtitle.DrawLatex(0.208,0.74,subtitle_string)
 
     if rootfile:
-        myCan.Print(tag+'/'+name+'.root','root')
+        myCan.Print(name+'.root','root')
     else:
-        myCan.Print(tag+'/'+name+'.pdf','pdf')
-        myCan.Print(tag+'/'+name+'.png','png')
+        myCan.Print(name+'.pdf','pdf')
+        myCan.Print(name+'.png','png')
 
 def MakeSystematicPlots(configObj):
     '''Make plots of the systematic shape variations of each process based on those
@@ -700,7 +718,7 @@ def MakeSystematicPlots(configObj):
                 c.Print(configObj.projPath+'/UncertPlots/Uncertainty_%s_%s_%s_%s.png'%(p,r,s,'proj'+axis),'png')
 
 def _get_signal_strength(fd_file):
-    tree_fit = fd_file.Get('tree_fit_s')
+    tree_fit = fd_file.Get('tree_fit_sb')
     tree_fit.GetEntry(0)
     return tree_fit.r
 
@@ -811,8 +829,8 @@ def ReorderHists(histlist):
     return outlist
 
 def NuisPulls():
-    diffnuis_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnostics.root --abs -g nuisance_pulls.root'
-    executeCmd(diffnuis_cmd)
+    diffnuis_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnosticsTest.root --abs -g nuisance_pulls.root'
+    execute_cmd(diffnuis_cmd)
     # Make a PDF of the nuisance_pulls.root
     if os.path.exists('nuisance_pulls.root'):
         nuis_file = ROOT.TFile.Open('nuisance_pulls.root')
@@ -827,14 +845,15 @@ def _getGoodFitResults(tfile):
             warnings.warn('Unable to find result fit_%s...'%fittag,RuntimeWarning)
         else:
             successful_fits.append(fittag)
+    return successful_fits
 
 def SavePostFitParametricFuncVals():
-    fit_result_file = ROOT.TFile.Open('fitDiagnostics.root')
+    fit_result_file = ROOT.TFile.Open('fitDiagnosticsTest.root')
     goodFitTags = _getGoodFitResults(fit_result_file)
     for fittag in goodFitTags:
         coeffs_final = fit_result_file.Get('fit_'+fittag).floatParsFinal()
         all_par_names = [] # get names of anything matching *_par<N>
-        for i in range(coeffs_final.getSize):
+        for i in range(coeffs_final.getSize()):
             name = coeffs_final.at(i).GetName()
             if name.split('_')[-1].startswith('par'):
                 all_par_names.append(name)
@@ -843,17 +862,17 @@ def SavePostFitParametricFuncVals():
         all_obj_names = set(['_'.join(name.split('_')[:-1]) for name in all_par_names])
 
         for obj_name in all_obj_names:
-            with open('{tag}/rpf_params_%s_fit%s.txt'%(self.tag,obj_name,fittag),'w') as param_out:
+            with open('rpf_params_%s_fit%s.txt'%(obj_name,fittag),'w') as param_out:
                 for par_name in [p for p in all_par_names if p.startswith(obj_name)]:
                     var = coeffs_final.find(par_name)
                     param_out.write('%s: %s +/- %s\n'%(par_name, var.getValV(), var.getError()))
 
 def GenPostFitShapes():
-    fit_result_file = ROOT.TFile.Open('fitDiagnostics.root')
+    fit_result_file = ROOT.TFile.Open('fitDiagnosticsTest.root')
     goodFitTags = _getGoodFitResults(fit_result_file)
     for t in goodFitTags:
-        shapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_{0}.root -f fitDiagnostics.root:fit_{0} --postfit --sampling --samples 100 --print 2> PostFitShapes2D_stderr_{0}.txt'.format(t)
-        executeCmd(shapes_cmd)
+        shapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_{0}.root -f fitDiagnosticsTest.root:fit_{0} --postfit --sampling --samples 100 --print 2> PostFitShapes2D_stderr_{0}.txt'.format(t)
+        execute_cmd(shapes_cmd)
 
     if 'b' in goodFitTags:
         fit_result = fit_result_file.Get("fit_b")

@@ -190,13 +190,13 @@ class ParametricFunction(Generic2D):
 
         ::
 
-            {
+            {0: {
                 'constraint': 'flatParam' or 'param <mu> <sigma>'
                 'MIN' = -1000
                 'MAX' = 1000
                 'NOM' = 0
                 'ERROR' = 0.1
-            }
+            } }
 
         The 'constraint' can only be 'flatParam' or 'param <mu> <sigma>' (options in the Combine card) 
         which represent "no constraint" and "Gaussian constraint centered at <mu> and with width <sigma>", respectively.
@@ -245,10 +245,10 @@ class ParametricFunction(Generic2D):
         '''
         f = self.formula.replace(' ','')
         f = f.replace('+x','+%s'%x).replace('+y','+%s'%y)
-        f = f.replace('*x','+%s'%x).replace('*y','+%s'%y)
-        f = f.replace('-x','+%s'%x).replace('-y','+%s'%y)
-        f = f.replace('/x','+%s'%x).replace('/y','+%s'%y)
-        f = f.replace('(x','+%s'%x).replace('(y','+%s'%y)
+        f = f.replace('*x','*%s'%x).replace('*y','*%s'%y)
+        f = f.replace('-x','-%s'%x).replace('-y','-%s'%y)
+        f = f.replace('/x','/%s'%x).replace('/y','/%s'%y)
+        f = f.replace('(x','(%s'%x).replace('(y','(%s'%y)
         return f
 
     def getNparams(self):
@@ -275,13 +275,13 @@ class ParametricFunction(Generic2D):
         out = []
         for i in range(self.getNparams()):
             name = '%s_par%s'%(self.name,i)
-            constraint = 'flatParam'; MIN = -1000; MAX = 1000; NOM = 0; ERROR = 0.1
+            constraint = 'flatParam'; MIN = -1000; MAX = 1000; NOM = 0.1; ERROR = 0.1
             if i in constraints:
-                constraint = constraints['constraint']
-                MIN = constraints['MIN']
-                MAX = constraints['MAX']
-                NOM = constraints['NOM']
-                ERROR = constraints['ERROR']
+                if 'constraint' in constraints[i]: constraint = constraints[i]['constraint']
+                if 'MIN' in constraints[i]: MIN = constraints[i]['MIN']
+                if 'MAX' in constraints[i]: MAX = constraints[i]['MAX']
+                if 'NOM' in constraints[i]: NOM = constraints[i]['NOM']
+                if 'ERROR' in constraints[i]: ERROR = constraints[i]['ERROR']
 
             this_out = {'name':name, 'obj': RooRealVar(name,name,NOM,MIN,MAX), 'constraint': constraint}
             this_out['obj'].setError(ERROR)
