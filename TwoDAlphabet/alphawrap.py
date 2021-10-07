@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from TwoDAlphabet.helpers import roofit_form_to_TF1
 from ROOT import RooRealVar, RooFormulaVar, RooArgList, RooParametricHist2D, RooConstVar, TFormula, RooAddition
-from binning import copy_hist_with_new_bins
+from TwoDAlphabet.binning import copy_hist_with_new_bins
 # import numpy as np
 # from numpy.lib.function_base import piecewise
 
