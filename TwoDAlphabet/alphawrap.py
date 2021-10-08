@@ -358,7 +358,7 @@ class BinnedDistribution(Generic2D):
                     if constant:
                         self.binVars[bin_name] = RooConstVar(bin_name, bin_name, cat_hist.GetBinContent(xbin,ybin))
                     else:
-                        self.binVars[bin_name] = RooRealVar(bin_name, bin_name, cat_hist.GetBinContent(xbin,ybin))
+                        self.binVars[bin_name] = RooRealVar(bin_name, bin_name, cat_hist.GetBinContent(xbin,ybin), 1e-6, 1e6)
                         self.nuisances.append({'name':bin_name, 'constraint':'flatParam', 'obj': self.binVars[bin_name]})
                     self._varStorage.append(self.binVars[bin_name]) # For safety if we add shape templates            
                      
