@@ -139,9 +139,9 @@ class Config:
 
         parser = argparse.ArgumentParser()
         # Blinding
-        parser.add_argument('blindedPlots', type=list, nargs='?',
+        parser.add_argument('blindedPlots', default=[], type=list, nargs='?',
             help='List of regions in which to blind plots of x-axis SIG. Does not blind fit.')
-        parser.add_argument('blindedFit', type=list, nargs='?',
+        parser.add_argument('blindedFit', default=[], type=list, nargs='?',
             help='List of regions in which to blind fit of x-axis SIG. Does not blind plots.')
         # Plotting
         parser.add_argument('haddSignals', default=True, type=bool, nargs='?',
@@ -498,11 +498,6 @@ class OrganizedHists():
                 h.SetTitle(row.out_histname)
                 h.SetFillColor(row.color)
 
-                if h.Integral() <= 0:
-                    print ('WARNING: %s has zero or negative events - %s'%(row.out_histname, h.Integral()))
-                    for b in range(1,h.GetNbinsX()*h.GetNbinsY()+1):
-                        h.SetBinContent(b,1e-10)
-
                 self.file.WriteObject(h, row.out_histname)
                 self.CreateSubRegions(h, binning)
 
@@ -548,6 +543,10 @@ class OrganizedHists():
             hsub = h.Clone()
             hsub = copy_hist_with_new_bins(h.GetName().replace('_FULL','_'+sub),'X',h,binning.xbinByCat[sub])
             hsub.SetTitle(hsub.GetName())
+            if hsub.Integral() <= 0:
+                print ('WARNING: %s has zero or negative events - %s'%(hsub.GetName(), h.Integral()))
+                for b in range(1,hsub.GetNbinsX()*hsub.GetNbinsY()+1):
+                    hsub.SetBinContent(b,1e-6)
             self.file.WriteObject(hsub, hsub.GetName())
 
 def _keyword_replace(df,col_strs):
