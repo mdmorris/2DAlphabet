@@ -418,26 +418,13 @@ class Config:
         '''
         out = {}
         for region,group in self.df.groupby('region'):
-            data_sources = group.loc[group.process_type.eq('DATA')][['source_filename','source_histname']]
-            if data_sources.shape[0] > 1:
-                raise RuntimeError('More than one data source found in\n%s'%data_sources)
-
-            data_file = ROOT.TFile.Open(data_sources.iloc[0]['source_filename'])
-            data_hist = data_file.Get(data_sources.iloc[0]['source_histname'])
+            data_hist = self.organizedHists.Get(process='data_obs',region=region,systematic='')
             qcd = data_hist.Clone(data_hist.GetName().replace('data_obs','qcd'))
             qcd.SetDirectory(0)
 
-            bkg_sources = group.loc[group.process_type.eq('BKG') & group.variation.eq('nominal')][['source_filename','source_histname']]
-            for bkg_file_name,bkg_hist_names in bkg_sources.groupby('source_filename'):
-                if bkg_file_name == data_file.GetName():
-                    bkg_file = data_file
-                else:
-                    bkg_file = ROOT.TFile.Open(bkg_file_name)
-
-                if bkg_hist_names.shape[0] > 1:
-                    raise RuntimeError('More than one bkg histogram found in %s\n%s'%(bkg_file_name,bkg_hist_names))
-
-                bkg_hist = bkg_file.Get(bkg_hist_names.iloc[0].source_histname)
+            bkg_sources = group.loc[group.process_type.eq('BKG') & group.variation.eq('nominal')]['process']
+            for process_name in bkg_sources.to_list():
+                bkg_hist = self.organizedHists.Get(process=process_name,region=region,systematic='')
                 qcd.Add(bkg_hist,-1)
 
             out[region] = qcd
@@ -523,7 +510,12 @@ class OrganizedHists():
         '''
         if subspace not in ['FULL','LOW','SIG','HIGH']:
             raise NameError("Subspace '%s' not accepted. Options are 'FULL','LOW','SIG','HIGH'.")
-        return self.file.Get(histname if histname != '' else '_'.join([process,region,subspace,systematic]))
+        if histname == '':
+            histname = '_'.join([process,region,subspace])
+            if systematic != '':
+                histname+='_'+systematic
+
+        return self.file.Get(histname)
 
     def GetHistNames(self):
         return [hkey.GetName() for hkey in self.file.GetListOfKeys()]
@@ -544,7 +536,7 @@ class OrganizedHists():
             hsub = copy_hist_with_new_bins(h.GetName().replace('_FULL','_'+sub),'X',h,binning.xbinByCat[sub])
             hsub.SetTitle(hsub.GetName())
             if hsub.Integral() <= 0:
-                print ('WARNING: %s has zero or negative events - %s'%(hsub.GetName(), h.Integral()))
+                print ('WARNING: %s has zero or negative events - %s'%(hsub.GetName(), hsub.Integral()))
                 for b in range(1,hsub.GetNbinsX()*hsub.GetNbinsY()+1):
                     hsub.SetBinContent(b,1e-6)
             self.file.WriteObject(hsub, hsub.GetName())
