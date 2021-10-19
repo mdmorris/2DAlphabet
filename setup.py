@@ -9,7 +9,7 @@ requires = [
       'pandas'
 ]
 if sys.version_info.major == 3:
-      requires.append('sphinx-book-theme')
+      requires.append('doxypypy')
 
 setuptools.setup(name='TwoDAlphabet',
       version='2.0',

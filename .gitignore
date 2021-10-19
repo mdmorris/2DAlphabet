@@ -8,3 +8,4 @@ cov.xml
 *.egg-info
 tests_unfinished
 .vscode/
+docs/
