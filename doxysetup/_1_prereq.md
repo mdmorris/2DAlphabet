@@ -1,4 +1,57 @@
-# Configuration files
+Getting Started {#getting-started}
+===============
+
+\tableofcontents{html}
+
+# Installation {#install}
+
+2D Alphabet can only be used in a CMSSW environment. The Higgs Analysis
+Combine Tool must be installed. Please follow the instructions below to
+checkout a 2D Alphabet-friendly version of Combine. These instructions are
+based off of the [Combine documentation](http://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/) 
+for 102X setup. Please cross-check the instructions here with the official
+instructions. The only difference should be in the cloned repository and lack
+of branch change. Note also that the CMSSW release is different from the
+release recommended by the Combine tool documentation in order to maintain
+compatibility with Fermilab's LPC changing to SL7 by September 1st, 2020.
+
+For `csh`:
+```sh
+    set SCRAM_ARCH=slc7_amd64_gcc700
+    cmsrel CMSSW_10_6_14
+    cd CMSSW_10_6_14/src
+    cmsenv
+    git clone https://github.com/lcorcodilos/2DAlphabet.git
+    git clone https://github.com/lcorcodilos/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
+    bash <(curl -s https://raw.githubusercontent.com/lcorcodilos/CombineHarvester/master/CombineTools/scripts/sparse-checkout-ssh.sh)
+    scram b clean; scram b -j 10
+    cmsenv
+```
+
+For `bash`:
+```bash
+    export SCRAM_ARCH=slc7_amd64_gcc700
+    cmsrel CMSSW_10_6_14
+    cd CMSSW_10_6_14/src
+    cmsenv
+    git clone https://github.com/lcorcodilos/2DAlphabet.git
+    git clone https://github.com/lcorcodilos/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit/
+    curl -s https://raw.githubusercontent.com/lcorcodilos/CombineHarvester/master/CombineTools/scripts/sparse-checkout-ssh.sh | bash
+    scram b clean; scram b -j 10
+    cmsenv
+```
+
+Run `combine --help` and check it returns the help menu to confirm you've successfully setup combine.
+
+Try to call RooParametricHist2D in interactive python if you're feeling
+uneasy and to ensure everything is working. 
+
+```python
+import ROOT
+r = RooParametricHist2D()
+```
+
+# JSON Configuration Files {#config}
 
 The goal of the JSON is to have an easily understandable and configurable input
 that allows the
@@ -9,25 +62,7 @@ the user is encouraged to add what they need, there are some keys and values
 that must stay the same. These static strings are always in capital letters
 to make them easy to distinguish. The six static sections are described below.
 
-## Groups of configuration files
-
-Multiple configuration files can be provided to 2D Alphabet to simultaneously
-fit pass-fail pairs. There are several important notes to make about
-this feature.
-
-* The data between the configuration files **must** be statistically independent.
-  It is the responsibility of the user to ensure this in their selection.
-* Any commonly named systematic uncertainties across configuration files will
-  automatically be correlated in the fit. For example, if you have `syst1`
-  defined and used in `config1.json` and `config2.json`, a single nuisance parameter
-  will be correlated across the `config1` and `config2` pass-fail pairs.
-* Configuration files with a commonly named systematic still use the uncertainty
-  templates provided in each corresponding configuration file. The templates
-  are just mapped to the same nuisance  parameter generated (and tied to the Gaussian constraint).
-* Provide unique names to systematic uncertainties across configuration files
-  if you wish for them to be uncorrelated.
-
-# `GLOBAL`
+## `GLOBAL` {#config-global}
 This section is designed to help users with large configuration file
 names by allowing them to create JSON-wide variables. For example,
 if all of your files are located in `/long/path/to/my/files/`, you 
@@ -46,7 +81,7 @@ that are identical to keys in `GLOBAL` so accidental substitutions don't happen.
 This means keys in `GLOBAL` should be at least partially descriptive 
 (single character keys would be a bad idea). 
 
-# `OPTIONS`
+## `OPTIONS` {#config-options}
 
 This section is dedicated to providing per-config options to 2D Alphabet. 
 Unless noted, these options only affect `run_MLfit.py` since
@@ -118,7 +153,7 @@ working on the 2D Alphabet code or debugging a fit.
   "newYbins", "rpf", "rpfVarNames", "organizedDict", "floatingBins". I cannot think
   of a good use for this option that would not also be dangerous or overcome by just re-running!
         
-# **`PROCESS`**
+## `PROCESS` {#config-process}
 
 In this section, the user can define as many processes as they need. This 
 includes data, background simulation, and signal simulation. Please note two 
@@ -174,7 +209,7 @@ Here is an example PROCESS dictionary section:
     }
 ```
 
-# **`BINNING`**
+## `BINNING` {#config-binning}
 This dictionary is the opportunity to define the axis binning of the user's space.
 The binning values are split into x and y axis definitions where the x-axis describes
 the variable whose signal region is blinded. Note that 2D Alphabet can rebin
@@ -237,7 +272,7 @@ define binning per region of the `X` axis. `BINS` can be used as well as `MIN`, 
     "SIGEND": <upper bound of signal region of x-axis> # int
 ```
 
-# `FIT`
+## `FIT` {#config-fit}
 This section defines the values of the fit parameters for the transfer
 function from the fail region to the passing (or pass-fail ratio). The
 2D fit can accommodate any functional form. Each parameter in equation
@@ -290,7 +325,7 @@ form.
 }
 ```
 
-# **`SYSTEMATIC`**
+## `SYSTEMATIC` {#config-syst}
 Because it bears repeating, please note the difference between this section, `SYSTEMATIC`,
 and the list of `SYSTEMATICS` defined inside the `PROCESS` dictionary. The `SYSTEMATIC`
 dictionary is a place to define as many systematics as a user may need. Similar to the
@@ -305,13 +340,13 @@ the user to change the Gaussian constraint on the shape. For no change in the co
 If you have templates representing a 2 $$\sigma$$ shift, use 0.5 to properly constrain
 the associated nuisance parameter during the shape interpolation with Combine.
 
-## Symmetric, log-normal
+### Symmetric, log-normal {#config-syst-sym}
 ```json
 "CODE": 0,
 "VAL": <uncertainty> # float
 ```
 
-## Asymmetric, log-normal
+### Asymmetric, log-normal {#config-syst-asym}
 
 ```json
 "CODE": 1,
@@ -319,7 +354,7 @@ the associated nuisance parameter during the shape interpolation with Combine.
 "VALDOWN": <-1 $$\sigma$$ uncertainty> # float
 ```
 
-## Shape based uncertainty, in same file as nominal histogram
+### Shape based uncertainty, in same file as nominal histogram {#config-syst-shape1}
 ```json
 "CODE: 2",
 "HISTPASS_UP": <name of hist (in same file as nominal hist) for +1 sig uncertainty in pass distribution>, # string
@@ -329,7 +364,7 @@ the associated nuisance parameter during the shape interpolation with Combine.
 "SCALE": <scale value to change scale of nuisance constraint> # float
 ```
 
-## Shape based uncertainty, in different file as nominal histogram. 
+### Shape based uncertainty, in different file as nominal histogram {#config-syst-shape2}
 
 This is the more flexible
 but also more complicated option. The user can specify files three different ways. 
@@ -370,3 +405,9 @@ Below is an example of the totally generic way (3).
 ```
 
 The various options lead to flexibility but the more organized you are, the easier it is to write the configuration file!
+
+# Python Interface {#python}
+
+## Constructing TwoDAlphabet {#python-twoD}
+
+## Defining Parametric Shapes {#python-parametric}

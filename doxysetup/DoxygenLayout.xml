@@ -3,25 +3,13 @@
   <!-- Navigation index tabs for HTML output -->
   <navindex>
     <tab type="mainpage" visible="yes" title=""/>
-    <tab type="pages" visible="yes" title="Guides" intro=""/>
-    <tab type="modules" visible="yes" title="Python Tools" intro=""/>
-    <tab type="namespacelist" visible="yes" title="C++ Tools"/>
-      <tab type="namespacelist" visible="yes" title="" intro=""/>
-      <tab type="namespacemembers" visible="yes" title="" intro=""/>
-    </tab>
-    <tab type="classes" visible="yes" title="">
+    <tab type="pages" visible="yes" title=""/>
+    <!-- <tab type="user" visible="yes" title="Installation" url="md_doxysetup_prereq.html"/>
+    <tab type="user" visible="yes" title="JSON Configuration" url="md_doxysetup_config.html"/>
+    <tab type="user" visible="yes" title="Defining parametric shapes" url="md_doxysetup_ddsetup.html"/> -->
     <tab type="classlist" visible="yes" title="Python API Docs" intro=""/>
-      <tab type="classindex" visible="$ALPHABETICAL_INDEX" title=""/> 
-      <tab type="hierarchy" visible="yes" title="" intro=""/>
-      <tab type="classmembers" visible="yes" title="" intro=""/>
-    </tab>
-    <tab type="files" visible="yes" title="">
-      <tab type="filelist" visible="yes" title="" intro=""/>
-      <tab type="globals" visible="yes" title="" intro=""/>
-    </tab>
-    <tab type="user" url="md_doxysetup__config.html" title="JSON Configuration"/>
-    <tab type="user" url="md_doxysetup__ddsetup.html" title="Python Data-driven Modeling Setup"/>
-    <tab type="examples" visible="yes" title="" intro=""/>  
+    
+    
   </navindex>
 
   <!-- Layout definition for a class page -->

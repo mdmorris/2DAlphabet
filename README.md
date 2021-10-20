@@ -1,4 +1,4 @@
-Welcome to 2DAlphabet's documentation!
+Welcome to 2DAlphabet's documentation!  {#mainpage}
 =======================================
 2D Alphabet is a framework to construct the workspace for a specific type of
 background estimate, provide input to the Combine statistical tool, plot the
