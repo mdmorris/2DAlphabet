@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['projpath',['projPath',['../class_two_d_alphabet_1_1config_1_1_config.html#a1b0ace8ca931bc351da2ed069bb5618e',1,'TwoDAlphabet::config::Config']]]
+  ['options',['options',['../class_two_d_alphabet_1_1config_1_1_config.html#a02eacfd40be9042ceb0f07547365203d',1,'TwoDAlphabet::config::Config']]],
+  ['organizedhists',['organizedHists',['../class_two_d_alphabet_1_1config_1_1_config.html#a9e00ba0dbfc3eef2769bc9bf7aeb2cda',1,'TwoDAlphabet::config::Config']]]
 ];

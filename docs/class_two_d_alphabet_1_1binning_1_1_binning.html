@@ -91,6 +91,7 @@ $(document).ready(function(){initNavTree('class_two_d_alphabet_1_1binning_1_1_bi
   <div class="summary">
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="#pub-attribs">Public Attributes</a> &#124;
+<a href="#pri-methods">Private Member Functions</a> &#124;
 <a href="class_two_d_alphabet_1_1binning_1_1_binning-members.html">List of all members</a>  </div>
   <div class="headertitle">
 <div class="title">Binning Class Reference</div>  </div>
@@ -164,6 +165,18 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:acfbc2059409b4a8d4e72aa8afcafa5b0"><td class="memItemLeft" align="right" valign="top"><a id="acfbc2059409b4a8d4e72aa8afcafa5b0"></a>
 &#160;</td><td class="memItemRight" valign="bottom"><b>yVar</b></td></tr>
 <tr class="separator:acfbc2059409b4a8d4e72aa8afcafa5b0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pri-methods"></a>
+Private Member Functions</h2></td></tr>
+<tr class="memitem:ac29920421e77cfbd0909fd3e0410bee1"><td class="memItemLeft" align="right" valign="top"><a id="ac29920421e77cfbd0909fd3e0410bee1"></a>
+def&#160;</td><td class="memItemRight" valign="bottom"><b>_autoYslices</b> (self)</td></tr>
+<tr class="separator:ac29920421e77cfbd0909fd3e0410bee1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6c27ec296fb0c1e9b38f77b2e6bc71f8"><td class="memItemLeft" align="right" valign="top">def&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_two_d_alphabet_1_1binning_1_1_binning.html#a6c27ec296fb0c1e9b38f77b2e6bc71f8">_checkBinning</a> (self, axis)</td></tr>
+<tr class="memdesc:a6c27ec296fb0c1e9b38f77b2e6bc71f8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Perform sanity check that new binning scheme is a subset of the starting input space.  <a href="#a6c27ec296fb0c1e9b38f77b2e6bc71f8">More...</a><br /></td></tr>
+<tr class="separator:a6c27ec296fb0c1e9b38f77b2e6bc71f8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a333d8ea5b1c775ac80a3d8f2a0e4c6f2"><td class="memItemLeft" align="right" valign="top"><a id="a333d8ea5b1c775ac80a3d8f2a0e4c6f2"></a>
+def&#160;</td><td class="memItemRight" valign="bottom"><b>_getYslices</b> (self, binning_dict)</td></tr>
+<tr class="separator:a333d8ea5b1c775ac80a3d8f2a0e4c6f2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Class to handle information on and manipulations of binning schemes. </p>
@@ -219,6 +232,57 @@ Public Attributes</h2></td></tr>
 </div>
 </div>
 <h2 class="groupheader">Member Function Documentation</h2>
+<a id="a6c27ec296fb0c1e9b38f77b2e6bc71f8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6c27ec296fb0c1e9b38f77b2e6bc71f8">&#9670;&nbsp;</a></span>_checkBinning()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">def _checkBinning </td>
+          <td>(</td>
+          <td class="paramtype">&#160;</td>
+          <td class="paramname"><em>self</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">&#160;</td>
+          <td class="paramname"><em>axis</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">private</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Perform sanity check that new binning scheme is a subset of the starting input space. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">axis</td><td>Either "X" or "Y".</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="exception"><dt>Exceptions</dt><dd>
+  <table class="exception">
+    <tr><td class="paramname">ValueError</td><td>If requested binning is not a subset of the input space. </td></tr>
+    <tr><td class="paramname">ValueError</td><td>If binning sheme is not in increasing order. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
 <a id="a758f4ac7fbdb14752627641baccb6cba"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a758f4ac7fbdb14752627641baccb6cba">&#9670;&nbsp;</a></span>CreateRRVs()</h2>
 

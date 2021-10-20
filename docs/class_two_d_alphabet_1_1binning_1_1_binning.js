@@ -1,6 +1,9 @@
 var class_two_d_alphabet_1_1binning_1_1_binning =
 [
     [ "__init__", "class_two_d_alphabet_1_1binning_1_1_binning.html#ae03c17b16669a071f9cffda09705695e", null ],
+    [ "_autoYslices", "class_two_d_alphabet_1_1binning_1_1_binning.html#ac29920421e77cfbd0909fd3e0410bee1", null ],
+    [ "_checkBinning", "class_two_d_alphabet_1_1binning_1_1_binning.html#a6c27ec296fb0c1e9b38f77b2e6bc71f8", null ],
+    [ "_getYslices", "class_two_d_alphabet_1_1binning_1_1_binning.html#a333d8ea5b1c775ac80a3d8f2a0e4c6f2", null ],
     [ "CreateHist", "class_two_d_alphabet_1_1binning_1_1_binning.html#af2662028f4ecdef8cb606fc1212a7b48", null ],
     [ "CreateRRVs", "class_two_d_alphabet_1_1binning_1_1_binning.html#a758f4ac7fbdb14752627641baccb6cba", null ],
     [ "GetBinCenterBase", "class_two_d_alphabet_1_1binning_1_1_binning.html#a8ff1ef018514d061bb81bd377bceb88c", null ],

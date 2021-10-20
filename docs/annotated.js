@@ -13,9 +13,6 @@ var annotated =
         [ "Config", "class_two_d_alphabet_1_1config_1_1_config.html", "class_two_d_alphabet_1_1config_1_1_config" ],
         [ "OrganizedHists", "class_two_d_alphabet_1_1config_1_1_organized_hists.html", "class_two_d_alphabet_1_1config_1_1_organized_hists" ]
       ] ],
-      [ "plot", null, [
-        [ "Plotter", "class_two_d_alphabet_1_1plot_1_1_plotter.html", "class_two_d_alphabet_1_1plot_1_1_plotter" ]
-      ] ],
       [ "twoDalphabet", null, [
         [ "TwoDAlphabet", "class_two_d_alphabet_1_1two_dalphabet_1_1_two_d_alphabet.html", "class_two_d_alphabet_1_1two_dalphabet_1_1_two_d_alphabet" ]
       ] ]
