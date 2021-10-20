@@ -1,10 +1,32 @@
+from collections import OrderedDict
 import ROOT, os, warnings, pandas, collections, math
 from TwoDAlphabet.helpers import get_hist_maximum, set_hist_maximums, execute_cmd
 from TwoDAlphabet.binning import stitch_hists_in_x, convert_to_events_per_unit, get_min_bin_width
 from TwoDAlphabet.ext import tdrstyle, CMS_lumi
 
 class Plotter(object):
+    '''Class to manage output distributions, manipulate them, and provide access to plotting
+    standard groups of distributions.
+
+    Attributes:
+        fit_tag (str): Either 's' or 'b'.
+        fit_results (RooFitResult): The RooFitResult corresponding to the fit_tag.
+        signal_strength (float): The post-fit signal strength.
+        twoD (TwoDAlphabet): TwoDAlphabet object storing various meta information needed for access.
+        yaxis1D_title (str): Title for "counts" axis of 1D plots. Defaults to 'Events / bin' but can change if plotting events per unit.
+        df (pandas.DataFrame): DataFrame organizing the post-fit and pre-fit plots and their 1D projections.
+        dir (str): Directory path to save final images.
+        slices (dict): Stores edges to slice "x" and "y" axes. 
+        root_out (ROOT.TFile): File storing all histograms that are made.
+    '''
     def __init__(self,twoD,fittag,loadExisting=False):
+        '''Constructor.
+
+        Args:
+            twoD (TwoDAlphabet): Object with meta information about the run.
+            fittag (str): Either 's' or 'b'.
+            loadExisting (bool, optional): Flag to load existing projections instead of remaking everything. Defaults to False.
+        '''
         columns = [
             'process','region','type','title',
             'prefit_2D','postfit_2D',
@@ -23,6 +45,7 @@ class Plotter(object):
         self.df = pandas.DataFrame(columns=columns)
         self.dir = 'plots_fit_{f}'.format(f=self.fittag)
         self.slices = {'x': {}, 'y': {}}
+        self.root_out = None
 
         if not loadExisting:
             self._make()
@@ -30,26 +53,59 @@ class Plotter(object):
             self._load()
 
     def __del__(self):
+        '''On deletion, save DataFrame to csv and close ROOT file.'''
         self.df.to_csv('%s/df.csv'%self.dir)
         self.root_out.Close()
 
     class _entryTracker(object):
+        '''Subclass to track entries for the output ROOT file and DataFrame.
+        The entry itself is a row in the DataFrame with columns holding meta
+        information and histogram objects. The meta information describes the
+        process, process type, a "pretty" process title, and the selectioin region.
+        Since all histogram objects share this information, the various interpretations
+        (1D vs 2D, projections, pre-fit vs post-fit, etc) are stored in the same row.
+        These histograms can be added to the row via the `track` method. Only the string
+        storing the name is tracked and the actual histogram is saved to the output ROOT file
+        storing all histograms for all rows.
+        '''
         def __init__(self,plotter,p,r,t,title):
+            '''Constructor.
+
+            Args:
+                plotter (Plotter): Parent plotter object for access to open ROOT file.
+                p (str): Process name of entry.
+                r (str): Region name of entry.
+                t (str): Process type of entry (ex. "BKG").
+                title (str): Pretty process title for the legend.
+            '''
             self.plotter = plotter
             self.entry = {'process': p, 'region': r, 'type': t, 'title': title}
 
         def track(self,k,h):
+            '''Add a key to the `self.entry` dict to track a histogram of name `h.GetName()`.
+            Also write the histogram to output ROOT file.
+
+            Args:
+                k (str): Key name (ex. 'prefit_2D').
+                h (ROOT.TH1): ROOT histogram to track.
+            '''
             self.entry[k] = h.GetName()
             self.plotter.root_out.WriteTObject(h,h.GetName())
 
     def _load(self):
-        # open pickled dataframe and root_out
+        '''Open pickled DataFrame and output ROOT file
+        and reference with `self.df` and `self.root_out` attributes.'''
         root_out_name = '%s/all_plots.root'%self.dir
         self.root_out = ROOT.TFile.Open(root_out_name)
-        self.df = pandas.read_csv('df.csv')
+        self.df = pandas.read_csv('%s/df.csv'%self.dir)
 
     def _make(self):
-        # make root_out and fill dataframe
+        '''Make the DataFrame and output ROOT file from scratch
+        and reference with `self.df` and `self.root_out` attributes.
+        
+        Loops over all regions and processes from the pre-fit and post-fit shapes
+        and tracks/constructs the 2D histograms and six projections (three each for "x" and "y"). 
+        '''
         root_out_name = '%s/all_plots.root'%self.dir
         self.root_out = ROOT.TFile.Open(root_out_name,'RECREATE')
 
@@ -58,7 +114,12 @@ class Plotter(object):
 
         for region in self.twoD.GetRegions():
             binning,_ = self.twoD.GetBinningFor(region)
-            blinding = [1] if region in self.twoD.config.options.blindedPlots else []
+            if self.twoD.config.options.blindedPlots != None:
+                if region in self.twoD.config.options.blindedPlots:
+                    blinding = [1]
+                else: blinding = []
+            else: blinding = []
+
             self.slices['x'][region] = {'vals': binning.xSlices,'idxs':binning.xSliceIdx}
             self.slices['y'][region] = {'vals': binning.ySlices,'idxs':binning.ySliceIdx}
             
@@ -83,8 +144,7 @@ class Plotter(object):
                     full = stitch_hists_in_x(out2d_name, binning, [low,sig,high], blinded=blinding if process == 'data_obs' else [])
                     full.SetMinimum(0)
                     full.SetTitle('%s, %s, %s'%(process,region,time))
-                    # if self.twoD.IsSignal(process) and fittag == 's' and time == 'postfit':
-                    #     full.Scale(self.signal_strength)
+
                     entry.track('%s_2D'%time, full)
 
                     # Now do projections using the 2D
@@ -98,12 +158,12 @@ class Plotter(object):
                             
                             hslice = getattr(full,'Projection'+proj)(hname,start,stop,'e')
                             hslice_title = '%s, %s, %s, %s-%s'%(proc_title,region,time,slices['vals'][islice],slices['vals'][islice+1])
-                            hslice = self._format_hist(
+                            hslice = self._format_1Dhist(
                                 hslice, hslice_title,
-                                binning.xtitle, binning.ytitle,
+                                binning.xtitle if proj == 'X' else binning.ytitle,
+                                self.yaxis1D_title,
                                 color, proc_type)
 
-                            # TRACK
                             col_name = '{t}_proj{x}{i}'.format(t=time,x=proj.lower(),i=islice)
                             entry.track(col_name, hslice)
 
@@ -114,16 +174,43 @@ class Plotter(object):
         self.root_out = ROOT.TFile.Open(root_out_name)
 
     def Get(self,hname):
+        '''Get a histogram by name from the master ROOT file.
+        Does quick check for if the histogram is saved.
+        
+        Args:
+            hname (str): Histogram name.
+
+        Raises:
+            LookupError: If histogram cannot be found.
+        '''
         if hname not in [k.GetName() for k in self.root_out.GetListOfKeys()]:
             raise LookupError('Histogram %s not found in %s'%(hname,self.root_out.GetName()))
         return self.root_out.Get(hname).Clone()
 
-    def _format_hist(self, hslice, title, xtitle, ytitle, color, proc_type):
-        if not isinstance(hslice,ROOT.TH2):
-            ytitle = self.yaxis1D_title
-            if self.twoD.config.options.plotEvtsPerUnit:
-                hslice = convert_to_events_per_unit(hslice)
-                ytitle = 'Events / %s GeV' % get_min_bin_width(hslice)
+    def _format_1Dhist(self, hslice, title, xtitle, ytitle, color, proc_type):
+        '''Perform some basic formatting of a 1D histogram so that the ROOT.TH1
+        already has some of the meta information set like line and fill colors.
+        Also renormalizes bins to the minimum bin width if the y-axis is requested
+        to be plotted as events per unit rather than events per bin.
+
+        Args:
+            hslice (ROOT.TH1): Histogram.
+            title (str): Title for the output histogram.
+            xtitle (str): X-axis title for the output histogram.
+            ytitle (str): Y-axis title for the output histogram. Will be modified if requesting to plot events/unit.
+            color (int): ROOT color code.
+            proc_type (str): Process type. Either 'BKG', 'SIGNAL', or 'DATA'.
+
+        Raises:
+            NameError: If proc_type is not 'BKG', 'SIGNAL', or 'DATA'.
+
+        Returns:
+            TH1: Formatted histogram.
+        '''
+        ytitle = self.yaxis1D_title
+        if self.twoD.config.options.plotEvtsPerUnit:
+            hslice = convert_to_events_per_unit(hslice)
+            ytitle = 'Events / %s GeV' % get_min_bin_width(hslice)
         hslice.SetMinimum(0)
         hslice.SetTitle(title)
         hslice.GetXaxis().SetTitle(xtitle)
@@ -137,10 +224,24 @@ class Plotter(object):
         elif proc_type == 'DATA':
             hslice.SetLineColor(color)
             hslice.SetMarkerColor(color)
+        else:
+            raise NameError('Process type "%s" is not supported.'%proc_type)
 
         return hslice
 
     def _order_df_on_proc_list(self,df,proc_type,proclist=[],alphaBottom=True):
+        '''Re-order input dataframe (`df`) based on the ordered list of process names (`proclist`).
+        Useful for pre-ordering process before trying to construct a THStack.
+
+        Args:
+            df (pandas.DataFrame): Input DataFrame to manipulate.
+            proc_type (str): Process type.  Either 'BKG', 'SIGNAL', or 'DATA'.
+            proclist (list, optional): Ordered list of processes to order by. Defaults to [] in which case order is determined based on alphaBottom.
+            alphaBottom (bool, optional): Only matters if proclist == []. Defaults to True in which case parametric Alphabet objects included first (thus, on the bottom of the THStack).
+
+        Returns:
+            pandas.DataFrame: Ordered DataFrame.
+        '''
         if proclist == []:
             if alphaBottom:
                 process_order = self.twoD.GetProcesses(ptype=proc_type,onlyNonConfig=True) + self.twoD.GetProcesses(ptype=proc_type,includeNonConfig=False)
@@ -153,6 +254,15 @@ class Plotter(object):
         return process_order_df.merge(df,on='process',how='outer')
 
     def plot_2D_distributions(self):
+        '''Take the saved 2D distributions and plot them together on sub-pads
+        based on process and region groupings.
+
+        Plots are grouped based on process and then the regions and pre-fit/post-fit
+        plots share the same canvas as sub-pads.
+
+        Returns:
+            None
+        '''
         for process, group in self.df.groupby('process'):
             out_file_name = 'plots_fit_{f}/{p}_2D'.format(f=self.fittag,p=process)
             hist_list = []
@@ -161,12 +271,25 @@ class Plotter(object):
                 hist_list.append( self.Get(subgroup.postfit_2D.iloc[0]) )
             
             out_file_name = 'plots_fit_{f}/{p}_2D'.format(f=self.fittag,p=process)
-            MakeCan(name=out_file_name,histlist=hist_list,year=self.twoD.config.options.year)
+            self.MakePad2D(name=out_file_name,histlist=hist_list,year=self.twoD.config.options.year)
 
     def plot_projections(self,logyFlag):
+        '''Plot comparisons of data and the post-fit background model and signal
+        using the 1D projections. Canvases are grouped based on projection axis.
+        The canvas rows are separate selection regions while the columns 
+        are the different slices of the un-plotted axis.
+
+        Args:
+            logyFlag (bool): If True, set the y-axis to be log scale.
+
+        Returns:
+            None
+        '''
+        
         for proj in ['postfit_projx','postfit_projy']:
-            data, bkgs, totalbkgs, signals, slices = [], [], [], [], []
+            pads = OrderedDict()
             for region, group in self.df.groupby('region'):
+                binning,_ = self.twoD.GetBinningFor(region)
                 ordered_bkgs = self._order_df_on_proc_list(
                                     group.loc[group.type.eq('BKG')],
                                     proc_type='BKG',
@@ -186,36 +309,37 @@ class Plotter(object):
                     else:
                         these_signals = [self.Get(hname) for hname in ordered_signals[projn].to_list()]
 
-                    # Add everything to track
-                    data.append(this_data)
-                    totalbkgs.append(this_totalbkg)
-                    bkgs.append(these_bkgs)
-                    signals.append(these_signals)
-                    slices.append('%s-%s'%(
+                    slice_edges = (
                         self.slices['x' if 'y' in proj else 'y'][region]['vals'][islice],
+                        binning.xtitle if 'y' in proj else binning.ytitle,
                         self.slices['x' if 'y' in proj else 'y'][region]['vals'][islice+1]
-                        )
                     )
-                
-            out_file_name = 'plots_fit_{f}/{proj}%s'.format(f=self.fittag,proj=proj)
-            log_str = '' if logyFlag == False else '_logy'
-            MakeCan(
-                out_file_name%log_str,
-                histlist=data,      bkglist=bkgs,
-                totalBkg=totalbkgs, signals=signals,
-                subtitles=slices, bkgNames=list(ordered_bkgs.title),
-                addSignals=self.twoD.config.options.haddSignals, logy=logyFlag
-            )
+                    slice_str = '%s < %s < %s %s'%(*slice_edges, 'GeV')
+
+                    out_file_name = 'plots_fit_{f}/{projn}_{reg}{logy}'.format(
+                                        f=self.fittag, projn=projn, reg=region,
+                                        logy='' if logyFlag == False else '_logy')
+                    pads['%s_%s'%(projn,region)] = self.MakePad1D(out_file_name, this_data, these_bkgs, these_signals,
+                                   subtitle=slice_str, totalBkg=this_totalbkg,
+                                   logyFlag=logyFlag, year=self.twoD.config.options.year,
+                                   extraTextx='Preliminary', savePDF=False, savePNG=False, saveROOT=True)
+            
+            out_can_name = 'plots_fit_{f}/{proj}{logy}'.format(
+                                        f=self.fittag, proj=proj,
+                                        logy='' if logyFlag == False else '_logy')
+            # TODO: Change order by unpacking pads with an ordered list
+            self.MakeCan(out_can_name, pads)
 
     def plot_pre_vs_post(self):
-        # Make comparisons for each background process of pre and post fit projections
+        '''Make comparisons for each background process of pre and post fit projections.
+        '''
         for proj in ['projx','projy']:
             for process, group in self.df[~self.df.process.isin(['data_obs','TotalBkg'])].groupby('process'):
-                pre_list, post_list, titleList = [], [], []
+                pads = OrderedDict()
                 for region, subgroup in group.groupby('region'):
+                    binning,_ = self.twoD.GetBinningFor(region)
                     for islice in range(3):
                         projn = proj+str(islice)
-                        slices = self.slices['x' if 'y' in proj else 'y'][region]
 
                         post = self.Get( subgroup['postfit_'+projn].iloc[0] )
                         post.SetLineColor(ROOT.kBlack)
@@ -224,16 +348,22 @@ class Plotter(object):
                         pre = self.Get( subgroup['prefit_'+projn].iloc[0] )
                         pre.SetTitle('Prefit, '+process)
 
-                        pre_list.append([pre])  # in terms of makeCan these are "bkg hists"
-                        post_list.append(post)   # and these are "data hists"
-                        titleList.append('%s-%s'%(slices['vals'][islice],slices['vals'][islice+1]))
+                        slice_edges = (
+                            self.slices['x' if 'y' in proj else 'y'][region]['vals'][islice],
+                            binning.xtitle if 'y' in proj else binning.ytitle,
+                            self.slices['x' if 'y' in proj else 'y'][region]['vals'][islice+1]
+                        )
+                        slice_str = '%s < %s < %s %s'%(*slice_edges, 'GeV')
 
-                MakeCan(
-                    'plots_fit_{f}/{p}_{proj}'.format(f=self.fittag,p=process,proj=proj),
-                    histlist=post_list, bkglist=pre_list,
-                    totalBkg=[b[0] for b in pre_list], bkgNames=['Prefit, '+process],
-                    subtitles=titleList, dataName=post.GetTitle(),
-                    datastyle='histe', year=self.twoD.config.options.year
+                        pads['{p}_{projn}_{reg}'.format(p=process,projn=projn, region=region)] = self.MakePad1D(
+                            'plots_fit_{f}/{p}_{projn}_{reg}'.format(f=self.fittag, p=process,projn=projn, region=region),
+                            data=post, bkg=[pre], totalBkg=pre, subtitle=slice_str, savePNG=False, savePDF=False, saveROOT=True,
+                            datastyle='histe', year=self.twoD.config.options.year, extraText='Preliminary'
+                        )
+
+                self.MakeCan(
+                    'plots_fit_{f}/{p}_{proj}'.format(f=self.fittag, p=process,proj=proj),
+                    pads
                 )
 
     def plot_transfer_funcs(self):
@@ -340,6 +470,328 @@ class Plotter(object):
         # rpf_final.Write()
         # rpf_file.Close()
 
+    def _save_pad_generic(self, outname, pad, saveROOT, savePDF, savePNG):
+        if saveROOT:
+            self.root_out.WriteTObject(pad,outname)
+        if savePDF:
+            pad.Print(outname+'.pdf','pdf')
+        if savePNG:
+            pad.Print(outname+'.png','png')
+
+    def _make_pad_gen(self, name):
+        tdrstyle.setTDRStyle()
+        ROOT.gStyle.SetLegendFont(42)
+        ROOT.gStyle.SetTitleBorderSize(0)
+        ROOT.gStyle.SetTitleAlign(33)
+        ROOT.gStyle.SetTitleX(.77)
+
+        pad = ROOT.TCanvas(name, name, 800, 700)
+        pad.cd(); pad.SetRightMargin(0.0); pad.SetTopMargin(0.0); pad.SetBottomMargin(0.0)
+        return pad
+
+    def MakePad2D(self, outname, hist, style='lego', logzFlag=False,
+                  saveROOT=False, savePDF=True, savePNG=True, year=1, extraText='Preliminary'):
+        '''Make a pad holding a 2D plot with standardized formatting conventions.
+
+        Args:
+            outname (str): Output file path name.
+            hist (TH2): Histogram to draw on the pad.
+            style (str, optional): ROOT drawing style. Defaults to 'lego'.
+            logzFlag (bool, optional): Make log z-axis. Defaults to False.
+            saveROOT (bool, optional): Save to master ROOT file. Defaults to False.
+            savePDF (bool, optional): Save to PDF. Defaults to True.
+            savePNG (bool, optional): Save to PNG. Defaults to True.
+            year (int, optional): Luminosity formatting. Options are 16, 17, 18, 1 (full Run 2), 2 (16+17+18). Defaults to 1.
+            extraText (str, optional): Prepended to the CMS subtext. Defaults to 'Preliminary'.
+
+        Returns:
+            [type]: [description]
+        '''
+        pad = self._make_pad_gen()
+        pad.SetLeftMargin(0.15)
+        pad.SetRightMargin(0.2)
+        pad.SetBottomMargin(0.12)
+        pad.SetTopMargin(0.1)
+        if logzFlag: pad.SetLogz()
+
+        hist.GetXaxis().SetTitleOffset(1.15); hist.GetXaxis().SetLabelSize(0.05); hist.GetXaxis().SetTitleSize(0.05)
+        hist.GetYaxis().SetTitleOffset(1.5);  hist.GetYaxis().SetLabelSize(0.05); hist.GetYaxis().SetTitleSize(0.05)
+        hist.GetZaxis().SetTitleOffset(1.5);  hist.GetZaxis().SetLabelSize(0.05); hist.GetZaxis().SetTitleSize(0.05)
+        hist.GetXaxis().SetNdivisions(505)
+        
+        if 'lego' in style.lower():
+            hist.GetZaxis().SetTitleOffset(1.4)
+
+        hist.Draw(style)
+        
+        CMS_lumi.extraText = extraText
+        CMS_lumi.CMS_lumi(pad, year, 11, sim=False if 'data' in hist.GetName().lower() else True)
+
+        self._save_pad_generic(outname, pad, saveROOT, savePDF, savePNG)
+
+        return pad
+
+    def MakePad1D(self, outname, data, bkgs, signals, title='', subtitle='',
+                totalBkg=None, logyFlag=False, saveROOT=False, savePDF=True, savePNG=True,
+                dataOff=False, datastyle='pe X0', year=1, addSignals=True, extraText='Preliminary'):
+        '''Make a pad holding a 1D plot with standardized formatting conventions.
+
+        Args:
+            outname (str): Output file path name.
+            data (TH1): Data histogram.
+            bkgs ([TH1]): List of background histograms (will be stacked).
+            signals ([TH1]): List of signal histograms.
+            title (str, optional): Title of plot. Only applicable if bkgs is empty. Defaults to ''.
+            subtitle (str, optional): Subtitle text for physics information (like slice ranges). Defaults to ''.
+            totalBkg (TH1, optional): Total background estimate from fit. Used to get total background uncertianty. Defaults to None.
+            logyFlag (bool, optional): Make log y-axis. Defaults to False.
+            saveROOT (bool, optional): Save to master ROOT file. Defaults to False.
+            savePDF (bool, optional): Save to PDF. Defaults to True.
+            savePNG (bool, optional): Save to PNG. Defaults to True.
+            dataOff (bool, optional): Turn off the data from plotting. Defaults to False.
+            datastyle (str, optional): ROOT drawing style for the data. Defaults to 'pe X0'.
+            year (int, optional): Luminosity formatting. Options are 16, 17, 18, 1 (full Run 2), 2 (16+17+18). Defaults to 1.
+            addSignals (bool, optional): If True, multiple signals will be added together and plotted as one. If False, signals are plotted individually. Defaults to True.
+            extraText (str, optional): Prepended to the CMS subtext. Defaults to 'Preliminary'.
+
+        Returns:
+            ROOT.TPad: Output pad.
+        '''
+        def _format_data():
+            data.SetLineColorAlpha(ROOT.kBlack, 0 if dataOff else 1)
+            if 'pe' in datastyle.lower():
+                data.SetMarkerColorAlpha(ROOT.kBlack,0 if dataOff else 1)
+                data.SetMarkerStyle(8)
+            if 'hist' in datastyle.lower():
+                data.SetFillColorAlpha(0,0)
+
+            data.SetTitleOffset(1.15,"xy")
+            data.GetYaxis().SetTitleOffset(1.04)
+            data.GetYaxis().SetLabelSize(0.07)
+            data.GetYaxis().SetTitleSize(0.09)
+            data.GetXaxis().SetLabelSize(0.07)
+            data.GetXaxis().SetTitleSize(0.09)
+            data.GetXaxis().SetLabelOffset(0.05)
+            if logyFlag == True:
+                data.SetMinimum(1e-3)
+            
+            data.GetYaxis().SetNdivisions(508)
+            
+            return data
+
+        def _make_sub_pads():
+            if not dataOff:
+                main_pad = ROOT.TPad(data.GetName()+'_main',data.GetName()+'_main',0, 0.35, 1, 1)
+                sub_pad  = ROOT.TPad(data.GetName()+'_sub',data.GetName()+'_sub',0, 0, 1, 0.35)
+            else:
+                main_pad = ROOT.TPad(data.GetName()+'_main',data.GetName()+'_main',0, 0.1, 1, 1)
+                sub_pad  = ROOT.TPad(data.GetName()+'_sub',data.GetName()+'_sub',0, 0, 0, 0)
+
+            main_pad.SetBottomMargin(0.04)
+            main_pad.SetLeftMargin(0.17)
+            main_pad.SetRightMargin(0.05)
+            main_pad.SetTopMargin(0.1)
+
+            sub_pad.SetLeftMargin(0.17)
+            sub_pad.SetRightMargin(0.05)
+            sub_pad.SetTopMargin(0)
+            sub_pad.SetBottomMargin(0.35)
+
+            if logyFlag == True:
+                main_pad.SetLogy()
+            
+            main_pad.Draw()
+            sub_pad.Draw()
+
+            return main_pad, sub_pad
+
+        def _make_legend():
+            legend = ROOT.TLegend(0.65,legend_topY,0.90,0.88)
+            legend.SetBorderSize(0)
+            if not dataOff: legend.AddEntry(data,data.GetName().split(',')[0],datastyle)
+            return legend
+
+        def _make_totalBkg():           
+            totalBkg.SetMarkerStyle(0)
+            totalBkg_err = totalBkg.Clone()
+            totalBkg.SetLineColor(ROOT.kBlack)
+            totalBkg_err.SetLineColor(ROOT.kBlack)
+            totalBkg_err.SetLineWidth(0)
+            totalBkg_err.SetFillColor(ROOT.kBlack)
+            totalBkg_err.SetFillStyle(3354)
+            if logyFlag: 
+                totalBkg.SetMinimum(1e-3)
+                totalBkg_err.SetMinimum(1e-3)
+            legend.AddEntry(totalBkg_err,'Total bkg unc.','F')
+
+            return totalBkg, totalBkg_err
+
+        def _make_stack():
+            stack = ROOT.THStack(data.GetName()+'_stack',data.GetName()+'_stack')
+            # Build the stack
+            legend_info = collections.OrderedDict()
+            for bkg in bkgs:     # Won't loop if bkglist is empty
+                if logyFlag:
+                    bkg.SetMinimum(1e-3)
+
+                stack.Add(bkg)
+                legend_info[bkg.GetName().split(',')[0]] = bkg
+
+            if logyFlag:
+                stack.SetMinimum(1e-3) 
+
+            # Deal with legend which needs ordering reversed from stack build
+            legend_duplicates = []
+            for bname in reversed(legend_info.keys()):
+                if bname not in legend_duplicates:
+                    legend.AddEntry(legend_info[bname],bname,'f')
+                    legend_duplicates.append(bname)
+            
+            return stack
+
+        def _make_signals():
+            sigs_to_plot = signals
+            # Can add together for total signal
+            if addSignals:
+                totsig = signals[0].Clone()
+                for isig in range(1,len(signals)):
+                    totsig.Add(signals[isig])
+                sigs_to_plot = [totsig]
+
+            # Plot either way
+            for isig,sig in enumerate(sigs_to_plot):
+                sig.SetLineWidth(2)
+                if logyFlag == True:
+                    sig.SetMinimum(1e-3)
+
+                legend.AddEntry(sig,sig.GetTitle().split(',')[0],'L')
+            
+            return sigs_to_plot
+
+        def _draw_subtitle_tex():
+            subtitle_tex = ROOT.TLatex()
+            subtitle_tex.SetNDC()
+            subtitle_tex.SetTextAngle(0)
+            subtitle_tex.SetTextColor(ROOT.kBlack)
+            subtitle_tex.SetTextFont(42)
+            subtitle_tex.SetTextAlign(12) 
+            subtitle_tex.SetTextSize(0.06)
+            subtitle_tex.DrawLatex(0.208,0.74,subtitle)
+
+        def _draw_extralumi_tex():
+            lumiE = ROOT.TLatex()
+            lumiE.SetNDC()
+            lumiE.SetTextAngle(0)
+            lumiE.SetTextColor(ROOT.kBlack)
+            lumiE.SetTextFont(42)
+            lumiE.SetTextAlign(31) 
+            lumiE.SetTextSize(0.7*0.1)
+            lumiE.DrawLatex(1-0.05,1-0.1+0.2*0.1,"137 fb^{-1} (13 TeV)")
+
+        def _draw_just_data():
+            data.SetMaximum(1.13*data.GetMaximum())
+            data.SetTitle(title)
+            data.SetTitleOffset(1.1)
+            data.Draw(datastyle)
+            CMS_lumi.CMS_lumi(pad, year, 11)
+
+        def _get_nsignals():
+            if len(signals) == 0: nsignals = 0
+            elif addSignals:      nsignals = 1
+            else:                 nsignals = len(signals[0])
+            return nsignals
+
+        pad = self._make_pad_gen()
+        data = _format_data()
+
+        if len(bkgs) == 0:
+            _draw_just_data()
+        else:
+            main_pad, sub_pad = _make_sub_pads()
+            nsignals = _get_nsignals()
+            legend_topY = 0.73-0.03*(min(len(bkgs[0]),6)+nsignals+1)
+            legend = _make_legend()
+            totalBkg, totalBkg_err = _make_totalBkg()
+            signals = _make_signals()        
+            stack = _make_stack()
+            set_hist_maximums(stack, totalBkg, data, 2.5-legend_topY+0.03)
+
+            # Go to main pad and draw
+            main_pad.cd()
+            data.Draw(datastyle)
+            stack.Draw('same hist') # need to draw twice because the axis doesn't exist for modification until drawing
+            try:    stack.GetYaxis().SetNdivisions(508)
+            except: stack.GetYaxis().SetNdivisions(8,5,0)
+            stack.Draw('same hist')
+            for sig in signals:
+                sig.Draw('hist same')
+
+            # Draw total hist and error
+            totalBkg.Draw('hist same')
+            totalBkg_err.Draw('e2 same')
+            legend.Draw()
+            if not dataOff:
+                data.Draw(datastyle+' same')
+
+            ROOT.gPad.RedrawAxis()
+
+            sub_pad.cd()
+            pull = MakePullPlot(data,totalBkg)
+            pull.Draw('hist')
+
+            CMS_lumi.extraText = extraText
+            CMS_lumi.cmsTextSize = 0.9
+            CMS_lumi.cmsTextOffset = 2
+            CMS_lumi.lumiTextSize = 0.9
+            CMS_lumi.CMS_lumi(main_pad, year, 11)
+            main_pad.cd()           
+            _draw_subtitle_tex()
+            
+        self._save_pad_generic(outname, pad, saveROOT, savePDF, savePNG)
+        return pad
+
+    def MakeCan(self, outname, pads, saveROOT=False, savePDF=True, savePNG=True):
+        '''Combine multiple pads/canvases into one canvas for convenience of viewing.
+        Input pad order matters.
+
+        Args:
+            outname (str): Output file path name.
+            pads ([TCanvas,TPad]): List of canvases/pads to plot together on one canvas.
+            saveROOT (bool, optional): Save to master ROOT file. Defaults to False.
+            savePDF (bool, optional): Save to PDF. Defaults to True.
+            savePNG (bool, optional): Save to PNG. Defaults to True.
+
+        Raises:
+            RuntimeError: If 10 or more subdivisions are requested.
+
+        Returns:
+            ROOT.TCanvas: Output canvas.
+        '''
+        if len(pads) == 1:
+            width = 800; height = 700; padx = 1; pady = 1
+        elif len(pads) == 2:
+            width = 1200; height = 700; padx = 2; pady = 1
+        elif len(pads) == 3:
+            width = 1800; height = 600; padx = 3; pady = 1
+        elif len(pads) == 4:
+            width = 1200; height = 1000; padx = 2; pady = 2
+        elif len(pads) <= 6:
+            width = 1600; height = 1000; padx = 3; pady = 2
+        elif len(pads) <= 9:
+            width = 1600; height = 1600; padx = 3; pady = 3
+        else:
+            raise RuntimeError('histlist of size %s not currently supported'%(len(pads),pads))
+
+        canvas = ROOT.TCanvas(outname, outname, width, height)
+        canvas.cd()
+        canvas.Divide(padx, pady)
+        for i in range(1,padx*pady+1):
+            canvas.cd(i)
+            pads[i].DrawClonePad()
+
+        self._save_pad_generic(outname, canvas, saveROOT, savePDF, savePNG)
+        return canvas
+
 def _get_start_stop(i,slice_idxs):
     start = slice_idxs[i]+1
     stop  = slice_idxs[i+1]
@@ -352,327 +804,6 @@ def plotAllFitResults(twoD,fittag):
     plotter.plot_projections(logyFlag=True)
     plotter.plot_pre_vs_post()
     # plotter.plot_transfer_funcs()
-
-
-def MakeCan(name, histlist, bkglist=[],totalBkg=None,signals=[],
-            titles=[],subtitles=[],sliceVar='X',dataName='Data',
-            logy=False,rootfile=False,dataOff=False, bkgNames=[],
-            datastyle='pe',year=1, addSignals=True, extraText=''):
-    '''histlist is just the generic list but if bkglist is specified (non-empty)
-    then this function will stack the backgrounds and compare against histlist as if 
-    it is data. The imporant bit is that bkglist is a list of lists. The first index
-    of bkglist corresponds to the index in histlist (the corresponding data). 
-    For example you could have:
-      histlist = [data1, data2]
-      bkglist = [[bkg1_1,bkg2_1],[bkg1_2,bkg2_2]]
-
-    Args:
-        name ([type]): [description]
-        tag ([type]): [description]
-        histlist ([type]): [description]
-        bkglist (list, optional): [description]. Defaults to [].
-        totalBkg ([type], optional): [description]. Defaults to None.
-        signals (list, optional): [description]. Defaults to [].
-        titles (list, optional): [description]. Defaults to [].
-        subtitles (list, optional): [description]. Defaults to [].
-        sliceVar (str, optional): [description]. Defaults to 'X'.
-        dataName (str, optional): [description]. Defaults to 'Data'.
-        bkgNames (list, optional): [description]. Defaults to [].
-        signalNames (list, optional): [description]. Defaults to [].
-        logy (bool, optional): [description]. Defaults to False.
-        rootfile (bool, optional): [description]. Defaults to False.
-        dataOff (bool, optional): [description]. Defaults to False.
-        datastyle (str, optional): [description]. Defaults to 'pe'.
-        year (int, optional): [description]. Defaults to 1.
-        addSignals (bool, optional): [description]. Defaults to True.
-        extraText (str, optional): [description]. Defaults to ''.
-
-    Raises:
-        RuntimeError: [description]
-        TypeError: [description]
-    '''
-    if len(histlist) == 1:
-        width = 800; height = 700; padx = 1; pady = 1
-    elif len(histlist) == 2:
-        width = 1200; height = 700; padx = 2; pady = 1
-    elif len(histlist) == 3:
-        width = 1800; height = 600; padx = 3; pady = 1
-    elif len(histlist) == 4:
-        width = 1200; height = 1000; padx = 2; pady = 2
-    elif len(histlist) <= 6:
-        width = 1600; height = 1000; padx = 3; pady = 2
-    elif len(histlist) <= 9:
-        width = 1600; height = 1600; padx = 3; pady = 3
-    else:
-        raise RuntimeError('histlist of size %s not currently supported'%(len(histlist),histlist))
-
-    tdrstyle.setTDRStyle()
-    ROOT.gStyle.SetLegendFont(42)
-    ROOT.gStyle.SetTitleBorderSize(0)
-    ROOT.gStyle.SetTitleAlign(33)
-    ROOT.gStyle.SetTitleX(.77)
-    myCanName = '_'.join(name.split('/'))
-    myCan = ROOT.TCanvas(myCanName,myCanName,width,height)
-    myCan.Divide(padx,pady)
-
-    # A bunch of empty lists for storage if needed
-    stacks, tot_hists_err, tot_hists, legends, mains, subs, pulls, tot_sigs = [], [], [], [], [], [], [], []
-
-    # For each hist/data distribution
-    for hist_index, hist in enumerate(histlist):
-        # Grab the pad we want to draw in
-        myCan.cd(hist_index+1)
-        thisPad = myCan.GetPrimitive(myCanName+'_'+str(hist_index+1))
-        thisPad.cd(); thisPad.SetRightMargin(0.0); thisPad.SetTopMargin(0.0); thisPad.SetBottomMargin(0.0)
-
-        # If this is a TH2, just draw the lego
-        if hist.ClassName().find('TH2') != -1:
-            if len(bkglist) > 0:
-                raise TypeError('It seems you are trying to plot backgrounds with data on a 2D plot. This is not supported since there is no good way to view this type of distribution.')
-
-            ROOT.gPad.SetLeftMargin(0.15)
-            ROOT.gPad.SetRightMargin(0.2)
-            ROOT.gPad.SetBottomMargin(0.12)
-            ROOT.gPad.SetTopMargin(0.1)
-            if logy: ROOT.gPad.SetLogz()
-            hist.GetXaxis().SetTitleOffset(1.15); hist.GetXaxis().SetLabelSize(0.05); hist.GetXaxis().SetTitleSize(0.05)
-            hist.GetYaxis().SetTitleOffset(1.5);  hist.GetYaxis().SetLabelSize(0.05); hist.GetYaxis().SetTitleSize(0.05)
-            hist.GetZaxis().SetTitleOffset(1.5);  hist.GetZaxis().SetLabelSize(0.05); hist.GetZaxis().SetTitleSize(0.05)
-            hist.GetXaxis().SetNdivisions(505)
-            if 'lego' in datastyle.lower():
-                hist.GetZaxis().SetTitleOffset(1.4)
-            if len(titles) > 0:
-                hist.SetTitle(titles[hist_index])
-
-            if datastyle != 'pe': hist.Draw(datastyle)
-            else: hist.Draw('colz')
-            
-            CMS_lumi.extraText = extraText
-            CMS_lumi.CMS_lumi(thisPad, year, 11, sim=False if 'data' in name.lower() else True)
-        
-        # Otherwise it's a TH1 hopefully
-        else:
-            hist.SetLineColorAlpha(ROOT.kBlack, 0 if dataOff else 1)
-            if 'pe' in datastyle.lower():
-                hist.SetMarkerColorAlpha(ROOT.kBlack,0 if dataOff else 1)
-                hist.SetMarkerStyle(8)
-            if 'hist' in datastyle.lower():
-                hist.SetFillColorAlpha(0,0)
-
-            # If there are no backgrounds, only plot the data (semilog if desired)
-            if len(bkglist) == 0:
-                hist.SetMaximum(1.13*hist.GetMaximum())
-                if len(titles) > 0:
-                    hist.SetTitle(titles[hist_index])
-                hist.SetTitleOffset(1.1)
-                hist.Draw(datastyle)
-                CMS_lumi.CMS_lumi(thisPad, year, 11)
-            
-            # Otherwise...
-            else:
-                # Create some subpads, a legend, a stack, and a total bkg hist that we'll use for the error bars
-                if not dataOff:
-                    mains.append(ROOT.TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.35, 1, 1))
-                    subs.append(ROOT.TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 1, 0.35))
-
-                else:
-                    mains.append(ROOT.TPad(hist.GetName()+'_main',hist.GetName()+'_main',0, 0.1, 1, 1))
-                    subs.append(ROOT.TPad(hist.GetName()+'_sub',hist.GetName()+'_sub',0, 0, 0, 0))
-
-                if len(signals) == 0:
-                    nsignals = 0
-                elif addSignals:
-                    nsignals = 1
-                else:
-                    nsignals = len(signals[0])
-                legend_topY = 0.73-0.03*(min(len(bkglist[0]),6)+nsignals+1)
-                # legend_bottomY = 0.2+0.02*(len(bkglist[0])+nsignals+1)
-
-                legends.append(ROOT.TLegend(0.65,legend_topY,0.90,0.88))
-                if not dataOff: legends[hist_index].AddEntry(hist,dataName,datastyle)
-
-                stacks.append(ROOT.THStack(hist.GetName()+'_stack',hist.GetName()+'_stack'))
-                if totalBkg == None:
-                    tot_hist = hist.Clone(hist.GetName()+'_tot')
-                    tot_hist.Reset()
-                else:
-                    tot_hist = totalBkg[hist_index]
-
-                tot_hist.SetTitle(hist.GetTitle())
-                tot_hist.SetMarkerStyle(0)
-                tot_hists.append(tot_hist)
-                tot_hists_err.append(tot_hist.Clone())
-                tot_hists[hist_index].SetLineColor(ROOT.kBlack)
-                tot_hists_err[hist_index].SetLineColor(ROOT.kBlack)
-                tot_hists_err[hist_index].SetLineWidth(0)
-                tot_hists_err[hist_index].SetFillColor(ROOT.kBlack)
-                tot_hists_err[hist_index].SetFillStyle(3354)
-                if 'Postfit' not in dataName: legends[hist_index].AddEntry(tot_hists_err[hist_index],'Total bkg unc.','F')
-
-                # Set margins and make these two pads primitives of the division, thisPad
-                mains[hist_index].SetBottomMargin(0.04)
-                mains[hist_index].SetLeftMargin(0.17)
-                mains[hist_index].SetRightMargin(0.05)
-                mains[hist_index].SetTopMargin(0.1)
-
-                subs[hist_index].SetLeftMargin(0.17)
-                subs[hist_index].SetRightMargin(0.05)
-                subs[hist_index].SetTopMargin(0)
-                subs[hist_index].SetBottomMargin(0.35)
-                mains[hist_index].Draw()
-                subs[hist_index].Draw()
-                
-                # Build the stack
-                legend_info = collections.OrderedDict()
-                for ibkg,bkg in enumerate(bkglist[hist_index]):     # Won't loop if bkglist is empty
-                    if totalBkg == None:
-                        tot_hists[hist_index].Add(bkg)
-                    if logy:
-                        bkg.SetMinimum(1e-3)
-
-                    stacks[hist_index].Add(bkg)
-                    legend_info[bkgNames[ibkg]] = bkg
-
-                # Deal with legend which needs ordering reversed from stack build
-                legend_duplicates = []
-                for bname in reversed(legend_info.keys()):
-                    if bname not in legend_duplicates:
-                        legends[hist_index].AddEntry(legend_info[bname],bname,'f')
-                        legend_duplicates.append(bname)
-                    
-                # Go to main pad, set logy if needed
-                mains[hist_index].cd()
-
-                # Set y max of all hists to be the same to accommodate the tallest
-                histList = [stacks[hist_index],tot_hists[hist_index],hist]
-
-                yMax = get_hist_maximum(histList)
-                for h in histList:
-                    h.SetMaximum(yMax*(2.5-legend_topY+0.03))
-                    if logy == True:
-                        h.SetMaximum(yMax*10**(2.5-legend_topY+0.1))
-
-                # Now draw the main pad
-                # if len(titles) > 0:
-                hist.SetTitle('')#titles[hist_index])
-                hist.SetTitleOffset(1.15,"xy")
-                hist.GetYaxis().SetTitleOffset(1.04)
-                hist.GetYaxis().SetLabelSize(0.07)
-                hist.GetYaxis().SetTitleSize(0.09)
-                hist.GetXaxis().SetLabelSize(0.07)
-                hist.GetXaxis().SetTitleSize(0.09)
-                hist.GetXaxis().SetLabelOffset(0.05)
-                if logy == True:
-                    hist.SetMinimum(1e-3)
-                
-                hist.GetYaxis().SetNdivisions(508)
-                if datastyle == 'pe': datastyle = 'pe X0'
-                hist.Draw(datastyle)
-
-                if logy == True: stacks[hist_index].SetMinimum(1e-3) 
-                
-                stacks[hist_index].Draw('same hist') # need to draw twice because the axis doesn't exist for modification until drawing
-                try:
-                    stacks[hist_index].GetYaxis().SetNdivisions(508)
-                except:
-                    stacks[hist_index].GetYaxis().SetNdivisions(8,5,0)
-                stacks[hist_index].Draw('same hist')
-
-                # Do the signals
-                sigs_to_plot = []
-                if len(signals) > 0: 
-                    # Can add together for total signal
-                    if addSignals:
-                        totsig = signals[hist_index][0].Clone()
-                        for isig in range(1,len(signals[hist_index])):
-                            totsig.Add(signals[hist_index][isig])
-                        sigs_to_plot = [totsig]
-                    # or treat separately
-                    else:
-                        for sig in signals[hist_index]:
-                            sigs_to_plot.append(sig)
-
-                    # Plot either way
-                    tot_sigs.append(sigs_to_plot)
-                    for isig,sig in enumerate(sigs_to_plot):
-                        sig.SetLineWidth(2)
-                        if logy == True:
-                            sig.SetMinimum(1e-3)
-
-                        legends[hist_index].AddEntry(sig,sig.GetTitle().split(',')[0],'L')
-                        sig.Draw('hist same')
-
-                # Draw total hist and error
-                if logy: 
-                    tot_hists[hist_index].SetMinimum(1e-3)
-                    tot_hists_err[hist_index].SetMinimum(1e-3)
-                tot_hists[hist_index].Draw('hist same')
-                tot_hists_err[hist_index].Draw('e2 same')
-
-                legends[hist_index].SetBorderSize(0)
-                legends[hist_index].Draw()
-
-                if not dataOff:
-                    hist.Draw(datastyle+' same')
-
-                ROOT.gPad.RedrawAxis()
-
-                # Draw the pull
-                subs[hist_index].cd()
-                # Build the pull
-                pulls.append(MakePullPlot(hist,tot_hists[hist_index]))
-                pulls[hist_index].SetFillColor(ROOT.kBlue)
-                pulls[hist_index].SetTitle(";"+hist.GetXaxis().GetTitle()+";(Data-Bkg)/#sigma")
-                pulls[hist_index].SetStats(0)
-
-                pulls[hist_index].GetYaxis().SetRangeUser(-2.9,2.9)
-                pulls[hist_index].GetYaxis().SetTitleOffset(0.4)                             
-                pulls[hist_index].GetYaxis().SetLabelSize(0.13)
-                pulls[hist_index].GetYaxis().SetTitleSize(0.12)
-                pulls[hist_index].GetYaxis().SetNdivisions(306)
-
-                pulls[hist_index].GetXaxis().SetLabelSize(0.13)
-                pulls[hist_index].GetXaxis().SetTitleSize(0.15)
-                pulls[hist_index].GetXaxis().SetTitle(hist.GetXaxis().GetTitle())
-                pulls[hist_index].GetYaxis().SetTitle("(Data-Bkg)/#sigma")
-                pulls[hist_index].Draw('hist')
-
-                if logy == True:
-                    mains[hist_index].SetLogy()
-
-                CMS_lumi.extraText = extraText
-                CMS_lumi.cmsTextSize = 0.9
-                CMS_lumi.cmsTextOffset = 2
-                CMS_lumi.lumiTextSize = 0.9
-                
-                CMS_lumi.CMS_lumi(mains[hist_index], year, 11)
-                mains[hist_index].cd()
-                lumiE = ROOT.TLatex()
-                lumiE.SetNDC()
-                lumiE.SetTextAngle(0)
-                lumiE.SetTextColor(ROOT.kBlack)
-                lumiE.SetTextFont(42)
-                lumiE.SetTextAlign(31) 
-                lumiE.SetTextSize(0.7*0.1)
-                lumiE.DrawLatex(1-0.05,1-0.1+0.2*0.1,"137 fb^{-1} (13 TeV)")
-                
-                if isinstance(subtitles,list) and len(subtitles) > 0:
-                    subtitle = ROOT.TLatex()
-                    subtitle.SetNDC()
-                    subtitle.SetTextAngle(0)
-                    subtitle.SetTextColor(ROOT.kBlack)
-                    subtitle.SetTextFont(42)
-                    subtitle.SetTextAlign(12) 
-                    subtitle.SetTextSize(0.06)
-                    # print (subtitles[hist_index])
-                    subtitle_string = '%s < %s < %s %s'%(subtitles[hist_index].split('-')[0], sliceVar.split(' ')[0], subtitles[hist_index].split('-')[1], 'GeV')
-                    subtitle.DrawLatex(0.208,0.74,subtitle_string)
-
-    if rootfile:
-        myCan.Print(name+'.root','root')
-    else:
-        myCan.Print(name+'.pdf','pdf')
-        myCan.Print(name+'.png','png')
 
 def MakeSystematicPlots(configObj):
     '''Make plots of the systematic shape variations of each process based on those
@@ -770,34 +901,45 @@ def ColorCodeSortedIndices(colors):
                 new_color_order.append(idx)
     return new_color_order
 
-def MakePullPlot( DATA,BKG):
-    BKGUP, BKGDOWN = MakeUpDown(BKG)
-    pull = DATA.Clone(DATA.GetName()+"_pull")
-    pull.Add(BKG,-1)
+def MakePullPlot(data, bkg):
+    bkgup, bkgdown = MakeUpDown(bkg)
+    pull = data.Clone(data.GetName()+"_pull")
+    pull.Add(bkg,-1)
+    
     sigma = 0.0
-    FScont = 0.0
-    BKGcont = 0.0
     for ibin in range(1,pull.GetNbinsX()+1):
-        FScont = DATA.GetBinContent(ibin)
-        BKGcont = BKG.GetBinContent(ibin)
-        if FScont>=BKGcont:
-            FSerr = DATA.GetBinErrorLow(ibin)
-            BKGerr = abs(BKGUP.GetBinContent(ibin)-BKG.GetBinContent(ibin))
-        if FScont<BKGcont:
-            FSerr = DATA.GetBinErrorUp(ibin)
-            BKGerr = abs(BKGDOWN.GetBinContent(ibin)-BKG.GetBinContent(ibin))
-        if FSerr != None:
-            sigma = math.sqrt(FSerr*FSerr + BKGerr*BKGerr)
+        d = data.GetBinContent(ibin)
+        b = bkg.GetBinContent(ibin)
+        if d >= b:
+            derr = data.GetBinErrorLow(ibin)
+            berr = abs(bkgup.GetBinContent(ibin)-bkg.GetBinContent(ibin))
+        elif d < b:
+            derr = data.GetBinErrorUp(ibin)
+            berr = abs(bkgdown.GetBinContent(ibin)-bkg.GetBinContent(ibin))
+        
+        if d == 0:
+            derr = 1
+
+        sigma = math.sqrt(derr*derr + berr*berr)
+        if sigma != 0:
+            pull.SetBinContent(ibin, (pull.GetBinContent(ibin))/sigma)
         else:
-            sigma = math.sqrt(BKGerr*BKGerr)
-        if FScont == 0.0:
-            pull.SetBinContent(ibin, 0.0 )  
-        else:
-            if sigma != 0 :
-                pullcont = (pull.GetBinContent(ibin))/sigma
-                pull.SetBinContent(ibin, pullcont)
-            else :
-                pull.SetBinContent(ibin, 0.0 )
+            pull.SetBinContent(ibin, 0.0 )
+
+    pull.SetFillColor(ROOT.kBlue)
+    pull.SetTitle(";"+data.GetXaxis().GetTitle()+";(Data-Bkg)/#sigma")
+    pull.SetStats(0)
+
+    pull.GetYaxis().SetRangeUser(-2.9,2.9)
+    pull.GetYaxis().SetTitleOffset(0.4)                             
+    pull.GetYaxis().SetLabelSize(0.13)
+    pull.GetYaxis().SetTitleSize(0.12)
+    pull.GetYaxis().SetNdivisions(306)
+
+    pull.GetXaxis().SetLabelSize(0.13)
+    pull.GetXaxis().SetTitleSize(0.15)
+    pull.GetXaxis().SetTitle(data.GetXaxis().GetTitle())
+    pull.GetYaxis().SetTitle("(Data-Bkg)/#sigma")
     return pull
 
 def MakeUpDown(hist):

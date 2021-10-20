@@ -197,7 +197,7 @@ def roofit_form_to_TF1(RFVform,shift=0): # shift tells function how much to shif
 
     return TF1form
 
-def set_hist_maximums(histList,factor=1.1):
+def set_hist_maximums(*histList,factor=1.1):
     '''Take in a list of histograms and set the maximum of each
     to the maximum of the group multiplied by `factor`.
 
