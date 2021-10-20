@@ -17,12 +17,24 @@ class Generic2D(object):
     garbage collection of RooFit objects, assign each instance of this class to a persistent
     variable.
 
-    Args:
+    Attributes:
         name (str): Unique name of object which will be prepended to all associated RooFit objects.
-        binning (TwoDAlphabet.Binning): Binning scheme object.
-        forcePositive (bool, optional). Defaults to True in which case the bin values will be lower bound by 1e-9.
+        binning (Binning): Binning object.
+        nuisances (list): All tracked nuisance dictionaries.
+        binVars (OrderedDict): Ordered dictionary of all RooAbsArgs representing the bins of the space.
+        binArgLists (dict): Dict mapping of the subspaces (LOW, SIG, HIGH) to the RooArgList of the RooAbsArgs in the subspace.
+        rph (dict): Dict mapping of the subspaces (LOW, SIG, HIGH) to the RooParametricHist2D objects of the subspaces.
+        forcePositive (bool): Option to ensure bin values cannot be negative.
     '''
-    def __init__(self,name,binning,forcePositive):
+    
+    def __init__(self,name,binning,forcePositive=True):
+        '''Constructor.
+
+        Args:
+            name (str): Unique name of object which will be prepended to all associated RooFit objects.
+            binning (TwoDAlphabet.Binning): Binning scheme object.
+            forcePositive (bool, optional). Defaults to True in which case the bin values will be lower bound by 1e-9.
+        '''
         self.name = name
         self.binning = binning
         self.nuisances = []
@@ -188,8 +200,7 @@ class ParametricFunction(Generic2D):
         as the underlying function parameters change. Set parameter specific
         values by specifying the `constraints` argument with a dict formatted as
 
-        ::
-
+        \code{.json}
             {0: {
                 'constraint': 'flatParam' or 'param <mu> <sigma>'
                 'MIN' = -1000
@@ -197,18 +208,19 @@ class ParametricFunction(Generic2D):
                 'NOM' = 0
                 'ERROR' = 0.1
             } }
+        \endcode
 
         The 'constraint' can only be 'flatParam' or 'param <mu> <sigma>' (options in the Combine card) 
         which represent "no constraint" and "Gaussian constraint centered at <mu> and with width <sigma>", respectively.
 
-        Args:
-            name (str): Unique name for the new object.
-            formula (str): Must reference fit parameters by ordinal with @. Use "x" and "y" to represent
+        @param name (str): Unique name for the new object.
+        @param formula (str): Must reference fit parameters by ordinal with @. Use "x" and "y" to represent
                 the "x" and "y" axes of the space. All other terms are indexed starting at 0. Ex. "@0 + x*@1 +y*@2".
-            constraints (dict, optional): Map of formula parameters to constraint information. Defaults to {} in which
+        @param constraints (dict, optional): Map of formula parameters to constraint information. Defaults to {} in which
                 case the constraint will be flat, the starting value of the parameter will be 0 with a step size of 0.1,
                 and the range of the parameter will be [-1000,1000]. 
-            forcePositive (bool, optional). Defaults to True in which case the bin values will be lower bound by 1e-9.
+            
+        @param forcePositive (bool, optional). Defaults to True in which case the bin values will be lower bound by 1e-9.
         '''
         super(ParametricFunction,self).__init__(name,binning,forcePositive)
         self.formula = formula
