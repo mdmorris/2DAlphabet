@@ -170,8 +170,8 @@ class Plotter(object):
                 self.df = self.df.append(entry.entry,ignore_index=True)
 
         shapes_file.Close()
-        self.root_out.Close()
-        self.root_out = ROOT.TFile.Open(root_out_name)
+        # self.root_out.Close()
+        # self.root_out = ROOT.TFile.Open(root_out_name)
 
     def Get(self,hname):
         '''Get a histogram by name from the master ROOT file.
@@ -264,14 +264,16 @@ class Plotter(object):
             None
         '''
         for process, group in self.df.groupby('process'):
-            out_file_name = 'plots_fit_{f}/{p}_2D'.format(f=self.fittag,p=process)
-            hist_list = []
-            for _,subgroup in group.groupby('region'):
-                hist_list.append( self.Get(subgroup.prefit_2D.iloc[0]) )
-                hist_list.append( self.Get(subgroup.postfit_2D.iloc[0]) )
-            
-            out_file_name = 'plots_fit_{f}/{p}_2D'.format(f=self.fittag,p=process)
-            self.MakePad2D(name=out_file_name,histlist=hist_list,year=self.twoD.config.options.year)
+            pads = []
+            for region,subgroup in group.groupby('region'):           
+                out_file_name = 'plots_fit_{f}/%s_{p}_{r}_2D'.format(f=self.fittag,p=process,r=region)
+                pads.append(self.MakePad2D(outname=out_file_name%('prefit'), hist=self.Get(subgroup.prefit_2D.iloc[0]),
+                               year=self.twoD.config.options.year, savePDF=False, savePNG=False, saveROOT=True))
+                pads.append(self.MakePad2D(outname=out_file_name%('postfit'), hist=self.Get(subgroup.postfit_2D.iloc[0]),
+                               year=self.twoD.config.options.year, savePDF=False, savePNG=False, saveROOT=True))
+
+                self.MakeCan('plots_fit_{f}/{p}_{r}_2D'.format(f=self.fittag,p=process,r=region), pads=pads)
+
 
     def plot_projections(self,logyFlag):
         '''Plot comparisons of data and the post-fit background model and signal
@@ -312,23 +314,26 @@ class Plotter(object):
                     slice_edges = (
                         self.slices['x' if 'y' in proj else 'y'][region]['vals'][islice],
                         binning.xtitle if 'y' in proj else binning.ytitle,
-                        self.slices['x' if 'y' in proj else 'y'][region]['vals'][islice+1]
+                        self.slices['x' if 'y' in proj else 'y'][region]['vals'][islice+1],
+                        'GeV'
                     )
-                    slice_str = '%s < %s < %s %s'%(*slice_edges, 'GeV')
+                    slice_str = '%s < %s < %s %s'%slice_edges
 
                     out_file_name = 'plots_fit_{f}/{projn}_{reg}{logy}'.format(
                                         f=self.fittag, projn=projn, reg=region,
                                         logy='' if logyFlag == False else '_logy')
+                    print ('DEBUG: %s' %out_file_name)
                     pads['%s_%s'%(projn,region)] = self.MakePad1D(out_file_name, this_data, these_bkgs, these_signals,
                                    subtitle=slice_str, totalBkg=this_totalbkg,
                                    logyFlag=logyFlag, year=self.twoD.config.options.year,
-                                   extraTextx='Preliminary', savePDF=False, savePNG=False, saveROOT=True)
+                                   extraText='Preliminary', savePDF=False, savePNG=False, saveROOT=True)
             
             out_can_name = 'plots_fit_{f}/{proj}{logy}'.format(
                                         f=self.fittag, proj=proj,
                                         logy='' if logyFlag == False else '_logy')
+            print ('DEBUG: %s'%out_can_name)
             # TODO: Change order by unpacking pads with an ordered list
-            self.MakeCan(out_can_name, pads)
+            self.MakeCan(out_can_name, pads.values())
 
     def plot_pre_vs_post(self):
         '''Make comparisons for each background process of pre and post fit projections.
@@ -351,19 +356,23 @@ class Plotter(object):
                         slice_edges = (
                             self.slices['x' if 'y' in proj else 'y'][region]['vals'][islice],
                             binning.xtitle if 'y' in proj else binning.ytitle,
-                            self.slices['x' if 'y' in proj else 'y'][region]['vals'][islice+1]
+                            self.slices['x' if 'y' in proj else 'y'][region]['vals'][islice+1],
+                            'GeV'
                         )
-                        slice_str = '%s < %s < %s %s'%(*slice_edges, 'GeV')
+                        slice_str = '%s < %s < %s %s'%slice_edges
 
-                        pads['{p}_{projn}_{reg}'.format(p=process,projn=projn, region=region)] = self.MakePad1D(
-                            'plots_fit_{f}/{p}_{projn}_{reg}'.format(f=self.fittag, p=process,projn=projn, region=region),
-                            data=post, bkg=[pre], totalBkg=pre, subtitle=slice_str, savePNG=False, savePDF=False, saveROOT=True,
+                        key = '{p}_{projn}_{reg}'.format(p=process,projn=projn, reg=region)
+                        print ('DEBUG: %s'%key)
+                        pads[key] = self.MakePad1D(
+                            'plots_fit_{f}/{k}'.format(f=self.fittag, k=key),
+                            post, [pre], totalBkg=pre, subtitle=slice_str, savePNG=False, savePDF=False, saveROOT=True,
                             datastyle='histe', year=self.twoD.config.options.year, extraText='Preliminary'
                         )
 
+                print ('DEBUG: %s'%'plots_fit_{f}/{p}_{proj}'.format(f=self.fittag, p=process,proj=proj))
                 self.MakeCan(
                     'plots_fit_{f}/{p}_{proj}'.format(f=self.fittag, p=process,proj=proj),
-                    pads
+                    pads.values()
                 )
 
     def plot_transfer_funcs(self):
@@ -490,7 +499,7 @@ class Plotter(object):
         return pad
 
     def MakePad2D(self, outname, hist, style='lego', logzFlag=False,
-                  saveROOT=False, savePDF=True, savePNG=True, year=1, extraText='Preliminary'):
+                  saveROOT=True, savePDF=False, savePNG=False, year=1, extraText='Preliminary'):
         '''Make a pad holding a 2D plot with standardized formatting conventions.
 
         Args:
@@ -498,16 +507,16 @@ class Plotter(object):
             hist (TH2): Histogram to draw on the pad.
             style (str, optional): ROOT drawing style. Defaults to 'lego'.
             logzFlag (bool, optional): Make log z-axis. Defaults to False.
-            saveROOT (bool, optional): Save to master ROOT file. Defaults to False.
-            savePDF (bool, optional): Save to PDF. Defaults to True.
-            savePNG (bool, optional): Save to PNG. Defaults to True.
+            saveROOT (bool, optional): Save to master ROOT file. Defaults to True.
+            savePDF (bool, optional): Save to PDF. Defaults to False.
+            savePNG (bool, optional): Save to PNG. Defaults to False.
             year (int, optional): Luminosity formatting. Options are 16, 17, 18, 1 (full Run 2), 2 (16+17+18). Defaults to 1.
             extraText (str, optional): Prepended to the CMS subtext. Defaults to 'Preliminary'.
 
         Returns:
             [type]: [description]
         '''
-        pad = self._make_pad_gen()
+        pad = self._make_pad_gen(outname)
         pad.SetLeftMargin(0.15)
         pad.SetRightMargin(0.2)
         pad.SetBottomMargin(0.12)
@@ -531,8 +540,8 @@ class Plotter(object):
 
         return pad
 
-    def MakePad1D(self, outname, data, bkgs, signals, title='', subtitle='',
-                totalBkg=None, logyFlag=False, saveROOT=False, savePDF=True, savePNG=True,
+    def MakePad1D(self, outname, data, bkgs=[], signals=[], title='', subtitle='',
+                totalBkg=None, logyFlag=False, saveROOT=True, savePDF=False, savePNG=False,
                 dataOff=False, datastyle='pe X0', year=1, addSignals=True, extraText='Preliminary'):
         '''Make a pad holding a 1D plot with standardized formatting conventions.
 
@@ -558,6 +567,7 @@ class Plotter(object):
             ROOT.TPad: Output pad.
         '''
         def _format_data():
+            data.SetBinErrorOption(ROOT.TH1.kPoisson)
             data.SetLineColorAlpha(ROOT.kBlack, 0 if dataOff else 1)
             if 'pe' in datastyle.lower():
                 data.SetMarkerColorAlpha(ROOT.kBlack,0 if dataOff else 1)
@@ -701,7 +711,7 @@ class Plotter(object):
             else:                 nsignals = len(signals[0])
             return nsignals
 
-        pad = self._make_pad_gen()
+        pad = self._make_pad_gen(outname)
         data = _format_data()
 
         if len(bkgs) == 0:
@@ -712,9 +722,9 @@ class Plotter(object):
             legend_topY = 0.73-0.03*(min(len(bkgs[0]),6)+nsignals+1)
             legend = _make_legend()
             totalBkg, totalBkg_err = _make_totalBkg()
-            signals = _make_signals()        
+            signals = signals if len(signals) == 0 else _make_signals()        
             stack = _make_stack()
-            set_hist_maximums(stack, totalBkg, data, 2.5-legend_topY+0.03)
+            set_hist_maximums([stack, totalBkg, data], 2.5-legend_topY+0.03)
 
             # Go to main pad and draw
             main_pad.cd()
@@ -750,7 +760,7 @@ class Plotter(object):
         self._save_pad_generic(outname, pad, saveROOT, savePDF, savePNG)
         return pad
 
-    def MakeCan(self, outname, pads, saveROOT=False, savePDF=True, savePNG=True):
+    def MakeCan(self, outname, pads, saveROOT=False, savePDF=True, savePNG=True, padx=0, pady=0):
         '''Combine multiple pads/canvases into one canvas for convenience of viewing.
         Input pad order matters.
 
@@ -767,26 +777,27 @@ class Plotter(object):
         Returns:
             ROOT.TCanvas: Output canvas.
         '''
-        if len(pads) == 1:
-            width = 800; height = 700; padx = 1; pady = 1
-        elif len(pads) == 2:
-            width = 1200; height = 700; padx = 2; pady = 1
-        elif len(pads) == 3:
-            width = 1800; height = 600; padx = 3; pady = 1
-        elif len(pads) == 4:
-            width = 1200; height = 1000; padx = 2; pady = 2
-        elif len(pads) <= 6:
-            width = 1600; height = 1000; padx = 3; pady = 2
-        elif len(pads) <= 9:
-            width = 1600; height = 1600; padx = 3; pady = 3
-        else:
-            raise RuntimeError('histlist of size %s not currently supported'%(len(pads),pads))
+        if padx == 0 and pady == 0:
+            if len(pads) == 1:
+                width = 800; height = 700; padx = 1; pady = 1
+            elif len(pads) == 2:
+                width = 1200; height = 700; padx = 2; pady = 1
+            elif len(pads) == 3:
+                width = 1800; height = 600; padx = 3; pady = 1
+            elif len(pads) == 4:
+                width = 1200; height = 1000; padx = 2; pady = 2
+            elif len(pads) <= 6:
+                width = 1600; height = 1000; padx = 3; pady = 2
+            elif len(pads) <= 9:
+                width = 1600; height = 1600; padx = 3; pady = 3
+            else:
+                raise RuntimeError('histlist of size %s not currently supported'%(len(pads),pads))
 
         canvas = ROOT.TCanvas(outname, outname, width, height)
         canvas.cd()
         canvas.Divide(padx, pady)
-        for i in range(1,padx*pady+1):
-            canvas.cd(i)
+        for i in range(len(pads)):
+            canvas.cd(i+1)
             pads[i].DrawClonePad()
 
         self._save_pad_generic(outname, canvas, saveROOT, savePDF, savePNG)
