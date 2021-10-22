@@ -48,7 +48,6 @@ class Config:
         if 'GLOBAL' in self.config.keys(): self._varReplacement()
         self.name = self.config['NAME']
         self.projPath = projPath+'/'
-        self.options = self.GetOptions(externalOptions)
         self.loadPrevious = loadPrevious
         self.nsignals, self.nbkgs = 0, 0
         self.df = self.FullTable()
@@ -121,48 +120,6 @@ class Config:
                 continue
             new_string = self._section('GLOBAL')[old_string]
             self.config = config_loop_replace(self.config, old_string, new_string)
-
-    def GetOptions(self,externalOptions={}):
-        '''Loads options specific to this config file (from 'OPTIONS' section).
-        External options (externalOptions) can be provided but will overwrite those in
-        the config (and modify the config in-place so that the version later saved
-        reflects the conditions under which the config was used).
-
-        Args:
-            externalOptions (dict, optional): Option-value pairs. Defaults to {}.
-
-        Returns:
-            ArgumentParser.Namespace
-        '''
-        if 'OPTIONS' in self.config.keys():
-            self.config['OPTIONS'].update(externalOptions)
-
-        parser = argparse.ArgumentParser()
-        # Blinding
-        parser.add_argument('blindedPlots', default=[], type=list, nargs='?',
-            help='List of regions in which to blind plots of x-axis SIG. Does not blind fit.')
-        parser.add_argument('blindedFit', default=[], type=list, nargs='?',
-            help='List of regions in which to blind fit of x-axis SIG. Does not blind plots.')
-        # Plotting
-        parser.add_argument('haddSignals', default=True, type=bool, nargs='?',
-            help='Combine signals into one histogram for the sake of plotting. Still treated as separate in fit. Defaults to True.')
-        parser.add_argument('plotTitles', default=False, type=bool, nargs='?',
-            help='Include titles in plots. Defaults to False.')
-        parser.add_argument('plotUncerts', default=False, type=bool, nargs='?',
-            help='Plot comparison of pre-fit uncertainty shape templates in 1D projections. Defaults to False.')
-        parser.add_argument('plotPrefitSigInFitB', default=False, type=bool, nargs='?',
-            help='In the b-only post-fit plots, plot the signal normalized to its pre-fit value. Defaults to False.')
-        parser.add_argument('plotEvtsPerUnit', default=False, type=bool, nargs='?',
-            help='Post-fit bins are plotted as events per unit rather than events per bin. Defaults to False.')
-        parser.add_argument('year', default=1, type=int, nargs='?',
-            help='Year information used for the sake of plotting text. Defaults to 1 which indicates that the full Run 2 is being analyzed.')
-        
-        if 'OPTIONS' in self.config.keys():
-            out = parse_arg_dict(parser,self._section('OPTIONS'))
-        else:
-            out = parser.parse_args([])
-
-        return out
 
     def SaveOut(self): # pragma: no cover
         '''Save the histogram table to the <self.projPath> directory in csv

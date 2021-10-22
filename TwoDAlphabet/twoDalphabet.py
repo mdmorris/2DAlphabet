@@ -25,9 +25,10 @@ class TwoDAlphabet:
             externalOpts (dict, optional): Option-value pairs. Defaults to {}.
         '''
         self.tag = tag
-        self.config = None
-        self.options = self.GetOptions(externalOpts)
-        if jsons == [] and os.path.isdir(self.tag+'/'):
+        self.config = Config(json,self.tag+'/',findreplace)
+        self.options = self.GetOptions(
+                            self.config._section('OPTIONS').update(externalOpts)
+                        )
             print ('Attempting to grab existing runConfig ...')
             jsons = glob.glob(self.tag+'/runConfig_*.json')
         if jsons == []:
@@ -47,10 +48,12 @@ class TwoDAlphabet:
         self.alphaObjs = pandas.DataFrame(columns=['process','region','obj','norm','process_type','color','combine_idx','title'])
         self.alphaParams = pandas.DataFrame(columns=['name','obj','constraint']) # "name":"constraint"
 
-    def GetOptions(self,externalOpts):
-        '''General arguments passed to the project. Options specified in 
-        Config.GetOptions() can also be provided to set an option globally
-        to all Config objects being tracked.
+    def GetOptions(self,nonDefaultOpts):
+        '''Optional arguments passed to the project.
+        Options can be specified in the JSON config file (from 'OPTIONS' section)
+        or via the externalOpts argument dictionary. The options provided by externalOpts
+        override those from the config and modify the config in-place so that the
+        version later saved reflects the conditions under which the config was used.
 
         @param externalOpts (dict): Option-value pairs.
 
@@ -58,13 +61,37 @@ class TwoDAlphabet:
             ArgumentParser.Namespace
         '''
         parser = argparse.ArgumentParser()
+        # General
         parser.add_argument('verbosity', default=0, type=int, nargs='?',
             help="Save settings to file in json format. Ignored in json file")
         parser.add_argument('overwrite', default=False, type=bool, nargs='?',
             help="Delete project directory if it exists. Defaults to False.")
         parser.add_argument('debugDraw', default=False, type=bool, nargs='?',
             help="Draw all canvases while running for the sake of debugging. Useful for developers only. Defaults to False.")
-        return parse_arg_dict(parser,externalOpts)
+        # Blinding
+        parser.add_argument('blindedPlots', default=[], type=list, nargs='?',
+            help='List of regions in which to blind plots of x-axis SIG. Does not blind fit.')
+        parser.add_argument('blindedFit', default=[], type=list, nargs='?',
+            help='List of regions in which to blind fit of x-axis SIG. Does not blind plots.')
+        # Plotting
+        parser.add_argument('haddSignals', default=True, type=bool, nargs='?',
+            help='Combine signals into one histogram for the sake of plotting. Still treated as separate in fit. Defaults to True.')
+        parser.add_argument('plotTitles', default=False, type=bool, nargs='?',
+            help='Include titles in plots. Defaults to False.')
+        parser.add_argument('plotUncerts', default=False, type=bool, nargs='?',
+            help='Plot comparison of pre-fit uncertainty shape templates in 1D projections. Defaults to False.')
+        parser.add_argument('plotPrefitSigInFitB', default=False, type=bool, nargs='?',
+            help='In the b-only post-fit plots, plot the signal normalized to its pre-fit value. Defaults to False.')
+        parser.add_argument('plotEvtsPerUnit', default=False, type=bool, nargs='?',
+            help='Post-fit bins are plotted as events per unit rather than events per bin. Defaults to False.')
+        parser.add_argument('year', default=1, type=int, nargs='?',
+            help='Year information used for the sake of plotting text. Defaults to 1 which indicates that the full Run 2 is being analyzed.')
+        
+        if nonDefaultOpts != {}:
+            out = parse_arg_dict(parser,nonDefaultOpts)
+        else:
+            out = parser.parse_args([])
+        return out
 
     def AddConfig(self,jsonFileName,findreplace,onlyOn=['process','region']):
         '''Add a json configuration to process and track.
