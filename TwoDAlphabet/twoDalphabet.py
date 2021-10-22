@@ -54,17 +54,15 @@ class TwoDAlphabet:
                 self.GetHistMap(), readOnly=False
             )
 
-            # TODO: Change "obj" to be name that points to object in file
             self.alphaObjs = pandas.DataFrame(columns=['process','region','obj','norm','process_type','color','combine_idx','title'])
-            self.alphaParams = pandas.DataFrame(columns=['name','obj','constraint']) # "name":"constraint"
+            self.alphaParams = pandas.DataFrame(columns=['name','obj','constraint'])
 
         else:
             self.binnings = pickle.load(open(self.tag+'/binnings.p','rb'))
             self.organizedHists = OrganizedHists(self,readOnly=True)
-
-            # TODO: Make sure that this is saved and with "obj" key being a NAME
+            # Does not contain the RooFit objects - just meta info
             self.alphaObjs = pandas.read_csv(self.tag+'/alphaObjs.csv')
-            self.alphaParams = pandas.read_csv(self.tag+'/alphaParams.csv') # "name":"constraint"
+            self.alphaParams = pandas.read_csv(self.tag+'/alphaParams.csv')
         
         if self.options.debugDraw is False:
             ROOT.gROOT.SetBatch(True)
@@ -172,8 +170,11 @@ class TwoDAlphabet:
 
         pickle.dump(self.binnings,open(self.tag+'/binnings.p','wb'))
 
-        self.alphaObjs.to_csv(self.tag+'/alphaObjs.csv')
-        self.alphaParams.to_csv(self.tag+'/alphaParams.csv')
+        alphaObjs = self.alphaObjs.drop(columns=['obj','norm'])
+        alphaObjs.to_csv(self.tag+'/alphaObjs.csv')
+
+        alphaParams = self.alphaParams.drop(columns=['obj'])
+        alphaParams.to_csv(self.tag+'/alphaParams.csv')
 
 # --------------AlphaObj INTERFACE ------ #
     def AddAlphaObj(self, process, region, obj, ptype='BKG', color=ROOT.kYellow):
