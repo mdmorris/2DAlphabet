@@ -1,6 +1,7 @@
-import argparse, os, itertools, pandas, glob, warnings
+import argparse, os, itertools, pandas, glob, pickle, sys
 from collections import OrderedDict
-from TwoDAlphabet.config import Config
+from TwoDAlphabet.config import Config, OrganizedHists
+from TwoDAlphabet.binning import Binning
 from TwoDAlphabet.helpers import execute_cmd, parse_arg_dict, unpack_to_line, make_RDH, cd
 from TwoDAlphabet.alphawrap import Generic2D
 from TwoDAlphabet import plot
@@ -11,44 +12,87 @@ class TwoDAlphabet:
     '''
     # mkdirs + rebin + organize_hists
     # track naming and fit info internally ("region information")
-    def __init__(self,tag,jsons=[],findreplace={},externalOpts={}):
+    def __init__(self, tag, json='', findreplace={}, externalOpts={}, loadPrevious=False):
         '''Construct TwoDAlphabet object which takes as input an identification tag used to name
         the directory with stored results, JSON configuration files, find-replace pairs,
         and optional external arguments.
 
         Args:
             tag (str): Tag used to identify the outputs and create a project directory of the same name.
-            jsons (list(str), optional): List of JSON configuration file paths. Defaults to [] in which case
+            jsons (str, optional): JSON configuration file path. Defaults to '' in which case
                 the tag is assumed to already exist and the existing runConfig.json is grabbed.
             findreplace (dict, optional):  Non-nested dictionary with key-value pairs to find-replace
                 in the internal class configuration dict. Defaults to {}.
             externalOpts (dict, optional): Option-value pairs. Defaults to {}.
         '''
         self.tag = tag
-        self.config = Config(json,self.tag+'/',findreplace)
-        self.options = self.GetOptions(
-                            self.config._section('OPTIONS').update(externalOpts)
-                        )
+        if json == '' and os.path.isdir(self.tag+'/'):
             print ('Attempting to grab existing runConfig ...')
-            jsons = glob.glob(self.tag+'/runConfig_*.json')
-        if jsons == []:
+            json = glob.glob(self.tag+'/runConfig.json')
+        if json == '':
             raise RuntimeError('No jsons were input and no existing ones could be found.')
-        for j in jsons:
-            self.AddConfig(j,findreplace)
-            warnings.warn('Multiple config support is currently a work in progress. Only the first config will be used.',RuntimeWarning)
-            break
 
-        self._setupProjDir()
-        self.config.Construct()
-        self.df = self.config.df
-        self.nbkgs, self.nsignals = self.config.nbkgs, self.config.nsignals
-        if self.options.debugDraw == False:
+        config = Config(json, findreplace)
+        optdict = config._section('OPTIONS')
+        optdict.update(externalOpts)
+        self.options = self.LoadOptions(optdict)
+        self.df = config.FullTable()
+        self._binningMap = [g[0] for g in self.df.groupby(['region','binning'])]
+        self.nsignals, self.nbkgs = config.nsignals, config.nbkgs
+
+        if not loadPrevious:
+            template_file = ROOT.TFile.Open(self.df.iloc[0].source_filename)
+            template = template_file.Get(self.df.iloc[0].source_histname)
+            template.SetDirectory(0)
+
+            self.binnings = {}
+            for kbinning in config._section('BINNING').keys():
+                self.binnings[kbinning] = Binning(kbinning, config._section('BINNING')[kbinning], template)
+
+            self.organizedHists = OrganizedHists(
+                self.tag+'/', self.binnings,
+                self.GetHistMap(), readOnly=False
+            )
+
+            # TODO: Change "obj" to be name that points to object in file
+            self.alphaObjs = pandas.DataFrame(columns=['process','region','obj','norm','process_type','color','combine_idx','title'])
+            self.alphaParams = pandas.DataFrame(columns=['name','obj','constraint']) # "name":"constraint"
+
+        else:
+            self.binnings = pickle.load(open(self.tag+'/binnings.p','rb'))
+            self.organizedHists = OrganizedHists(self,readOnly=True)
+
+            # TODO: Make sure that this is saved and with "obj" key being a NAME
+            self.alphaObjs = pandas.read_csv(self.tag+'/alphaObjs.csv')
+            self.alphaParams = pandas.read_csv(self.tag+'/alphaParams.csv') # "name":"constraint"
+        
+        if self.options.debugDraw is False:
             ROOT.gROOT.SetBatch(True)
 
-        self.alphaObjs = pandas.DataFrame(columns=['process','region','obj','norm','process_type','color','combine_idx','title'])
-        self.alphaParams = pandas.DataFrame(columns=['name','obj','constraint']) # "name":"constraint"
+        config.SaveOut(self.tag+'/')
 
-    def GetOptions(self,nonDefaultOpts):
+    def _setupProjDir(self):
+        '''Create the directory structure where results will be stored.
+        '''
+        if not os.path.isdir(self.tag+'/'):
+            if self.options.overwrite: 
+                execute_cmd('rm -rf '+self.tag)
+            print ('Making dir '+self.tag+'/')
+            os.mkdir(self.tag+'/')
+
+        dirs_to_make = [
+            self.tag+'/',
+            self.tag+'/plots_fit_b/',
+            self.tag+'/plots_fit_s/',
+        ]
+        if self.options.plotUncerts and not os.path.isdir(self.tag+'/UncertPlots/'): 
+            dirs_to_make.append(self.tag+'/UncertPlots/')
+
+        for d in dirs_to_make:
+            if not os.path.isdir(d):
+                os.mkdir(d)
+
+    def LoadOptions(self, nonDefaultOpts={}):
         '''Optional arguments passed to the project.
         Options can be specified in the JSON config file (from 'OPTIONS' section)
         or via the externalOpts argument dictionary. The options provided by externalOpts
@@ -86,63 +130,18 @@ class TwoDAlphabet:
             help='Post-fit bins are plotted as events per unit rather than events per bin. Defaults to False.')
         parser.add_argument('year', default=1, type=int, nargs='?',
             help='Year information used for the sake of plotting text. Defaults to 1 which indicates that the full Run 2 is being analyzed.')
-        
+
         if nonDefaultOpts != {}:
             out = parse_arg_dict(parser,nonDefaultOpts)
         else:
             out = parser.parse_args([])
         return out
 
-    def AddConfig(self,jsonFileName,findreplace,onlyOn=['process','region']):
-        '''Add a json configuration to process and track.
-
-        Args:
-            jsonFileName (str): JSON configuration file name/path.
-            findreplace (dict): Non-nested dictionary with key-value pairs to find-replace
-                in the internal class configuration dict.
-            onlyOn (list(str),str): Column name or list of columns to match for determining duplicates.
-                Options are either 'process' or 'region'. Defaults is ['process','region'] and both are considered.
-        '''
-        inputConfig = Config(jsonFileName,self.tag+'/',findreplace,externalOptions=vars(self.options))
-        if self.config == None:
-            self.config = inputConfig
-        else:
-            self.config.Add(inputConfig,onlyOn)
-
-    def AddAlphaObj(self,process,region,obj,ptype='BKG',color=ROOT.kYellow):
-        '''Start
-
-        Args:
-            process ([type]): [description]
-            region ([type]): [description]
-            obj ([type]): [description]
-            ptype ([str]): 'BKG' or 'SIGNAL'.
-        '''
-        if not isinstance(obj,Generic2D):
-            raise RuntimeError('Can only tack objects of type Generic2D.')
-        if ptype not in ['BKG','SIGNAL']:
-            raise RuntimeError('Process type (ptype) can only be BKG or SIGNAL.')
-        self._checkAgainstConfig(process,region)
-
-        # for cat in ['LOW','SIG','HIGH']:
-        rph,norm = obj.RooParametricHist()
-        combine_idx = self._getCombineIdx(process,ptype)
-        model_obj_row = {
-            "process": process,
-            "region": region,
-            "obj": rph,
-            "norm": norm,
-            "process_type": ptype,
-            "color": color,
-            'title': process,
-            "combine_idx": combine_idx
-        }
-
-        self.alphaObjs = self.alphaObjs.append(model_obj_row,ignore_index=True)
-
-        nuis_obj_cols = ['name','obj','constraint']
-        for n in obj.nuisances:
-            self.alphaParams = self.alphaParams.append({c:n[c] for c in nuis_obj_cols},ignore_index=True)
+    def _checkAgainstConfig(self, process, region):
+        if (process,region) in self.GetProcRegPairs():
+            raise RuntimeError('Attempting to track an object for process-region pair (%s,%s) that already exists among those defined in the config:\n\t%s'%(process,region,self.GetProcesses()))
+        if region not in self.GetRegions():
+            raise RuntimeError('Attempting to track an object for region "%s" but that region does not exist among those defined in the config:\n\t%s'%(region,self.GetRegions()))
 
     def _getCombineIdx(self,process,ptype):
         if process in self.GetProcesses():
@@ -154,40 +153,128 @@ class TwoDAlphabet:
             elif ptype == 'SIGNAL':
                 out = self.nsignals
                 self.nsignals-=1
-        
+
         return out
 
-    def _checkAgainstConfig(self,process,region):
-        if (process,region) in self.GetProcRegPairs():
-            raise RuntimeError('Attempting to track an object for process-region pair (%s,%s) that already exists among those defined in the config:\n\t%s'%(process,region,self.GetProcesses()))
-        if region not in self.GetRegions():
-            raise RuntimeError('Attempting to track an object for region "%s" but that region does not exist among those defined in the config:\n\t%s'%(region,self.GetRegions()))
-
-    def _setupProjDir(self):
-        '''Create the directory structure where results will be stored.
+    def _saveOut(self):
+        '''Save to project directory:
+        - the full model table in csv (and markdown if py3)
+        - the binnings dictionary (with objects)
+        - the alphaObjs and alphaParams dictionaries (without objects)
         '''
-        if not os.path.isdir(self.tag+'/'):
-            if self.options.overwrite: 
-                execute_cmd('rm -rf '+self.tag)
-            print ('Making dir '+self.tag+'/')
-            os.mkdir(self.tag+'/')
+        if 'index' in self.df.columns:
+               df = self.df.reset_index(drop=True).drop('index',axis=1)
+        else:  df = self.df
 
-        dirs_to_make = [
-            self.tag+'/',
-            self.tag+'/plots_fit_b/',
-            self.tag+'/plots_fit_s/',
-        ]
-        if self.config.options.plotUncerts and not os.path.isdir(self.tag+'/UncertPlots/'): 
-            dirs_to_make.append(self.tag+'/UncertPlots/')
+        df.to_csv(self.tag+'/df.csv')
+        if sys.version_info.major == 3:
+            self.df.to_markdown(self.tag+'/df.md')
 
-        for d in dirs_to_make:
-            if not os.path.isdir(d):
-                os.mkdir(d)
+        pickle.dump(self.binnings,open(self.tag+'/binnings.p','wb'))
+
+        self.alphaObjs.to_csv(self.tag+'/alphaObjs.csv')
+        self.alphaParams.to_csv(self.tag+'/alphaParams.csv')
+
+# --------------AlphaObj INTERFACE ------ #
+    def AddAlphaObj(self, process, region, obj, ptype='BKG', color=ROOT.kYellow):
+        '''Start
+
+        Args:
+            process ([type]): [description]
+            region ([type]): [description]
+            obj ([type]): [description]
+            ptype ([str]): 'BKG' or 'SIGNAL'.
+        '''
+        if not isinstance(obj, Generic2D):
+            raise RuntimeError('Can only tack objects of type Generic2D.')
+        if ptype not in ['BKG','SIGNAL']:
+            raise RuntimeError('Process type (ptype) can only be BKG or SIGNAL.')
+        self._checkAgainstConfig(process, region)
+
+        # for cat in ['LOW','SIG','HIGH']:
+        rph,norm = obj.RooParametricHist()
+        combine_idx = self._getCombineIdx(process, ptype)
+        model_obj_row = {
+            "process": process,
+            "region": region,
+            "obj": rph,
+            "norm": norm,
+            "process_type": ptype,
+            "color": color,
+            'title': process,
+            "combine_idx": combine_idx
+        }
+
+        self.alphaObjs = self.alphaObjs.append(model_obj_row, ignore_index=True)
+
+        nuis_obj_cols = ['name', 'obj', 'constraint']
+        for n in obj.nuisances:
+            self.alphaParams = self.alphaParams.append({c:n[c] for c in nuis_obj_cols}, ignore_index=True)
+
+# --------------- GETTERS --------------- #
+    def InitQCDHists(self):
+        '''Loop over all regions and for a given region's data histogram, subtract the list of background histograms,
+        and return data-bkgList.
+
+        Returns:
+            dict(region,TH2): Dictionary with regions as keys and values as histograms of data-bkgList.
+        '''
+        out = {}
+        for region,group in self.df.groupby('region'):
+            data_hist = self.organizedHists.Get(process='data_obs',region=region,systematic='')
+            qcd = data_hist.Clone(data_hist.GetName().replace('data_obs','qcd'))
+            qcd.SetDirectory(0)
+
+            bkg_sources = group.loc[group.process_type.eq('BKG') & group.variation.eq('nominal')]['process']
+            for process_name in bkg_sources.to_list():
+                bkg_hist = self.organizedHists.Get(process=process_name,region=region,systematic='')
+                qcd.Add(bkg_hist,-1)
+
+            out[region] = qcd
+            
+        return out
+
+    def GetHistMap(self, df=None):
+        '''Collect information on the histograms to extract, manipulate, and save
+        into organized_hists.root and store it inside a `dict` where the key is the
+        filename and the value is a DataFrame with columns `source_histname`, `out_histname`,
+        `scale`, `color`, and `binning`. Only accounts for "FULL" category and does not 
+        contain information on subspaces.
+
+        Args:
+            df (pandas.DataFrame, optional): pandas.DataFrame to groupby. Defaults to None in which case self.df is used.
+
+        Returns:
+            dict(str:pandas.DataFrame): Map of file name to DataFrame with information on histogram name, scale factor, fill color, and output name.
+        '''
+        def _get_out_name(row):
+            '''Per-row processing to create the output histogram name.
+
+            Args:
+                row (pandas.Series): Row to process.
+
+            Returns:
+                str: New name.
+            '''
+            if row.variation == 'nominal':
+                return row.process+'_'+row.region+'_FULL'
+            else:
+                return row.process+'_'+row.region+'_FULL_'+row.variation+row.direction
+        if not isinstance(df,pandas.DataFrame):
+            df = self.df
+
+        hists = {}
+        for g in df.groupby(['source_filename']):
+            group_df = g[1].copy()
+            group_df = group_df[group_df['variation'].eq('nominal') | group_df["syst_type"].eq("shapes")]
+            group_df['out_histname'] = group_df.apply(_get_out_name,axis=1)
+            hists[g[0]] = group_df[['source_histname','out_histname','scale','color','binning']]
+        return hists
 
     def GetRegions(self):
         return self.df.region.unique()
 
-    def GetProcesses(self,ptype='',includeNonConfig=True,onlyNonConfig=False):
+    def GetProcesses(self, ptype='', includeNonConfig=True, onlyNonConfig=False):
         if ptype not in ['','SIGNAL','BKG','DATA']:
             raise ValueError('Process type "%s" not accepted. Must be empty string or one of "SIGNAL","BKG","DATA".'%ptype)
 
@@ -221,15 +308,14 @@ class TwoDAlphabet:
     def GetAllSystematics(self):
         return self.GetShapeSystematics()+self.GetAlphaSystematics()
 
-    def GetBinningFor(self,region):
-        pairs = [g[0] for g in self.df.groupby(['region','binning'])]
-        for p in pairs:
+    def GetBinningFor(self, region):
+        for p in self._binningMap:
             if p[0] == region:
-                return self.config.binnings[p[1]], p[1]
+                return self.binnings[p[1]], p[1]
         
-        raise RuntimeError('Cannot find region (%s) in config:\n\t%s'%(region,pairs))
+        raise RuntimeError('Cannot find region (%s) in config:\n\t%s'%(region,self._binningMap))
 
-    def _getProcessAttrBase(self,procName,attrName):
+    def _getProcessAttrBase(self, procName, attrName):
         if procName in self.df.process.unique():
             df = self.df
         elif procName in self.alphaObjs.process.unique():
@@ -239,31 +325,43 @@ class TwoDAlphabet:
 
         return df.loc[df.process.eq(procName)][attrName].iloc[0]
 
-    def GetProcessColor(self,procName):
+    def GetProcessColor(self, procName):
         return self._getProcessAttrBase(procName,'color')
 
-    def GetProcessType(self,procName):
+    def GetProcessType(self, procName):
         return self._getProcessAttrBase(procName,'process_type')
 
-    def GetProcessTitle(self,procName):
+    def GetProcessTitle(self, procName):
         return self._getProcessAttrBase(procName,'title')
 
-    def IsSignal(self,procName):
+    def IsSignal(self, procName):
         return self.GetProcessType(procName) == 'SIGNAL'
 
-    def IsBackground(self,procName):
+    def IsBackground(self, procName):
         return self.GetProcessType(procName) == 'BKG'
 
-    def IsData(self,procName):
+    def IsData(self, procName):
         return self.GetProcessType(procName) == 'DATA'
 
-    def _saveOut(self):
-        '''Save individual configs to project directory.
-        '''
-        self.config.SaveOut()
-        # with open(self.tag+'/twoDobj.p','wb') as f:
-        #     pickle.dump(self,f)
+    def _getCatNameRobust(self, hname):
+        if hname.split('_')[-1] in ['FULL','SIG','HIGH','LOW']: # simplest case
+            out =  hname.split('_')[-1]
+        else: # systematic variation so need to be careful
+            this_rname = False
+            for rname in self.GetRegions():
+                if rname in hname:
+                    this_rname = rname
+                    break
 
+            if not this_rname: raise RuntimeError('Could not find a region name from %s in "%s"'%(self.GetRegions(),hname))
+
+            start_idx = hname.index(this_rname)+len(this_rname)+1 #+1 for the trailing underscore
+            end_idx = hname.index('_',start_idx)
+            out = hname[start_idx:end_idx]
+        
+        return out
+
+# ---------- FIRST STEP CONSTRUCTION ------ #
     def _makeCard(self):
         card_new = open(self.tag+'/card.txt','w')
         # imax (bins), jmax (backgrounds+signals), kmax (systematics) 
@@ -312,8 +410,8 @@ class TwoDAlphabet:
             syst_lines[syst] = '{0:20} {1:20} '.format(syst, syst_type)
 
         # Work with template bkgs first
-        for pair,group in self.df.groupby(['process','region']):
-            proc,region = pair
+        for pair, group in self.df.groupby(['process','region']):
+            proc, region = pair
             if proc == 'data_obs': continue
             combine_idx = group.iloc[0].combine_idx
             for cat in ['LOW','SIG','HIGH']:
@@ -334,11 +432,11 @@ class TwoDAlphabet:
 
         # Now work with alpha objects
         # NOTE: duplicated code but no good way to combine without making things confusing
-        for pair,group in self.alphaObjs.groupby(['process','region']):
+        for pair,group in self.alphaObjs.groupby(['process', 'region']):
             proc,region = pair
             combine_idx = group.iloc[0].combine_idx
             for cat in ['LOW','SIG','HIGH']:
-                chan = '%s_%s'%(region,cat)
+                chan = '%s_%s'%(region, cat)
 
                 bin_line += '{0:20} '.format(chan)
                 processName_line += '{0:20} '.format(proc)
@@ -357,50 +455,32 @@ class TwoDAlphabet:
             card_new.write(syst_lines[line_key]+'\n')
 
         ######################################################
-        # Mark floating values as flatParams                 # 
+        # Mark floating values as flatParams                 #
         # We float just the rpf params and the failing bins. #
         ######################################################
         for param in self.alphaParams.itertuples():
-            card_new.write('{0:40} {1}\n'.format(param.name,param.constraint))
+            card_new.write('{0:40} {1}\n'.format(param.name, param.constraint))
         
-        card_new.close() 
-
-    def _getCatNameRobust(self,hname):
-        if hname.split('_')[-1] in ['FULL','SIG','HIGH','LOW']: # simplest case
-            out =  hname.split('_')[-1]
-        else: # systematic variation so need to be careful
-            this_rname = False
-            for rname in self.GetRegions():
-                if rname in hname:
-                    this_rname = rname
-                    break
-
-            if not this_rname: raise RuntimeError('Could not find a region name from %s in "%s"'%(self.GetRegions(),hname))
-
-            start_idx = hname.index(this_rname)+len(this_rname)+1 #+1 for the trailing underscore
-            end_idx = hname.index('_',start_idx)
-            out = hname[start_idx:end_idx]
-        
-        return out
+        card_new.close()
 
     def _makeWorkspace(self):
         var_lists = {}
-        for binningName in self.config.binnings.keys():
+        for binningName in self.binnings.keys():
             var_lists[binningName] = {
-                c:ROOT.RooArgList(self.config.binnings[binningName].xVars[c],self.config.binnings[binningName].yVar) for c in ['LOW','SIG','HIGH']
+                c:ROOT.RooArgList(self.binnings[binningName].xVars[c], self.binnings[binningName].yVar) for c in ['LOW','SIG','HIGH']
             }
 
         print ("Making workspace...")
         workspace = ROOT.RooWorkspace("w")
-        for hname in self.config.organizedHists.GetHistNames():
+        for hname in self.organizedHists.GetHistNames():
             cat = self._getCatNameRobust(hname)
             if cat == 'FULL':
                 continue
             
-            binningName = self.config.organizedHists.BinningLookup(hname.replace(cat,'FULL'))
+            binningName = self.organizedHists.BinningLookup(hname.replace(cat,'FULL'))
 
             print ('Making RooDataHist... %s'%hname)
-            rdh = make_RDH(self.config.organizedHists.Get(hname), var_lists[binningName][cat])
+            rdh = make_RDH(self.organizedHists.Get(hname), var_lists[binningName][cat])
             getattr(workspace,'import')(rdh)
 
         for rph in self.alphaObjs.obj:
@@ -411,7 +491,7 @@ class TwoDAlphabet:
             for norm_cat in norm.values():
                 print ('Adding RooParametricHist norm... %s'%norm_cat.GetName())
                 getattr(workspace,'import')(norm_cat,ROOT.RooFit.RecycleConflictNodes(),ROOT.RooFit.Silence())
-        
+
         out = ROOT.TFile.Open(self.tag+'/base.root','RECREATE')
         out.cd()
         workspace.Write()
@@ -421,26 +501,11 @@ class TwoDAlphabet:
         self._makeCard()
         self._makeWorkspace()
         self._saveOut()
-        self.Load()
 
-    def Load(self):
-        '''Loads partially saved results of a previous run.
-        Will not make anything from scratch and only has access to
-        the base DataFrame, output histograms, the card, and the 
-        RooWorkspace.
-        '''
-        self.df = pandas.read_csv(self.tag+'/hist_table.csv')
-        self.hists_file = ROOT.TFile.Open(self.tag+'/organized_hists.root')
-
-    def plot(self):
-        # plotter.methodA()
-        # plotter.methodB()
-        # ...
-        pass
-
-    def MLfit(self,rMin=-1,rMax=10,extraParams={},verbosity=0):
+# -------- STAT METHODS ------------------ #
+    def MLfit(self, rMin=-1, rMax=10, extraParams={}, verbosity=0):
         with cd(self.tag):
-            _runMLfit(self.config.options.blindedFit, verbosity, rMin, rMax, extraParams)
+            _runMLfit(self.options.blindedFit, verbosity, rMin, rMax, extraParams)
             plot.NuisPulls()
             plot.SavePostFitParametricFuncVals()
             plot.GenPostFitShapes()
@@ -452,7 +517,7 @@ class TwoDAlphabet:
     def GoodnessOfFit(self):
         pass
 
-    def SignalInjection(self,r):
+    def SignalInjection(self, r):
         pass
 
     def Limits(self):
@@ -461,7 +526,7 @@ class TwoDAlphabet:
     def Impacts(self):
         pass
 
-def _runMLfit(blinding,verbosity,rMin,rMax,extraParams):
+def _runMLfit(blinding, verbosity, rMin, rMax, extraParams):
     param_options = '--text2workspace "--channel-masks" --setParameters '
     blinded_fit_masks = ['mask_%s_SIG=1'%r for r in blinding]
     param_options+= ','.join(blinded_fit_masks)
@@ -469,7 +534,7 @@ def _runMLfit(blinding,verbosity,rMin,rMax,extraParams):
     # Determine if any nuisance/sysetmatic parameters should be set before fitting
     more_params = ['%s=%s'%(p,v) for p,v in extraParams.items()]+['r=1'] # Always set r to start at 1
     if param_options != '': param_options += ','.join(more_params)
-    else: param_options = '--setParameters '+','.join(more_params)
+    else:                   param_options = '--setParameters '+','.join(more_params)
 
     fit_cmd = 'combine -M FitDiagnostics -d card.txt {param_options} --saveWorkspace --cminDefaultMinimizerStrategy 0 --rMin {rmin} --rMax {rmax} -v {verbosity}'
     fit_cmd = fit_cmd.format(
@@ -494,6 +559,6 @@ def SetSnapshot(d=''):
     fr = fr_f.Get('fit_b')
     myargs = ROOT.RooArgSet(fr.floatParsFinal())
     w.saveSnapshot('initialFit',myargs,True)
-    fout = ROOT.TFile('initialFitWorkspace.root',"recreate")
-    fout.WriteTObject(w,'w')
+    fout = ROOT.TFile('initialFitWorkspace.root', "recreate")
+    fout.WriteTObject(w, 'w')
     fout.Close()

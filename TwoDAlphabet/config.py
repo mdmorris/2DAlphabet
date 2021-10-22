@@ -1,4 +1,4 @@
-import ROOT, argparse, json, os, pandas, re, warnings, sys
+import ROOT, json, os, pandas, re, warnings
 from numpy import nan
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
@@ -24,54 +24,19 @@ class Config:
 
     Args:
         jsonPath (str): File name and path.
-        projPath (str): Project path.
         findreplace (dict, optional): Find-replace pairs. Defaults to {}.
-        externalOptions (dict, optional): Extra key-value pairs to add to the OPTIONS
-            section of the JSON file. Defaults to {}.
-        loadPrevious (bool, optional): Load the previous histograms made instead of remaking. Defaults to False.
 
     Attributes:
         config (dict): JSON config opened as a dict.
-        name (str): Name, inherited from the input JSON config.
-        projPath (str): The project path (`tag` attribute in `TwoDAlphabet()`).
-        options (Namespace): Final set of options to use.
-        loadPrevious (bool): Equal to the constructor arg of the same name.
         nsignals (int): Number of signal processes. Zero before running Construct().
         nbkgs (int): Number of signal processes. Zero before running Construct().
-        constructed (bool): Whether Construct() has been called yet or not.
-        binning (Binning): Binning object. Only exists after Construct().
-        organizedHists (OrganizedHists): Object for storing, manipulating, and accessing histograms for fit.
     '''
-    def __init__(self,jsonPath,projPath,findreplace={},externalOptions={},loadPrevious=False):
+    def __init__(self,jsonPath,findreplace={}):
         self.config = open_json(jsonPath)
         self._addFindReplace(findreplace)
         if 'GLOBAL' in self.config.keys(): self._varReplacement()
-        self.name = self.config['NAME']
-        self.projPath = projPath+'/'
-        self.loadPrevious = loadPrevious
         self.nsignals, self.nbkgs = 0, 0
-        self.df = self.FullTable()
-        self.constructed = False
         self._addedConfigs = []
-
-    def Construct(self):
-        '''Uses the config as instructions to setup binning, manipulate histograms,
-        save outputs, etc. Separated from the constructor so information from the config
-        can be extracted for basic sanity checks before it is processed.
-        '''
-        self.constructed = True
-        template_file = ROOT.TFile.Open(self.df.iloc[0].source_filename)
-        template = template_file.Get(self.df.iloc[0].source_histname)
-        template.SetDirectory(0)
-        self.binnings = {}
-        for kbinning in self._section('BINNING').keys():
-            self.binnings[kbinning] = Binning(kbinning, self._section('BINNING')[kbinning], template)
-        if self.loadPrevious: 
-            self.organizedHists = OrganizedHists(self,readOnly=True)
-        else:
-            self.organizedHists = OrganizedHists(self,readOnly=False)
-
-        return self
 
     def _section(self,key):
         '''Derive the dictionary for a given section of the configuration file
@@ -121,21 +86,14 @@ class Config:
             new_string = self._section('GLOBAL')[old_string]
             self.config = config_loop_replace(self.config, old_string, new_string)
 
-    def SaveOut(self): # pragma: no cover
-        '''Save the histogram table to the <self.projPath> directory in csv
+    def SaveOut(self, projPath): # pragma: no cover
+        '''Save the histogram table to the `projPath` directory in csv
         and markdown formats. No copy of the input JSONs is saved since multiple
         could be provided with the only final combination making it to the histogram table.
         '''
-        for c in self._addedConfigs+[self]:
-            file_out = open(c.projPath+'runConfig_%s.json'%c.name, 'w')
-            json.dump(c.config,file_out,indent=2,sort_keys=True)
-            file_out.close()
-
-        if 'index' in self.df.columns:
-            self.df = self.df.reset_index(drop=True).drop('index',axis=1)
-
-        self.df.to_csv(self.projPath+'hist_table.csv')
-        if sys.version_info.major == 3: self.df.to_markdown(self.projPath+'hist_table.md')
+        file_out = open(projPath+'runConfig.json', 'w')
+        json.dump(self.config,file_out,indent=2,sort_keys=True)
+        file_out.close()
 
     def FullTable(self):
         '''Generate full table of processes, regions, and systematic variations
@@ -281,45 +239,8 @@ class Config:
             combine_idx = '%s'%self.nbkgs # first signal idxed at 0 so set it *before* incrementing
         return combine_idx
 
-    def GetHistMap(self,df=None):
-        '''Collect information on the histograms to extract, manipulate, and save
-        into organized_hists.root and store it inside a `dict` where the key is the
-        filename and the value is a DataFrame with columns `source_histname`, `out_histname`,
-        `scale`, `color`, and `binning`. Only accounts for "FULL" category and does not 
-        contain information on subspaces.
-
-        Args:
-            df (pandas.DataFrame, optional): pandas.DataFrame to groupby. Defaults to None in which case self.df is used.
-
-        Returns:
-            dict(str:pandas.DataFrame): Map of file name to DataFrame with information on histogram name, scale factor, fill color, and output name.
-        '''
-        def _get_out_name(row):
-            '''Per-row processing to create the output histogram name.
-
-            Args:
-                row (pandas.Series): Row to process.
-
-            Returns:
-                str: New name.
-            '''
-            if row.variation == 'nominal':
-                return row.process+'_'+row.region+'_FULL'
-            else:
-                return row.process+'_'+row.region+'_FULL_'+row.variation+row.direction
-        if not isinstance(df,pandas.DataFrame):
-            df = self.df
-
-        hists = {}
-        for g in df.groupby(['source_filename']):
-            group_df = g[1].copy()
-            group_df = group_df[group_df['variation'].eq('nominal') | group_df["syst_type"].eq("shapes")]
-            group_df['out_histname'] = group_df.apply(_get_out_name,axis=1)
-            hists[g[0]] = group_df[['source_histname','out_histname','scale','color','binning']]
-        return hists
-
     def Add(self,cNew,onlyOn=['process','region']):
-        raise NotImplementedError('Work in progress.')
+        raise NotImplementedError('Multiple config support is currently a work in progress. Only the first config will be used.')
         def _drop(row,dupes_list):
             drop = False
             for d in dupes_list:
@@ -366,28 +287,6 @@ class Config:
     def GetNsystematics(self):
         return self.df.variation.nunique()-1
 
-    def InitQCDHists(self):
-        '''Loop over all regions and for a given region's data histogram, subtract the list of background histograms,
-        and return data-bkgList.
-
-        Returns:
-            dict(region,TH2): Dictionary with regions as keys and values as histograms of data-bkgList.
-        '''
-        out = {}
-        for region,group in self.df.groupby('region'):
-            data_hist = self.organizedHists.Get(process='data_obs',region=region,systematic='')
-            qcd = data_hist.Clone(data_hist.GetName().replace('data_obs','qcd'))
-            qcd.SetDirectory(0)
-
-            bkg_sources = group.loc[group.process_type.eq('BKG') & group.variation.eq('nominal')]['process']
-            for process_name in bkg_sources.to_list():
-                bkg_hist = self.organizedHists.Get(process=process_name,region=region,systematic='')
-                qcd.Add(bkg_hist,-1)
-
-            out[region] = qcd
-
-        return out
-
 class OrganizedHists():
     '''Class to store histograms in a consistent data structure and with accompanying
     methods to access the histograms.
@@ -403,20 +302,19 @@ class OrganizedHists():
     Args:
         configObj (Config): Config object.
     '''
-    def __init__(self,configObj,readOnly=False):
-        self.filename = configObj.projPath + 'organized_hists.root'
-        self.binnings = configObj.binnings
-        self.hist_map = configObj.GetHistMap()
+    def __init__(self,projPath,binnings,hist_map,readOnly=False):
+        self.filename = projPath + 'organized_hists.root'
+        self.hist_map = hist_map
 
         if os.path.exists(self.filename) and readOnly:
             self.file = ROOT.TFile.Open(self.filename,"OPEN")
         else:
             self.file = ROOT.TFile.Open(self.filename,"RECREATE")
-            self.Add()
+            self.Add(binnings)
             self.file.Close()
             self.file = ROOT.TFile.Open(self.filename,"OPEN")
 
-    def Add(self):
+    def Add(self, binnings):
         '''Manipulate all histograms in self.hist_map and save them to organized_hists.root.
 
         Returns:
@@ -430,7 +328,7 @@ class OrganizedHists():
                 h = infile.Get(row.source_histname)
                 h.SetDirectory(0)
                 h.Scale(row.scale)
-                binning = self.binnings[row.binning]
+                binning = binnings[row.binning]
 
                 if get_bins_from_hist("Y", h) != binning.ybinList:
                     h = copy_hist_with_new_bins(row.out_histname+'_rebinY','Y',h,binning.ybinList)

@@ -12,17 +12,14 @@ class Binning:
             start_template (TH2): Histogram to compare against when doing sanity checks.
         '''
         self.name = name
-        self.startTemplate = start_template.Clone()
-        self.startTemplate.Reset()
-        
         self.sigStart = binning_dict['X']['SIGSTART']
         self.sigEnd = binning_dict['X']['SIGEND']
         self.xtitle = binning_dict['X']['TITLE']
         self.ytitle = binning_dict['Y']['TITLE']
         self.xbinByCat, self.ybinList = parse_binning_info(binning_dict)
         self.ySlices,self.ySliceIdx = self._getYslices(binning_dict) # x slices defined as properties
-        self._checkBinning('X')
-        self._checkBinning('Y')
+        self._checkBinning('X',start_template)
+        self._checkBinning('Y',start_template)
         self.xVars, self.yVar = self.CreateRRVs(binning_dict['X'], binning_dict['Y']) 
 
     def CreateRRVs(self,xdict,ydict):
@@ -47,7 +44,7 @@ class Binning:
                                   self.xbinByCat[c])
         return xRRVs,yRRV
 
-    def _checkBinning(self,axis):
+    def _checkBinning(self,axis,start_template):
         '''Perform sanity check that new binning scheme is a subset of the
         starting input space.
 
@@ -58,8 +55,8 @@ class Binning:
             ValueError: If requested binning is not a subset of the input space.
             ValueError: If binning sheme is not in increasing order.
         '''
-        input_min = getattr(self.startTemplate,'Get%saxis'%axis)().GetXmin()
-        input_max = getattr(self.startTemplate,'Get%saxis'%axis)().GetXmax()
+        input_min = getattr(start_template,'Get%saxis'%axis)().GetXmin()
+        input_max = getattr(start_template,'Get%saxis'%axis)().GetXmax()
 
         if axis == 'X': new_bins = self.xbinList
         else: new_bins = self.ybinList
