@@ -59,7 +59,10 @@ class TwoDAlphabet:
 
         else:
             self.binnings = pickle.load(open(self.tag+'/binnings.p','rb'))
-            self.organizedHists = OrganizedHists(self,readOnly=True)
+            self.organizedHists = OrganizedHists(
+                self.tag+'/', self.binnings,
+                self.GetHistMap(), readOnly=True
+            )
             # Does not contain the RooFit objects - just meta info
             self.alphaObjs = pandas.read_csv(self.tag+'/alphaObjs.csv')
             self.alphaParams = pandas.read_csv(self.tag+'/alphaParams.csv')
@@ -83,7 +86,7 @@ class TwoDAlphabet:
             self.tag+'/plots_fit_b/',
             self.tag+'/plots_fit_s/',
         ]
-        if self.options.plotUncerts and not os.path.isdir(self.tag+'/UncertPlots/'): 
+        if self.options.plotTemplateComparisons and not os.path.isdir(self.tag+'/UncertPlots/'): 
             dirs_to_make.append(self.tag+'/UncertPlots/')
 
         for d in dirs_to_make:
@@ -120,7 +123,7 @@ class TwoDAlphabet:
             help='Combine signals into one histogram for the sake of plotting. Still treated as separate in fit. Defaults to True.')
         parser.add_argument('plotTitles', default=False, type=bool, nargs='?',
             help='Include titles in plots. Defaults to False.')
-        parser.add_argument('plotUncerts', default=False, type=bool, nargs='?',
+        parser.add_argument('plotTemplateComparisons', default=False, type=bool, nargs='?',
             help='Plot comparison of pre-fit uncertainty shape templates in 1D projections. Defaults to False.')
         parser.add_argument('plotPrefitSigInFitB', default=False, type=bool, nargs='?',
             help='In the b-only post-fit plots, plot the signal normalized to its pre-fit value. Defaults to False.')
@@ -166,7 +169,7 @@ class TwoDAlphabet:
 
         df.to_csv(self.tag+'/df.csv')
         if sys.version_info.major == 3:
-            self.df.to_markdown(self.tag+'/df.md')
+            df.to_markdown(self.tag+'/df.md')
 
         pickle.dump(self.binnings,open(self.tag+'/binnings.p','wb'))
 
@@ -175,6 +178,9 @@ class TwoDAlphabet:
 
         alphaParams = self.alphaParams.drop(columns=['obj'])
         alphaParams.to_csv(self.tag+'/alphaParams.csv')
+
+        if self.options.plotTemplateComparisons:
+            plot.make_systematic_plots(self)
 
 # --------------AlphaObj INTERFACE ------ #
     def AddAlphaObj(self, process, region, obj, ptype='BKG', color=ROOT.kYellow):
@@ -275,12 +281,12 @@ class TwoDAlphabet:
     def GetRegions(self):
         return self.df.region.unique()
 
-    def GetProcesses(self, ptype='', includeNonConfig=True, onlyNonConfig=False):
+    def GetProcesses(self, ptype='', includeNonConfig=True, includeConfig=True):
         if ptype not in ['','SIGNAL','BKG','DATA']:
             raise ValueError('Process type "%s" not accepted. Must be empty string or one of "SIGNAL","BKG","DATA".'%ptype)
 
         proc_list = []
-        if not onlyNonConfig:
+        if includeConfig:
             if ptype == '':
                 to_add = self.df.process.unique()
             else:
@@ -323,8 +329,7 @@ class TwoDAlphabet:
             df = self.alphaObjs
         else:
             raise NameError('Process "%s" does not exist.'%procName)
-
-        return df.loc[df.process.eq(procName)][attrName].iloc[0]
+        return get_process_attr(df, procName, attrName)
 
     def GetProcessColor(self, procName):
         return self._getProcessAttrBase(procName,'color')
@@ -504,16 +509,23 @@ class TwoDAlphabet:
         self._saveOut()
 
 # -------- STAT METHODS ------------------ #
-    def MLfit(self, rMin=-1, rMax=10, extraParams={}, verbosity=0):
+    def MLfit(self, rMin=-1, rMax=10, setExtraParams={}, verbosity=0):
         with cd(self.tag):
-            _runMLfit(self.options.blindedFit, verbosity, rMin, rMax, extraParams)
-            plot.NuisPulls()
-            plot.SavePostFitParametricFuncVals()
-            plot.GenPostFitShapes()
-            plot.plotAllFitResults(self,'b')
-            plot.plotAllFitResults(self,'s')
+            _runMLfit(self.options.blindedFit, verbosity, rMin, rMax, setExtraParams)
+            make_postfit_workspace('')
             # systematic_analyzer_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py card.txt --all -f html > systematics_table.html'
             # execute_cmd(systematic_analyzer_cmd)    
+
+    def StdPlots(self):
+        with cd(self.tag):
+            plot.nuis_pulls()
+            plot.save_post_fit_parametric_vals()
+            plot.make_correlation_matrix( # Ignore nuisance parameters that are bins
+                varsToIgnore=self.alphaParams.name.str.contains('_bin_\d+-\d+').to_list()
+            )
+            plot.gen_post_fit_shapes()
+            plot.gen_projections(self,'b')
+            plot.gen_projections(self,'s')
 
     def GoodnessOfFit(self):
         pass
@@ -527,13 +539,13 @@ class TwoDAlphabet:
     def Impacts(self):
         pass
 
-def _runMLfit(blinding, verbosity, rMin, rMax, extraParams):
+def _runMLfit(blinding, verbosity, rMin, rMax, setExtraParams):
     param_options = '--text2workspace "--channel-masks" --setParameters '
     blinded_fit_masks = ['mask_%s_SIG=1'%r for r in blinding]
     param_options+= ','.join(blinded_fit_masks)
     
     # Determine if any nuisance/sysetmatic parameters should be set before fitting
-    more_params = ['%s=%s'%(p,v) for p,v in extraParams.items()]+['r=1'] # Always set r to start at 1
+    more_params = ['%s=%s'%(p,v) for p,v in setExtraParams.items()]+['r=1'] # Always set r to start at 1
     if param_options != '': param_options += ','.join(more_params)
     else:                   param_options = '--setParameters '+','.join(more_params)
 
@@ -553,7 +565,10 @@ def _runMLfit(blinding, verbosity, rMin, rMax, extraParams):
 
     execute_cmd(fit_cmd)
 
-def SetSnapshot(d=''):
+def get_process_attr(df, procName, attrName):
+    return df.loc[df.process.eq(procName)][attrName].iloc[0]
+
+def make_postfit_workspace(d=''):
     w_f = ROOT.TFile.Open(d+'higgsCombineTest.FitDiagnostics.mH120.root')
     w = w_f.Get('w')
     fr_f = ROOT.TFile.Open(d+'fitDiagnosticsTest.root')
