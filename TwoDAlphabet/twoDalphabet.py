@@ -114,9 +114,9 @@ class TwoDAlphabet:
         parser.add_argument('debugDraw', default=False, type=bool, nargs='?',
             help="Draw all canvases while running for the sake of debugging. Useful for developers only. Defaults to False.")
         # Blinding
-        parser.add_argument('blindedPlots', default=[], type=list, nargs='?',
+        parser.add_argument('blindedPlots', default=[], type=str, nargs='*',
             help='List of regions in which to blind plots of x-axis SIG. Does not blind fit.')
-        parser.add_argument('blindedFit', default=[], type=list, nargs='?',
+        parser.add_argument('blindedFit', default=[], type=str, nargs='*',
             help='List of regions in which to blind fit of x-axis SIG. Does not blind plots.')
         # Plotting
         parser.add_argument('haddSignals', default=True, type=bool, nargs='?',

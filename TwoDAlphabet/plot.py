@@ -110,7 +110,7 @@ class Plotter(object):
 
         for region in self.twoD.GetRegions():
             binning,_ = self.twoD.GetBinningFor(region)
-            if self.twoD.options.blindedPlots != None:
+            if len(self.twoD.options.blindedPlots) > 0:
                 if region in self.twoD.options.blindedPlots:
                     blinding = [1]
                 else: blinding = []
