@@ -509,9 +509,9 @@ class TwoDAlphabet:
         self._saveOut()
 
 # -------- STAT METHODS ------------------ #
-    def MLfit(self, rMin=-1, rMax=10, setExtraParams={}, verbosity=0):
+    def MLfit(self, rMin=-1, rMax=10, setExtraParams={}, verbosity=0, usePreviousFit=False):
         with cd(self.tag):
-            _runMLfit(self.options.blindedFit, verbosity, rMin, rMax, setExtraParams)
+            _runMLfit(self.options.blindedFit, verbosity, rMin, rMax, setExtraParams, usePreviousFit)
             make_postfit_workspace('')
             # systematic_analyzer_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py card.txt --all -f html > systematics_table.html'
             # execute_cmd(systematic_analyzer_cmd)    
@@ -539,18 +539,15 @@ class TwoDAlphabet:
     def Impacts(self):
         pass
 
-def _runMLfit(blinding, verbosity, rMin, rMax, setExtraParams):
-    param_options = '--text2workspace "--channel-masks" --setParameters '
-    blinded_fit_masks = ['mask_%s_SIG=1'%r for r in blinding]
-    param_options+= ','.join(blinded_fit_masks)
-    
-    # Determine if any nuisance/sysetmatic parameters should be set before fitting
-    more_params = ['%s=%s'%(p,v) for p,v in setExtraParams.items()]+['r=1'] # Always set r to start at 1
-    if param_options != '': param_options += ','.join(more_params)
-    else:                   param_options = '--setParameters '+','.join(more_params)
+def _runMLfit(blinding, verbosity, rMin, rMax, setExtraParams, usePreviousFit=False):
+    if usePreviousFit: param_options = ''
+    else:              param_options = '--text2workspace "--channel-masks" '
+    params_to_set = ','.join(['mask_%s_SIG=1'%r for r in blinding]+['%s=%s'%(p,v) for p,v in setExtraParams.items()]+['r=1'])
+    param_options += '--setParameters '+params_to_set
 
-    fit_cmd = 'combine -M FitDiagnostics -d card.txt {param_options} --saveWorkspace --cminDefaultMinimizerStrategy 0 --rMin {rmin} --rMax {rmax} -v {verbosity}'
+    fit_cmd = 'combine -M FitDiagnostics {card_or_w} {param_options} --saveWorkspace --cminDefaultMinimizerStrategy 0 --rMin {rmin} --rMax {rmax} -v {verbosity}'
     fit_cmd = fit_cmd.format(
+        card_or_w='initifalFitWorkspace.root --snapshotName initialFit' if usePreviousFit else 'card.txt',
         param_options=param_options,
         rmin=rMin,
         rmax=rMax,
