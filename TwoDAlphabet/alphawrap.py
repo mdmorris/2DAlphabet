@@ -2,6 +2,7 @@ from collections import OrderedDict
 from TwoDAlphabet.helpers import roofit_form_to_TF1
 from ROOT import RooRealVar, RooFormulaVar, RooArgList, RooParametricHist2D, RooConstVar, TFormula, RooAddition
 from TwoDAlphabet.binning import copy_hist_with_new_bins
+import itertools
 # import numpy as np
 # from numpy.lib.function_base import piecewise
 
@@ -367,7 +368,7 @@ class BinnedDistribution(Generic2D):
             for ybin in range(1,cat_hist.GetNbinsY()+1):
                 for xbin in range(1,cat_hist.GetNbinsX()+1):
                     bin_name = '%s_bin_%s-%s'%(cat_name,xbin,ybin)
-                    if constant:
+                    if constant or self._nSurroundingZeros(cat_hist,xbin,ybin) > 5:
                         self.binVars[bin_name] = RooConstVar(bin_name, bin_name, cat_hist.GetBinContent(xbin,ybin))
                     else:
                         self.binVars[bin_name] = RooRealVar(bin_name, bin_name, max(5,cat_hist.GetBinContent(xbin,ybin)), 1e-6, 1e6)
@@ -424,6 +425,16 @@ class BinnedDistribution(Generic2D):
 
     def KDESmooth(self):
         raise NotImplementedError()
+
+    def _nSurroundingZeros(self,hist,xbin,ybin):
+        nzeros = 0
+        if hist.GetBinContent(xbin,ybin) > 0:
+            nzeros = 0
+        else:
+            for pair in itertools.product([xbin,xbin-1,xbin+1],[ybin-1,ybin,ybin+1]):
+                if hist.GetBinContent(pair[0],pair[1]) <= 0:
+                    nzeros += 1
+        return nzeros
 
 def singleBinInterp(name, nuis, binVar, upVal, downVal, forcePositive):
     '''Create a RooFormulaVar containing the nuisance parameter that can
