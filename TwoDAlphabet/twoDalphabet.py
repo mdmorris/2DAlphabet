@@ -41,6 +41,7 @@ class TwoDAlphabet:
         self.nsignals, self.nbkgs = config.nsignals, config.nbkgs
 
         if not loadPrevious:
+            self._setupProjDir()
             template_file = ROOT.TFile.Open(self.df.iloc[0].source_filename)
             template = template_file.Get(self.df.iloc[0].source_histname)
             template.SetDirectory(0)
@@ -85,6 +86,8 @@ class TwoDAlphabet:
             self.tag+'/',
             self.tag+'/plots_fit_b/',
             self.tag+'/plots_fit_s/',
+            self.tag+'/plots_fit_b/base_figs/',
+            self.tag+'/plots_fit_s/base_figs/',
         ]
         if self.options.plotTemplateComparisons and not os.path.isdir(self.tag+'/UncertPlots/'): 
             dirs_to_make.append(self.tag+'/UncertPlots/')

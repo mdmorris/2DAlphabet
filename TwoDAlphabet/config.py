@@ -340,7 +340,7 @@ class OrganizedHists():
                 h.SetTitle(row.out_histname)
                 h.SetFillColor(row.color)
 
-                self.file.WriteObject(h, row.out_histname)
+                self.file.WriteTObject(h, row.out_histname)
                 self.CreateSubRegions(h, binning)
 
             infile.Close()
