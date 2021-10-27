@@ -368,7 +368,7 @@ class BinnedDistribution(Generic2D):
             for ybin in range(1,cat_hist.GetNbinsY()+1):
                 for xbin in range(1,cat_hist.GetNbinsX()+1):
                     bin_name = '%s_bin_%s-%s'%(cat_name,xbin,ybin)
-                    if constant or self._nSurroundingZeros(cat_hist,xbin,ybin) > 5:
+                    if constant or self._nSurroundingZeros(cat_hist,xbin,ybin) > 7:
                         self.binVars[bin_name] = RooConstVar(bin_name, bin_name, cat_hist.GetBinContent(xbin,ybin))
                     else:
                         self.binVars[bin_name] = RooRealVar(bin_name, bin_name, max(5,cat_hist.GetBinContent(xbin,ybin)), 1e-6, 1e6)
