@@ -1,4 +1,4 @@
-import subprocess, json, ROOT, os, copy
+import subprocess, json, ROOT, os, copy, time
 from collections import defaultdict
 from contextlib import contextmanager
 
@@ -264,3 +264,125 @@ def replace_multi(s,findreplace):
 
 def unpack_to_line(toUnpack):
     return ' '.join(['{%s:20}'%i for i in range(len(toUnpack))]).format(*toUnpack)
+
+# ----------------- Inline condor submission --------------------
+class CondorRunner():
+    def __init__(self, name, primaryCmds, toPkg, runIn, toGrab, remakeEnv=False, eosRootfileTarball=None):
+        '''Should be run in a CMSSW/src directory and not in a nested folder. All paths
+        (besides the EOS rootfile tarball path) are treated relative to this folder.
+
+        Args:
+            name ([type]): [description]
+            primaryCmds ([type]): [description]
+            toPkg ([type]): [description]
+            runIn ([type]): [description]
+            toGrab ([type]): [description]
+            remakeEnv (bool, optional): [description]. Defaults to False.
+            eosRootfileTarball ([type], optional): [description]. Defaults to None.
+        '''
+        self.name = name
+        self.run_in = runIn
+        self.to_grab = toGrab
+        self.primary_cmds = primaryCmds
+        self.cmssw = os.environ['CMSSW_BASE'].split('/')[-1]
+        self.env_tarball_path = make_env_tarball(remakeEnv)
+        self.pkg_tarball_path = self._make_pkg_tarball(toPkg) if toPkg != None else ''
+        self.run_script_path = self._make_run_script()
+        self.run_args_path = self.run_script_path.replace('.sh','_args.txt')
+        self.rootfile_tarball_path = eosRootfileTarball
+
+    def submit(self):
+        twoD_dir_base = self.cmssw+'/src/2DAlphabet/TwoDAlphabet/'
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        out_jdl = 'temp_'+timestr+'_jdl'
+
+        execute_cmd("sed 's$TEMPSCRIPT${0}$g' {1}condor/templates/jdl_template > {2}".format(self.run_script_path, twoD_dir_base, out_jdl))
+        execute_cmd("sed -i 's$TEMPTAR${0}$g' {1}".format(self.pkg_tarball_path, out_jdl))
+        execute_cmd("sed -i 's$TEMPARGS${0}$g' {1}".format(self.run_args_path, out_jdl))
+        execute_cmd('mkdir notneeded')
+        execute_cmd("condor_submit "+out_jdl)
+        execute_cmd("mv {0} notneeded/".format(out_jdl))
+
+    def _make_pkg_tarball(self,to_pkg):
+        with cd(os.environ['CMSSW_BASE']+'/src'):
+            execute_cmd('tar -czvf {0}.tgz {1}'.format(self.name, to_pkg))
+            path = os.path.abspath('%s.tgz'%self.name)
+        return path
+
+    def _make_run_script(self):
+        blocks = []
+        blocks.append(
+            _setup_env.format(
+                env_tarball_path=self.env_tarball_path,
+                cmssw=self.cmssw,
+                scram_arch=os.environ['SCRAM_ARCH']
+            )
+        )
+
+        if self.pkg_tarball_path != None:
+            blocks.append(_setup_tar_pkg.format(pkg_tarball=self.pkg_tarball_path.split('/')[-1]))
+        
+        blocks.append('cd %s/src/; eval `scramv1 runtime -sh`'%self.cmssw)
+
+        if self.rootfile_tarball_path != None:
+            blocks.append(_unpack_rootfiles.format(rootfile_tarball_path=self.rootfile_tarball_path))
+
+        blocks.append('cd '%self.run_in)
+        blocks.append('echo $*')
+        blocks.append('$*')
+        blocks.append('cd $CMSSW_BASE/src/')
+        blocks.append(_grab_output.format(out_id=self.name, to_grab=self.to_grab))
+
+        shell_name = 'run_'+self.name+'.sh'
+        with open(shell_name,'w') as run_script:
+            for block in blocks:
+                run_script.write(block+'\n')
+
+        with open(shell_name.replace('.sh','_args.txt'),'w') as run_args:
+            for c in self.primary_cmds:
+                run_args.write(c+'\n')
+
+        return os.path.abspath(shell_name)
+
+def make_env_tarball(makeEnv=True):
+    dir_base = os.environ['CMSSW_BASE']
+    if not makeEnv:
+        with cd(dir_base+'/../'):
+            execute_cmd('tar --exclude-caches-all --exclude-vcs --exclude-caches-all --exclude-vcs -cvzf {cmssw}_env.tgz --exclude=tmp --exclude=".scram" --exclude=".SCRAM"'.format(cmssw=dir_base.split('/')[-1]))
+    relative_path = dir_base+'/../'+dir_base.split('/')[-1] + '_env.tgz'
+    try:
+        return os.path.abspath(relative_path)
+    except:
+        raise OSError('Environment tarball does not exist at %s'%relative_path)
+
+# Done in base dir
+_setup_env = '''
+#!/bin/bash
+source /cvmfs/cms.cern.ch/cmsset_default.sh
+xrdcp {env_tarball_path} env_tarball.tgz
+export SCRAM_ARCH={scram_arch}
+scramv1 project CMSSW {cmssw}
+tar -xzf env_tarball.tgz
+rm env_tarball.tgz'''
+
+# Done in base dir
+_setup_tar_pkg = '''
+mkdir tardir; cp {pkg_tarball} tardir/; cd tardir
+tar -xzvf {pkg_tarball}
+rm {pkg_tarball}
+cp -r * ../CMSSW_10_6_14/src/
+cd ../'''
+
+# Done in CMSSW/src
+_unpack_rootfiles = '''
+mkdir EOS_ROOTFILES
+cd EOS_ROOTFILES
+xrdcp {rootfile_tarball_path} ./
+tar -xzf {rootfile_tarball}
+rm {rootfile_tarball}
+cd ../'''
+
+# Done in CMSSW/src
+_grab_output = '''
+tar -czvf {out_id}.tgz {to_grab}
+cp {out_id}.tgz $CMSSW_BASE/../'''

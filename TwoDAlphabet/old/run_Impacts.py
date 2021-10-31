@@ -66,31 +66,7 @@ with header.cd(projDir):
         initialfit_cmd = 'combineTool.py -M Impacts -n '+taskName+' --rMin -15 --rMax 15 -d initialFitWorkspace.root --snapshotName initialFit --doInitialFit --cminDefaultMinimizerStrategy 0 -m 2000 '+impactNuisanceString
         header.executeCmd(initialfit_cmd)
         impact_cmd = 'combineTool.py -M Impacts -n '+taskName+' --rMin -15 --rMax 15 -d initialFitWorkspace.root --snapshotName initialFit --doFits --cminDefaultMinimizerStrategy 0 -m 2000 '+impactNuisanceString
-        if options.condor:
-            JOB_PREFIX = """#!/bin/bash
-source /cvmfs/cms.cern.ch/cmsset_default.sh
-xrdcp root://cmseos.fnal.gov//store/user/lcorcodi/10XwithNano.tgz ./
-export SCRAM_ARCH=slc6_amd64_gcc700
-scramv1 project CMSSW CMSSW_10_2_13
-tar -xzf 10XwithNano.tgz
-rm 10XwithNano.tgz
-
-mkdir tardir; cp tarball.tgz tardir/; cd tardir
-tar -xzf tarball.tgz
-cp -r * ../CMSSW_10_2_13/src/2DAlphabet/
-cd ../CMSSW_10_2_13/src/2DAlphabet/
-eval `scramv1 runtime -sh`
-scramv1 b clean; scramv1 b
-
-cd %s
-                """ % (projDir)
-            job_prefix_out = open('impact_prefix.txt','w')
-            job_prefix_out.write(JOB_PREFIX)
-            job_prefix_out.close()
-
-            impact_cmd = impact_cmd+' --job-mode condor --dry-run --prefix-file impact_prefix.txt --sub-opts "transfer_input_files = tarball.tgz" --task-name Impacts'+taskName
-        else:
-            header.executeCmd(impact_cmd)
+        header.executeCmd(impact_cmd)
 
     elif options.post:
         # Grab the output

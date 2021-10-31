@@ -3,7 +3,7 @@
 
 import sys, subprocess, ROOT
 
-def importPars(incard,fitresults,toDrop):
+def importPars(incard,fit_results,toDrop):
     # First convert the card
     subprocess.call(['text2workspace.py -b '+incard+' -o morphedWorkspace.root'],shell=True)
 

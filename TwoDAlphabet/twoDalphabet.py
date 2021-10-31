@@ -1,8 +1,8 @@
-import argparse, os, itertools, pandas, glob, pickle, sys
+import argparse, os, itertools, pandas, glob, pickle, sys, re
 from collections import OrderedDict
 from TwoDAlphabet.config import Config, OrganizedHists
 from TwoDAlphabet.binning import Binning
-from TwoDAlphabet.helpers import execute_cmd, parse_arg_dict, unpack_to_line, make_RDH, cd
+from TwoDAlphabet.helpers import CondorRunner, execute_cmd, parse_arg_dict, unpack_to_line, make_RDH, cd
 from TwoDAlphabet.alphawrap import Generic2D
 from TwoDAlphabet import plot
 import ROOT
@@ -560,6 +560,77 @@ class TwoDAlphabet:
 
             self.df = full_df
             
+    def GetParamsOnMatch(self, regex='', subtag='', b_or_s='b'):
+        out = {}
+
+        f = ROOT.TFile.Open(self.tag+'/'+subtag+'/fitDiagnosticsTest.root')
+        fr = f.Get('fit_'+b_or_s)
+        final_pars = ROOT.RooArgList(fr.floatParsFinal())
+
+        for i in range(final_pars.getSize()):
+            par = final_pars[i]
+            if re.search(regex, par.GetName()):
+                out[par.GetName()] = {'val': par.getValV(), 'error': par.getError()}
+
+        f.Close()
+
+        return out
+
+    def GenerateToys(self, name, subtag='', card=None, workspace=None, ntoys=1, seed=123456, expectSignal=0, setParams={}, freezeParams=[], run=True):
+        if card == None and workspace == None:
+            raise IOError('Either card or workspace must be provided relative to the directory where the generation will be run.')
+        elif card != None and workspace != None:
+            raise IOError('Only one of card or workspace can be provided.')
+
+        if card:
+            if isinstance(card, str):
+                card_name = card
+            elif isinstance(card, bool) and card == True:
+                card_name = 'card.txt'
+            workspace_file = '%s_gen_workspace.root'%(name if subtag=='' else subtag+'/'+name)
+            execute_cmd(
+                'text2workspace.py -b {0}/{1} -o {0}/{2} --channel-masks --X-no-jmax'.format(self.tag,card_name, workspace_file)
+            )
+            
+            input_opt = '-d %s'%workspace_file
+        
+        elif workspace:
+            if isinstance(workspace, str):
+                workspace_file = workspace.split(':')
+                input_opt = '-d %s --snapshotName %s'%(workspace.split(':'))
+            elif isinstance(workspace, bool) and workspace == True:
+                workspace_file = 'initialFitWorkspace.root'
+                input_opt = '-d %s --snapshotName initialFit'%workspace_file
+
+        masks_off = ['%s=0'%mask for mask in self._getMasks(self.tag+'/'+workspace_file)]
+
+        run_dir = self.tag+'/'+subtag
+        with cd(run_dir):
+            param_vals = ['%s=%s'%(k,v) for k,v in setParams.items()] + masks_off
+            param_opt = ''
+            if len(param_vals) > 0:
+                param_opt = '--setParameters '+','.join(param_vals),
+
+            freeze_opt = ''
+            if len(freezeParams) > 0:
+                freeze_opt = '--freezeParameters '+','.join(freezeParams)
+
+            gen_command_pieces = [
+                'combine -M GenerateOnly',
+                 input_opt, param_opt,
+                '--toysFrequentist --bypassFrequentistFit',
+                '-t %s'%ntoys,
+                '--saveToys -s %s'%seed,
+                '--expectSignal %s'%expectSignal,
+                '-n _%s'%name,
+                freeze_opt
+            ]
+            if run:
+                execute_cmd(' '.join(gen_command_pieces))
+            else:
+                print ('Not running:\n\t'+' '.join(gen_command_pieces))
+
+        return '%shiggsCombine_%s.GenerateOnly.mH120.%s.root'%(subtag+'/' if subtag!='' else '',name,seed)
 
     def _getMasks(self, filename):
         masked_regions = []
@@ -582,9 +653,35 @@ class TwoDAlphabet:
     def SignalInjection(self, r):
         pass
 
-    def Limits(self):
-        pass
+    def Limit(self, subtag, loadFitDir, signalSelect=[], blindData=True, verbosity=0, setParams={}, location='', eosRootfiles=''):
+        if subtag == '': 
+            raise RuntimeError('The subtag for limits must be non-empty so that the limit will be run in a nested directory.')
+        if location == '':
+            print ('Automatically determining whether location is "local" or "condor".')
+            if 'condor' in os.getcwd():
+                location = 'condor'
+            else:
+                location = 'local'
+        elif location not in ['local','condor']:
+            raise RuntimeError('Limit location can only be "", "local", or "condor". If empty string, will determine if condor based on absolute path.')
 
+        run_dir = self.tag+'/'+subtag
+        _runDirSetup(run_dir)
+        workspace_dir = workspace_dir = '' if subtag=='' else '../'
+        with cd(run_dir):
+            self._makeCard(workspace_dir, subtag, signalSelect)
+            limit_cmd = _runLimit(loadFitDir, blindData, verbosity, setParams, location) # runs on this line if location == 'local'
+            
+            if location == 'condor':
+                condor = CondorRunner(
+                    name=self.tag+'_'+subtag,
+                    primaryCmds=[limit_cmd],
+                    toPkg=run_dir,
+                    toGrab=run_dir+'/higgsCombineTest.AsymptoticLimits.mH120.root',
+                    eosRootfileTarball=eosRootfiles
+                )
+                condor.submit()
+                
     def Impacts(self):
         pass
 
@@ -622,6 +719,32 @@ def _runMLfit(blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False):
         execute_cmd('rm fitDiagnosticsTest.root')
 
     execute_cmd(fit_cmd)
+
+def _runLimit(loadFitDir, blindData, verbosity, setParams, location, condor_name=''):
+    fr_path = '../'+loadFitDir+'/fitDiagnosticsTest.root'
+    if not os.path.exists(fr_path):
+        raise OSError('The file %s does not exist. Please check that MLfit() finished correctly.'%fr_path)
+
+    import_fitresult('card.txt', fr_path)
+
+    param_options = ''
+    if len(setParams) > 0:
+        param_options = '--setParameters '+','.join('%s=%s'%(k,v) for k,v in setParams.items())
+
+    limit_cmd = 'combine -M AsymptoticLimits -d morphedWorkspace.root --snapshotName morphedModel --saveWorkspace --cminDefaultMinimizerStrategy 0 {param_opt} {blind_opt} -v {verb}' 
+    limit_cmd = limit_cmd.format(
+        blind_opt='--run=blind' if blindData else '',
+        param_opt=param_options,
+        verb=verbosity
+    )
+
+    # Run combine if not on condor
+    if location == 'local':   
+        with open('Limit_command.txt','w') as out:
+            out.write(limit_cmd) 
+        execute_cmd(limit_cmd)
+
+    return limit_cmd
 
 def get_process_attr(df, procName, attrName):
     return df.loc[df.process.eq(procName)][attrName].iloc[0]
