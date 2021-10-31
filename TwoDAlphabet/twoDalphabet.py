@@ -37,8 +37,9 @@ class TwoDAlphabet:
         optdict.update(externalOpts)
         self.options = self.LoadOptions(optdict)
         self.df = config.FullTable()
+        self.subtagTracker = {}
+        self.iterWorkspaceObjs = config.iterWorkspaceObjs
         self._binningMap = [g[0] for g in self.df.groupby(['region','binning'])]
-        self.nsignals, self.nbkgs = config.nsignals, config.nbkgs
 
         if not loadPrevious:
             self._setupProjDir()
@@ -82,19 +83,9 @@ class TwoDAlphabet:
             print ('Making dir '+self.tag+'/')
             os.mkdir(self.tag+'/')
 
-        dirs_to_make = [
-            self.tag+'/',
-            self.tag+'/plots_fit_b/',
-            self.tag+'/plots_fit_s/',
-            self.tag+'/plots_fit_b/base_figs/',
-            self.tag+'/plots_fit_s/base_figs/',
-        ]
+        _runDirSetup(self.tag)
         if self.options.plotTemplateComparisons and not os.path.isdir(self.tag+'/UncertPlots/'): 
-            dirs_to_make.append(self.tag+'/UncertPlots/')
-
-        for d in dirs_to_make:
-            if not os.path.isdir(d):
-                os.mkdir(d)
+            os.mkdir(self.tag+'/UncertPlots/')
 
     def LoadOptions(self, nonDefaultOpts={}):
         '''Optional arguments passed to the project.
@@ -147,17 +138,14 @@ class TwoDAlphabet:
         if region not in self.GetRegions():
             raise RuntimeError('Attempting to track an object for region "%s" but that region does not exist among those defined in the config:\n\t%s'%(region,self.GetRegions()))
 
-    def _getCombineIdx(self,process,ptype):
-        if process in self.GetProcesses():
-            out = self._getProcessAttrBase(process,'combine_idx')
-        else:
-            if ptype == 'BKG':
-                self.nbkgs+=1
-                out = self.nbkgs
-            elif ptype == 'SIGNAL':
-                out = self.nsignals
-                self.nsignals-=1
+    def _getCombineIdxMap(self):
+        all_signals = self.df[self.df.process_type.eq('SIGNAL')].process.unique().tolist() + self.alphaObjs[self.alphaObjs.process_type.eq('SIGNAL')].process.unique().tolist()
+        all_bkgs    = self.df[self.df.process_type.eq('BKG')].process.unique().tolist()    + self.alphaObjs[self.alphaObjs.process_type.eq('BKG')].process.unique().tolist()
 
+        signal_map = pandas.DataFrame({'process': all_signals, 'combine_idx': [-1*i for i in range(0,len(all_signals))] })
+        bkg_map    = pandas.DataFrame({'process': all_bkgs,    'combine_idx': [i for i in range(1,len(all_bkgs)+1)] })
+
+        out = pandas.concat([signal_map, bkg_map])
         return out
 
     def _saveOut(self):
@@ -203,7 +191,6 @@ class TwoDAlphabet:
 
         # for cat in ['LOW','SIG','HIGH']:
         rph,norm = obj.RooParametricHist()
-        combine_idx = self._getCombineIdx(process, ptype)
         model_obj_row = {
             "process": process,
             "region": region,
@@ -211,8 +198,7 @@ class TwoDAlphabet:
             "norm": norm,
             "process_type": ptype,
             "color": color,
-            'title': process,
-            "combine_idx": combine_idx
+            'title': process
         }
 
         self.alphaObjs = self.alphaObjs.append(model_obj_row, ignore_index=True)
@@ -270,6 +256,7 @@ class TwoDAlphabet:
                 return row.process+'_'+row.region+'_FULL'
             else:
                 return row.process+'_'+row.region+'_FULL_'+row.variation+row.direction
+        
         if not isinstance(df,pandas.DataFrame):
             df = self.df
 
@@ -352,6 +339,14 @@ class TwoDAlphabet:
     def IsData(self, procName):
         return self.GetProcessType(procName) == 'DATA'
 
+    @property
+    def nsignals(self):
+        return self.df[self.df.process_type.eq('SIGNAL')].process.nunique() + self.alphaObjs[self.alphaObjs.process_type.eq('SIGNAL')].process.nunique()
+
+    @property
+    def nbkgs(self):
+        return self.df[self.df.process_type.eq('BKG')].process.nunique() + self.alphaObjs[self.alphaObjs.process_type.eq('BKG')].process.nunique()
+
     def _getCatNameRobust(self, hname):
         if hname.split('_')[-1] in ['FULL','SIG','HIGH','LOW']: # simplest case
             out =  hname.split('_')[-1]
@@ -371,11 +366,18 @@ class TwoDAlphabet:
         return out
 
 # ---------- FIRST STEP CONSTRUCTION ------ #
-    def _makeCard(self):
-        card_new = open(self.tag+'/card.txt','w')
+    def _makeCard(self, workspace_dir='', subtag='', signalSelect=[], toyData=None):
+        full_df = self.df.copy(deep=True) # Temporarily set internal DF to a subset of just the selected signals
+        if signalSelect != []:
+            self.df = full_df.loc[~full_df.process_type.eq('SIGNAL') | (full_df.process_type.eq('SIGNAL') & full_df.process.isin(signalSelect))]
+            self.subtagTracker[subtag] = self.df.copy(deep=True)
+        
+        combine_idx_map = self._getCombineIdxMap()
+
+        card_new = open('card.txt','w')
         # imax (bins), jmax (backgrounds+signals), kmax (systematics) 
         imax = 3*len(self.GetRegions()) # pass, fail for each 'X' axis category    
-        jmax = self.nbkgs + -1*self.nsignals -1
+        jmax = self.nbkgs + self.nsignals -1
         kmax = len(self.GetShapeSystematics())-1 # -1 for nominal, does not include alphaParams
         channels = ['_'.join(r) for r in itertools.product(self.GetRegions(),['LOW','SIG','HIGH'])]
         
@@ -385,14 +387,20 @@ class TwoDAlphabet:
         card_new.write('-'*120+'\n')
 
         # Shapes
-        shape_line = 'shapes  {0:20} * base.root w:{0}_$CHANNEL w:{0}_$CHANNEL_$SYSTEMATIC\n'
+        shape_line = 'shapes  {0:20} * {1} w:{0}_$CHANNEL w:{0}_$CHANNEL_$SYSTEMATIC\n'
         for proc in self.GetProcesses(includeNonConfig=False):
             if proc == 'data_obs': continue
-            card_new.write(shape_line.format(proc))
+            card_new.write(shape_line.format(proc, workspace_dir+'base.root'))
 
-        shape_line_nosyst = shape_line.replace('_$SYSTEMATIC','')
-        for proc in list(self.alphaObjs.process.unique())+['data_obs']:
-            card_new.write(shape_line_nosyst.format(proc))
+        shape_line_nosyst = shape_line.replace(' w:{0}_$CHANNEL_$SYSTEMATIC','')
+        for proc in list(self.alphaObjs.process.unique()):
+            card_new.write(shape_line_nosyst.format(proc, workspace_dir+'base.root'))
+
+        # Do data - importing toy if needed
+        if toyData == None:
+            card_new.write(shape_line_nosyst.format('data_obs', workspace_dir+'base.root'))
+        else:
+            card_new.write(shape_line_nosyst.replace(' w:{0}_$CHANNEL','').format('data_obs', toyData))
 
         card_new.write('-'*120+'\n')
 
@@ -422,7 +430,7 @@ class TwoDAlphabet:
         for pair, group in self.df.groupby(['process','region']):
             proc, region = pair
             if proc == 'data_obs': continue
-            combine_idx = group.iloc[0].combine_idx
+            combine_idx = combine_idx_map[combine_idx_map.process.eq(proc)].combine_idx.iloc[0]
             for cat in ['LOW','SIG','HIGH']:
                 chan = '%s_%s'%(region,cat)
 
@@ -443,7 +451,7 @@ class TwoDAlphabet:
         # NOTE: duplicated code but no good way to combine without making things confusing
         for pair,group in self.alphaObjs.groupby(['process', 'region']):
             proc,region = pair
-            combine_idx = group.iloc[0].combine_idx
+            combine_idx = combine_idx_map[combine_idx_map.process.eq(proc)].combine_idx.iloc[0]
             for cat in ['LOW','SIG','HIGH']:
                 chan = '%s_%s'%(region, cat)
 
@@ -471,6 +479,7 @@ class TwoDAlphabet:
             card_new.write('{0:40} {1}\n'.format(param.name, param.constraint))
         
         card_new.close()
+        self.df = full_df # Set internal DF back to full one
 
     def _makeWorkspace(self):
         var_lists = {}
@@ -501,26 +510,45 @@ class TwoDAlphabet:
                 print ('Adding RooParametricHist norm... %s'%norm_cat.GetName())
                 getattr(workspace,'import')(norm_cat,ROOT.RooFit.RecycleConflictNodes(),ROOT.RooFit.Silence())
 
-        out = ROOT.TFile.Open(self.tag+'/base.root','RECREATE')
+        out = ROOT.TFile.Open('base.root','RECREATE')
         out.cd()
         workspace.Write()
         out.Close()
 
-    def Construct(self):
-        self._makeCard()
-        self._makeWorkspace()
+    def Construct(self, signalSelect=[]):
+        with cd(self.tag):
+            if self.iterWorkspaceObjs == {}:
+                self._makeCard()
+            elif len(signalSelect) > 0:
+                self._makeCard(subtag='',signalSelect=signalSelect)
+            self._makeWorkspace()
         self._saveOut()
 
 # -------- STAT METHODS ------------------ #
-    def MLfit(self, rMin=-1, rMax=10, setExtraParams={}, verbosity=0, usePreviousFit=False):
-        with cd(self.tag):
-            _runMLfit(self.options.blindedFit, verbosity, rMin, rMax, setExtraParams, usePreviousFit)
+    def MLfit(self, subtag='', rMin=-1, rMax=10, setParams={}, signalSelect=[], verbosity=0, usePreviousFit=False, toyData=None):
+        run_dir = self.tag+'/'+subtag
+        _runDirSetup(run_dir)
+        workspace_dir = '' if subtag=='' else '../'
+        with cd(run_dir):
+            if signalSelect != []:
+                self._makeCard(workspace_dir, subtag, signalSelect=signalSelect, toyData=toyData)
+
+            _runMLfit(
+                blinding=self.options.blindedFit,
+                verbosity=verbosity, 
+                rMin=rMin, rMax=rMax,
+                setParams=setParams,
+                usePreviousFit=usePreviousFit)
             make_postfit_workspace('')
             # systematic_analyzer_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py card.txt --all -f html > systematics_table.html'
             # execute_cmd(systematic_analyzer_cmd)    
 
-    def StdPlots(self):
-        with cd(self.tag):
+    def StdPlots(self, subtag=''):
+        run_dir = self.tag+'/'+subtag
+        with cd(run_dir):
+            full_df = self.df.copy(deep=True)
+            if subtag in self.subtagTracker:
+                self.df = self.subtagTracker[subtag]
             plot.nuis_pulls()
             plot.save_post_fit_parametric_vals()
             plot.make_correlation_matrix( # Ignore nuisance parameters that are bins
@@ -529,6 +557,24 @@ class TwoDAlphabet:
             plot.gen_post_fit_shapes()
             plot.gen_projections(self,'b')
             plot.gen_projections(self,'s')
+
+            self.df = full_df
+            
+
+    def _getMasks(self, filename):
+        masked_regions = []
+        f = ROOT.TFile.Open(filename)
+        w = f.Get('w')
+        allVars = ROOT.RooArgList(w.allVars())
+
+        for i in range(allVars.getSize()):
+            var = allVars[i]
+            if 'mask_' in var.GetName() and '_SIG_' in var.GetName():
+                if var.getValV() == 1:
+                    masked_regions.append(var.GetName())
+        f.Close()
+
+        return masked_regions
 
     def GoodnessOfFit(self):
         pass
@@ -542,10 +588,22 @@ class TwoDAlphabet:
     def Impacts(self):
         pass
 
-def _runMLfit(blinding, verbosity, rMin, rMax, setExtraParams, usePreviousFit=False):
+def _runDirSetup(runDir):
+    dirs_to_make = [
+        runDir+'/',
+        runDir+'/plots_fit_b/',
+        runDir+'/plots_fit_s/',
+        runDir+'/plots_fit_b/base_figs/',
+        runDir+'/plots_fit_s/base_figs/',
+    ]
+    for d in dirs_to_make:
+        if not os.path.isdir(d):
+            os.mkdir(d)
+
+def _runMLfit(blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False):
     if usePreviousFit: param_options = ''
     else:              param_options = '--text2workspace "--channel-masks" '
-    params_to_set = ','.join(['mask_%s_SIG=1'%r for r in blinding]+['%s=%s'%(p,v) for p,v in setExtraParams.items()]+['r=1'])
+    params_to_set = ','.join(['mask_%s_SIG=1'%r for r in blinding]+['%s=%s'%(p,v) for p,v in setParams.items()]+['r=1'])
     param_options += '--setParameters '+params_to_set
 
     fit_cmd = 'combine -M FitDiagnostics {card_or_w} {param_options} --saveWorkspace --cminDefaultMinimizerStrategy 0 --rMin {rmin} --rMax {rmax} -v {verbosity}'
@@ -578,3 +636,32 @@ def make_postfit_workspace(d=''):
     fout = ROOT.TFile('initialFitWorkspace.root', "recreate")
     fout.WriteTObject(w, 'w')
     fout.Close()
+
+# TODO: Add ability to freeze parameters via var.setConstant() while looping over floatParsFinal()
+def import_fitresult(inCard, fitResult, toDrop=[]):
+    # First convert the card and open workspace
+    execute_cmd('text2workspace.py -b %s -o morphedWorkspace.root --channel-masks --X-no-jmax'%inCard)
+    w_f = ROOT.TFile.Open('morphedWorkspace.root', 'UPDATE')
+    w = w_f.Get('w')
+    # Open fit result we want to import
+    print ('Importing %s...'%fitResult)
+    fr_f = ROOT.TFile.Open(fitResult)
+    fr = fr_f.Get('fit_b') # b-only fit result (fit_s for s+b)
+    myargs = fr.floatParsFinal()
+    outargs = ROOT.RooArgSet()
+
+    _cache = [] # to avoid seg faults
+    for i in range(myargs.getSize()):
+        var = myargs.at(i)
+        if var.GetName() in toDrop: continue
+
+        if not w.allVars().contains(var):
+            print ('WARNING: Could not find %s'%var.GetName())
+            continue
+                
+        outargs.add(var)
+        _cache.append(var)
+    
+    w.saveSnapshot('morphedModel',outargs,True)
+    w_f.WriteTObject(w,'w',"Overwrite")
+    w_f.Close()

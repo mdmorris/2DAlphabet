@@ -119,7 +119,7 @@ class Plotter(object):
             self.slices['x'][region] = {'vals': binning.xSlices,'idxs':binning.xSliceIdx}
             self.slices['y'][region] = {'vals': binning.ySlices,'idxs':binning.ySliceIdx}
             
-            for process in self.twoD.GetProcesses()+['TotalBkg']:
+            for process in self.twoD.GetProcesses()+['TotalBkg', 'data_obs']:
                 if process != 'TotalBkg':
                     color = self.twoD.GetProcessColor(process)
                     proc_type = self.twoD.GetProcessType(process)

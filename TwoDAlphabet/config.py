@@ -1,4 +1,5 @@
-import ROOT, json, os, pandas, re, warnings
+from collections import OrderedDict
+import ROOT, json, os, pandas, re, warnings, itertools
 from numpy import nan
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
@@ -34,8 +35,8 @@ class Config:
     def __init__(self,jsonPath,findreplace={}):
         self.config = open_json(jsonPath)
         self._addFindReplace(findreplace)
+        self.iterWorkspaceObjs = {}
         if 'GLOBAL' in self.config.keys(): self._varReplacement()
-        self.nsignals, self.nbkgs = 0, 0
         self._addedConfigs = []
 
     def _section(self,key):
@@ -83,8 +84,11 @@ class Config:
             if old_string == "HELP":
                 print ('WARNING: The HELP entry is deprecated and checking for it will be removed in the future. Please remove it from your config.')
                 continue
-            new_string = self._section('GLOBAL')[old_string]
-            self.config = config_loop_replace(self.config, old_string, new_string)
+            new_obj = self._section('GLOBAL')[old_string]
+            if isinstance(new_obj,list):
+                self.iterWorkspaceObjs[old_string] = new_obj
+            else:
+                self.config = config_loop_replace(self.config, old_string, new_obj)
 
     def SaveOut(self, projPath): # pragma: no cover
         '''Save the histogram table to the `projPath` directory in csv
@@ -106,6 +110,10 @@ class Config:
         regions = self._regionTable()
         processes = self._processTable()
         systematics = self._systematicsTable()
+
+        for p,group in processes.groupby(processes.index):
+            if group.title.nunique() > 1:
+                raise RuntimeError('There are multiple titles specified for process %s. Do not use multiple substitution for titles. Use plotting options instead.\n%s'%(p,group))
 
         for syst in list(processes.variation.unique()):
             if syst not in list(systematics.index.unique())+['nominal']:
@@ -181,8 +189,16 @@ class Config:
             for p in self._section('REGIONS')[r]['PROCESSES']:
                 if p not in self._section('PROCESSES'):
                     raise RuntimeError('Process "%s" listed for region "%s" not defined in PROCESSES section.'%(p,r))
-                out_df = out_df.append(pandas.Series({'process':p,'region':r,'binning':self._section('REGIONS')[r]['BINNING']}),ignore_index=True)
-            
+                
+                row_format = lambda c: {
+                    'process': c['PROCESS'],
+                    'region': c['REGION'],
+                    'binning':self._section('REGIONS')[c['REGION']]['BINNING']
+                }
+                rows_to_append = self._iterObjReplaceProducer({'PROCESS':p, 'REGION':r}, row_format)
+                for new_row in rows_to_append:
+                    out_df = out_df.append(new_row,ignore_index=True)
+                
         return out_df
 
     def _processTable(self):
@@ -196,22 +212,26 @@ class Config:
         out_df = pandas.DataFrame(columns=['color','process_type','scale','variation','source_filename','source_histname','alias','title','combine_idx'])
         for p in self._section('PROCESSES'):
             this_proc_info = self._section('PROCESSES')[p]
-            combine_idx = nan if p == 'data_obs' else self._getCombineIdx(this_proc_info)
+            this_proc_info['NAME'] = p
             if this_proc_info['TYPE'] == 'DATA' and p != 'data_obs':
                 raise RuntimeError('Any process of type DATA must have section key "data_obs".')
             for s in this_proc_info['SYSTEMATICS']+['nominal']:
-                out_df = out_df.append(pandas.Series(
-                                {'color': nan if 'COLOR' not in this_proc_info else this_proc_info['COLOR'],
-                                'process_type': this_proc_info['TYPE'],
-                                'scale': 1.0 if 'SCALE' not in this_proc_info else this_proc_info['SCALE'],
-                                'source_filename': this_proc_info['LOC'].split(':')[0],
-                                'source_histname': this_proc_info['LOC'].split(':')[1],
-                                'alias': p if 'ALIAS' not in this_proc_info.keys() else this_proc_info['ALIAS'], #in file name
-                                'title': p if 'TITLE' not in this_proc_info.keys() else this_proc_info['TITLE'], #in legend entry
-                                'variation': s,
-                                'combine_idx':combine_idx},
-                                name=p)
-                            )
+                this_proc_info['VARIATION'] = s
+                row_format = lambda info: pandas.Series(
+                    {'color': nan if 'COLOR' not in info else info['COLOR'],
+                    'process_type': info['TYPE'],
+                    'scale': 1.0 if 'SCALE' not in info else info['SCALE'],
+                    'source_filename': info['LOC'].split(':')[0],
+                    'source_histname': info['LOC'].split(':')[1],
+                    'alias': info['NAME'] if 'ALIAS' not in info.keys() else info['ALIAS'], #in file name
+                    'title': info['NAME'] if 'TITLE' not in info.keys() else info['TITLE'], #in legend entry
+                    'variation': info['VARIATION'],
+                    }, name=info['NAME']
+                )
+                rows_to_append = self._iterObjReplaceProducer(this_proc_info, row_format)
+                for new_row in rows_to_append:
+                    out_df = out_df.append(new_row)
+
         return out_df
 
     def _systematicsTable(self):
@@ -226,18 +246,58 @@ class Config:
         '''
         out_df = pandas.DataFrame(columns=_syst_col_defaults.keys())
         for s in self._section('SYSTEMATICS'):
-            for syst in _get_syst_attrs(s,self._section('SYSTEMATICS')[s]):
-                out_df = out_df.append(syst)
+            iterations_to_process = self._iterObjReplaceProducer(self._section('SYSTEMATICS')[s], lambda c: c)
+            for iteration in iterations_to_process:
+                for syst in _get_syst_attrs(s, iteration):
+                    out_df = out_df.append(syst)
+        
         return out_df
 
-    def _getCombineIdx(self,procdict):
-        if procdict['TYPE'] == 'SIGNAL':
-            combine_idx = '%s'%self.nsignals # first signal idxed at 0 so set it *before* incrementing
-            self.nsignals -= 1
-        else:
-            self.nbkgs += 1
-            combine_idx = '%s'%self.nbkgs # first signal idxed at 0 so set it *before* incrementing
-        return combine_idx
+    def _iterObjReplaceProducer(self, obj_package, func):
+        '''Pre-processes input to DataFrame in the case that the inputs
+        can take multiple values with keyword replacement.
+
+        Args:
+            obj_package ([type]): [description]
+            func ([type]): [description]
+        '''
+        def _iterativeReplace(base,find_replace_map):
+            out = base
+            for f,r in find_replace_map.items():
+                out = out.replace(f,r)
+            return out
+
+        to_vary = OrderedDict()
+        for objKey, obj in obj_package.items(): # do replacement for multiple objects
+            if not isinstance(obj, str):
+                to_vary[objKey] = [obj]
+                continue
+            to_vary[objKey] = []
+
+            matches = [] # find all matches to this obj
+            for iterKey in self.iterWorkspaceObjs.keys():
+                if iterKey in obj:
+                    matches.append(iterKey)
+
+            # Build all combinations of N matches
+            replacements_for_matches = [self.iterWorkspaceObjs[iterKey] for iterKey in matches]
+            for replacement_set in itertools.product(*replacements_for_matches):
+                if isinstance(replacement_set, str): replacement_set = set(replacement_set)
+                # Loop of replacements, perform replacements, and track the variation
+                find_replace_map = {matches[i]:replacement_set[i] for i in range(len(matches))}
+                to_vary[objKey].append(_iterativeReplace(obj, find_replace_map))
+
+            if len(to_vary[objKey]) == 0:
+                # if no replacements, store original
+                to_vary[objKey] = [obj]
+
+        # Use func to plug everything back together
+        out = []
+        for varied_set in itertools.product(*(to_vary.values())):
+            varied_set_map = {key: varied_set[i] for i,key in enumerate(to_vary.keys())}
+            out.append(func(varied_set_map))
+        
+        return out
 
     def Add(self,cNew,onlyOn=['process','region']):
         raise NotImplementedError('Multiple config support is currently a work in progress. Only the first config will be used.')
