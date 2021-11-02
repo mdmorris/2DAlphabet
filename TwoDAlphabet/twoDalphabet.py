@@ -81,7 +81,6 @@ class TwoDAlphabet:
             print ('Making dir '+self.tag+'/')
             os.mkdir(self.tag+'/')
 
-        _runDirSetup(self.tag)
         if self.options.plotTemplateComparisons and not os.path.isdir(self.tag+'/UncertPlots/'): 
             os.mkdir(self.tag+'/UncertPlots/')
 
@@ -316,10 +315,14 @@ class TwoDAlphabet:
             self._makeWorkspace()
         self._saveOut()
 
+    def MakeCard(self, subledger, subtag, workspaceDir='../', toyData=None):
+        with cd(self.tag):
+            _runDirSetup(subtag)
+            MakeCard(subledger, subtag, workspaceDir, toyData)
+
 # -------- STAT METHODS ------------------ #
-    def MLfit(self, subtag, rMin=-1, rMax=10, setParams={}, signalSelect=[], verbosity=0, usePreviousFit=False, toyData=None):
-        run_dir = _runDirSetup(self.tag+'/'+subtag)
-        with cd(run_dir):
+    def MLfit(self, subtag, rMin=-1, rMax=10, setParams={}, verbosity=0, usePreviousFit=False, toyData=None):
+        with cd(self.tag+'/'+subtag):
             _runMLfit(
                 subtag='',
                 blinding=self.options.blindedFit,
@@ -332,17 +335,18 @@ class TwoDAlphabet:
             # execute_cmd(systematic_analyzer_cmd)    
 
     def StdPlots(self, subtag, ledger=None):
-        if ledger == None: ledger = self.ledger
         run_dir = self.tag+'/'+subtag
         with cd(run_dir):
+            if ledger == None:
+                ledger = pickle.load(open('ledger.p','rb'))
             plot.nuis_pulls()
             plot.save_post_fit_parametric_vals()
             plot.make_correlation_matrix( # Ignore nuisance parameters that are bins
                 varsToIgnore=self.ledger.alphaParams.name.str.contains('_bin_\d+-\d+').to_list()
             )
             plot.gen_post_fit_shapes()
-            plot.gen_projections(self.options, ledger, 'b')
-            plot.gen_projections(self.options, ledger, 's')
+            plot.gen_projections(ledger, self, 'b')
+            plot.gen_projections(ledger, self, 's')
             
     def GetParamsOnMatch(self, regex='', subtag='', b_or_s='b'):
         out = {}
@@ -437,7 +441,7 @@ class TwoDAlphabet:
     def SignalInjection(self, r):
         pass
 
-    def Limit(self, subtag, loadFitDir, signalSelect=[], blindData=True, verbosity=0, setParams={}, location='', eosRootfiles=''):
+    def Limit(self, subtag, loadFitDir, blindData=True, verbosity=0, setParams={}, location='', eosRootfiles=''):
         if subtag == '': 
             raise RuntimeError('The subtag for limits must be non-empty so that the limit will be run in a nested directory.')
         if location == '':
@@ -451,9 +455,10 @@ class TwoDAlphabet:
 
         run_dir = self.tag+'/'+subtag
         _runDirSetup(run_dir)
-        workspace_dir = workspace_dir = '' if subtag=='' else '../'
+        workspace_dir = '' if subtag=='' else '../'
         with cd(run_dir):
-            self._makeCard(workspace_dir, subtag, signalSelect)
+            subledger = pickle.load(open('ledger.p','rb'))
+            self.MakeCard(subledger, subtag, workspace_dir)
             limit_cmd = _runLimit(loadFitDir, blindData, verbosity, setParams, location) # runs on this line if location == 'local'
             
             if location == 'condor':
@@ -478,8 +483,12 @@ class Ledger():
     def append(self, toAppend):
         self.df.append(toAppend, ignore_index=True if isinstance(toAppend, dict) else False)
 
-    def GetFull(self):
-        self.df.append()
+    def select(self,f,*args):
+        eval_lamba = lambda row: f(row,args)
+        df = self.df.loc[self.df.apply(eval_lamba, axis=1)]
+        new_ledger = Ledger(df)
+        new_ledger.alphaObjs = self.alphaObjs.loc[self.alphaObjs.apply(eval_lamba, axis=1)]
+        return new_ledger
 
     def GetRegions(self):
         return self.df.region.unique()
@@ -583,10 +592,10 @@ def _runDirSetup(runDir):
     
     return runDir
 
-def MakeCard(ledger, subtag, workspace_dir='', toyData=None):
+def MakeCard(ledger, subtag, workspaceDir, toyData=None):
     combine_idx_map = ledger._getCombineIdxMap()
 
-    card_new = open('card_%s.txt'%subtag,'w')
+    card_new = open('%s/card.txt'%subtag,'w')
     # imax (bins), jmax (backgrounds+signals), kmax (systematics) 
     imax = 3*len(ledger.GetRegions()) # pass, fail for each 'X' axis category    
     jmax = ledger.nbkgs + ledger.nsignals -1
@@ -602,15 +611,15 @@ def MakeCard(ledger, subtag, workspace_dir='', toyData=None):
     shape_line = 'shapes  {0:20} * {1} w:{0}_$CHANNEL w:{0}_$CHANNEL_$SYSTEMATIC\n'
     for proc in ledger.GetProcesses(includeNonConfig=False):
         if proc == 'data_obs': continue
-        card_new.write(shape_line.format(proc, workspace_dir+'base.root'))
+        card_new.write(shape_line.format(proc, workspaceDir+'base.root'))
 
     shape_line_nosyst = shape_line.replace(' w:{0}_$CHANNEL_$SYSTEMATIC','')
     for proc in list(ledger.alphaObjs.process.unique()):
-        card_new.write(shape_line_nosyst.format(proc, workspace_dir+'base.root'))
+        card_new.write(shape_line_nosyst.format(proc, workspaceDir+'base.root'))
 
     # Do data - importing toy if needed
     if toyData == None:
-        card_new.write(shape_line_nosyst.format('data_obs', workspace_dir+'base.root'))
+        card_new.write(shape_line_nosyst.format('data_obs', workspaceDir+'base.root'))
     else:
         card_new.write(shape_line_nosyst.replace(' w:{0}_$CHANNEL','').format('data_obs', toyData))
 
@@ -691,6 +700,7 @@ def MakeCard(ledger, subtag, workspace_dir='', toyData=None):
         card_new.write('{0:40} {1}\n'.format(param.name, param.constraint))
     
     card_new.close()
+    pickle.dump(ledger, open('%s/ledger.p'%subtag,'wb'))
 
 def _runMLfit(subtag, blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False):
     if usePreviousFit: param_options = ''
