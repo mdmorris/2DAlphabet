@@ -19,7 +19,7 @@ class Plotter(object):
         slices (dict): Stores edges to slice "x" and "y" axes. 
         root_out (ROOT.TFile): File storing all histograms that are made.
     '''
-    def __init__(self,twoD,fittag,loadExisting=False):
+    def __init__(self,options,ledger,fittag,loadExisting=False):
         '''Constructor.
 
         Args:
@@ -29,7 +29,8 @@ class Plotter(object):
         '''
 
         self.fittag = fittag
-        self.twoD = twoD
+        self.options = options
+        self.ledger = ledger
         self.yaxis1D_title = 'Events / bin'
         self.df = pandas.DataFrame(columns=['process','region','process_type','title'])
         self.dir = 'plots_fit_{f}'.format(f=self.fittag)
@@ -74,7 +75,7 @@ class Plotter(object):
             TH1: Formatted histogram.
         '''
         ytitle = self.yaxis1D_title
-        if self.twoD.options.plotEvtsPerUnit:
+        if self.options.plotEvtsPerUnit:
             hslice = convert_to_events_per_unit(hslice)
             ytitle = 'Events / %s GeV' % get_min_bin_width(hslice)
         hslice.SetMinimum(0)
@@ -108,10 +109,10 @@ class Plotter(object):
         shapes_file = ROOT.TFile.Open('postfitshapes_%s.root'%self.fittag)
         loc_base = '{r}_{c}_{t}/{p}'
 
-        for region in self.twoD.GetRegions():
-            binning,_ = self.twoD.GetBinningFor(region)
-            if len(self.twoD.options.blindedPlots) > 0:
-                if region in self.twoD.options.blindedPlots:
+        for region in self.ledger.GetRegions():
+            binning,_ = self.ledger.GetBinningFor(region)
+            if len(self.options.blindedPlots) > 0:
+                if region in self.options.blindedPlots:
                     blinding = [1]
                 else: blinding = []
             else: blinding = []
@@ -119,11 +120,11 @@ class Plotter(object):
             self.slices['x'][region] = {'vals': binning.xSlices,'idxs':binning.xSliceIdx}
             self.slices['y'][region] = {'vals': binning.ySlices,'idxs':binning.ySliceIdx}
             
-            for process in self.twoD.GetProcesses()+['TotalBkg', 'data_obs']:
+            for process in self.ledger.GetProcesses()+['TotalBkg', 'data_obs']:
                 if process != 'TotalBkg':
-                    color = self.twoD.GetProcessColor(process)
-                    proc_type = self.twoD.GetProcessType(process)
-                    proc_title = self.twoD.GetProcessTitle(process)
+                    color = self.ledger.GetProcessColor(process)
+                    proc_type = self.ledger.GetProcessType(process)
+                    proc_title = self.ledger.GetProcessTitle(process)
                 else:
                     color = ROOT.kBlack
                     proc_type = 'TOTAL'
@@ -137,6 +138,7 @@ class Plotter(object):
                 for time in ['prefit','postfit']:
                     # 2D distributions first
                     out2d_name = '%s_%s_%s_2D'%(process,region,time)
+                    print ('DEBUG: %s'%loc_base.format(r=region, c='BAND', t=time, p=process))
                     low  = shapes_file.Get(loc_base.format(r=region, c='LOW', t=time, p=process))
                     sig  = shapes_file.Get(loc_base.format(r=region, c='SIG', t=time, p=process))
                     high = shapes_file.Get(loc_base.format(r=region, c='HIGH',t=time, p=process))
@@ -203,9 +205,9 @@ class Plotter(object):
         '''
         if proclist == []:
             if alphaBottom:
-                process_order = self.twoD.GetProcesses(ptype=proc_type, includeNonConfig=True, includeConfig=False) + self.twoD.GetProcesses(ptype=proc_type, includeNonConfig=False, includeConfig=True)
+                process_order = self.ledger.GetProcesses(ptype=proc_type, includeNonConfig=True, includeConfig=False) + self.ledger.GetProcesses(ptype=proc_type, includeNonConfig=False, includeConfig=True)
             else:
-                process_order = self.twoD.GetProcesses(ptype=proc_type, includeNonConfig=False, includeConfig=True) + self.twoD.GetProcesses(ptype=proc_type, includeNonConfig=True, includeConfig=False)
+                process_order = self.ledger.GetProcesses(ptype=proc_type, includeNonConfig=False, includeConfig=True) + self.ledger.GetProcesses(ptype=proc_type, includeNonConfig=True, includeConfig=False)
         else:
             process_order = proclist
 
@@ -226,9 +228,9 @@ class Plotter(object):
             process, region = pr[0], pr[1]
             out_file_name = '{d}/base_figs/{p}_{r}_%s_2D'.format(d=self.dir,p=process,r=region)
             make_pad_2D(outname=out_file_name%('prefit'), hist=self.Get('{p}_{r}_{t}'.format(p=process,r=region,t='prefit_2D')),
-                            year=self.twoD.options.year, savePDF=True, savePNG=True)
+                            year=self.options.year, savePDF=True, savePNG=True)
             make_pad_2D(outname=out_file_name%('postfit'), hist=self.Get('{p}_{r}_{t}'.format(p=process,r=region,t='postfit_2D')),
-                            year=self.twoD.options.year, savePDF=True, savePNG=True)
+                            year=self.options.year, savePDF=True, savePNG=True)
 
             make_can('{d}/{p}_{r}_2D'.format(d=self.dir,p=process,r=region), [out_file_name%('prefit')+'.png', out_file_name%('postfit')+'.png'])
 
@@ -246,7 +248,7 @@ class Plotter(object):
         '''
         pads = pandas.DataFrame()
         for region, group in self.df.groupby('region'):
-            binning,_ = self.twoD.GetBinningFor(region)
+            binning,_ = self.ledger.GetBinningFor(region)
 
             for logyFlag in [False, True]:
 
@@ -259,7 +261,7 @@ class Plotter(object):
                     for islice in range(3):
                         projn = proj+str(islice)
                         sig_projn = projn
-                        if self.twoD.options.plotPrefitSigInFitB and self.fittag == 'b':
+                        if self.options.plotPrefitSigInFitB and self.fittag == 'b':
                             sig_projn = projn.replace('postfit','prefit')
 
                         this_data =      self.Get(row=group.loc[group.process_type.eq('DATA')].iloc[0], hist_type=projn)
@@ -281,7 +283,7 @@ class Plotter(object):
                         
                         make_pad_1D(out_pad_name, data=this_data, bkgs=these_bkgs, signals=these_signals,
                                     subtitle=slice_str, totalBkg=this_totalbkg,
-                                    logyFlag=logyFlag, year=self.twoD.options.year,
+                                    logyFlag=logyFlag, year=self.options.year,
                                     extraText='', savePDF=True, savePNG=True, ROOTout=False)
                         pads = pads.append({'pad':out_pad_name+'.png', 'region':region, 'proj':projn, 'logy':logyFlag}, ignore_index=True)
 
@@ -304,7 +306,7 @@ class Plotter(object):
             pads = pandas.DataFrame()
             for pr, _ in self.df[~self.df.process.isin(['data_obs','TotalBkg'])].groupby(['process','region']):
                 process, region = pr[0], pr[1]
-                binning,_ = self.twoD.GetBinningFor(region)
+                binning,_ = self.ledger.GetBinningFor(region)
                 for islice in range(3):
                     projn = proj+str(islice)
                     post = self.Get('%s_%s_postfit_%s'%(process,region,projn))
@@ -325,7 +327,7 @@ class Plotter(object):
                     make_pad_1D(
                         out_pad_name, 
                         post, [pre], totalBkg=pre, subtitle=slice_str, savePDF=True, savePNG=True, 
-                        datastyle='histe', year=self.twoD.options.year, extraText=''
+                        datastyle='histe', year=self.options.year, extraText=''
                     )
                     
                     pads = pads.append({'pad':out_pad_name+'.png','process':process,'region':region,'proj':projn}, ignore_index=True)
@@ -730,8 +732,8 @@ def _get_start_stop(i,slice_idxs):
     stop  = slice_idxs[i+1]
     return start, stop
 
-def gen_projections(twoD,fittag):
-    plotter = Plotter(twoD,fittag)
+def gen_projections(options,ledger,fittag):
+    plotter = Plotter(options, ledger, fittag)
     plotter.plot_2D_distributions()
     plotter.plot_projections()
     plotter.plot_pre_vs_post()
