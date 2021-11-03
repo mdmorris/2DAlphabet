@@ -64,8 +64,7 @@ class TwoDAlphabet:
                 self.GetHistMap(), readOnly=True
             )
             # Does not contain the RooFit objects - just meta info
-            self.ledger.alphaObjs = pandas.read_csv(self.tag+'/alphaObjs.csv')
-            self.ledger.alphaParams = pandas.read_csv(self.tag+'/alphaParams.csv')
+            self.ledger = LoadLedger(self.tag+'/')
         
         if self.options.debugDraw is False:
             ROOT.gROOT.SetBatch(True)
@@ -135,21 +134,8 @@ class TwoDAlphabet:
         - the binnings dictionary (with objects)
         - the alphaObjs and alphaParams dictionaries (without objects)
         '''
-        if 'index' in self.df.columns:
-               df = self.df.reset_index(drop=True).drop('index',axis=1)
-        else:  df = self.df
-
-        df.to_csv(self.tag+'/hist_ledger.csv')
-        if sys.version_info.major == 3:
-            df.to_markdown(self.tag+'/hist_ledger.md')
-
         pickle.dump(self.binnings,open(self.tag+'/binnings.p','wb'))
-
-        alphaObjs = self.ledger.alphaObjs.drop(columns=['obj','norm'])
-        alphaObjs.to_csv(self.tag+'/alphaObjs.csv')
-
-        alphaParams = self.ledger.alphaParams.drop(columns=['obj'])
-        alphaParams.to_csv(self.tag+'/alphaParams.csv')
+        self.ledger.Save(self.tag)
 
         if self.options.plotTemplateComparisons:
             plot.make_systematic_plots(self)
@@ -338,7 +324,7 @@ class TwoDAlphabet:
         run_dir = self.tag+'/'+subtag
         with cd(run_dir):
             if ledger == None:
-                ledger = pickle.load(open('ledger.p','rb'))
+                ledger = LoadLedger('')
             plot.nuis_pulls()
             plot.save_post_fit_parametric_vals()
             plot.make_correlation_matrix( # Ignore nuisance parameters that are bins
@@ -457,7 +443,7 @@ class TwoDAlphabet:
         _runDirSetup(run_dir)
         workspace_dir = '' if subtag=='' else '../'
         with cd(run_dir):
-            subledger = pickle.load(open('ledger.p','rb'))
+            subledger = LoadLedger('')
             self.MakeCard(subledger, subtag, workspace_dir)
             limit_cmd = _runLimit(loadFitDir, blindData, verbosity, setParams, location) # runs on this line if location == 'local'
             
@@ -577,6 +563,37 @@ class Ledger():
 
         out = pandas.concat([signal_map, bkg_map])
         return out
+
+    def _saveAlphas(self,outDir=''):
+        alphaObjs = self.alphaObjs
+        alphaParams = self.alphaParams
+
+        if 'obj' in alphaObjs.columns:
+            alphaObjs = alphaObjs.drop(columns=['obj','norm'])
+        alphaObjs.to_csv(outDir+'/ledger_alphaObjs.csv')
+        
+        if 'obj' in self.alphaParams.columns:
+            alphaParams = alphaParams.drop(columns=['obj'])
+        alphaParams.to_csv(outDir+'/ledger_alphaParams.csv')
+
+    def Save(self, outDir):
+        if 'index' in self.df.columns:
+               df = self.df.reset_index(drop=True).drop('index',axis=1)
+        else:  df = self.df
+
+        self.df.to_csv(outDir+'/ledger_df.csv')
+        if sys.version_info.major == 3:
+            df.to_markdown(outDir+'/ledger_hists.md')
+
+        self._saveAlphas(outDir)
+
+def LoadLedger(indir=''):
+    df = pandas.read_csv(indir+'ledger_df.csv')
+    ledger = Ledger(df)
+    ledger.alphaObjs = pandas.read_csv(indir+'ledger_alphaObjs.csv')
+    ledger.alphaParams = pandas.read_csv(indir+'ledger_alphaParams.csv')
+
+    return ledger
 
 def _runDirSetup(runDir):
     dirs_to_make = [
@@ -700,7 +717,7 @@ def MakeCard(ledger, subtag, workspaceDir, toyData=None):
         card_new.write('{0:40} {1}\n'.format(param.name, param.constraint))
     
     card_new.close()
-    pickle.dump(ledger, open('%s/ledger.p'%subtag,'wb'))
+    ledger.Save(subtag)
 
 def _runMLfit(subtag, blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False):
     if usePreviousFit: param_options = ''
