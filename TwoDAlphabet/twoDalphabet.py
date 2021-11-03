@@ -307,15 +307,15 @@ class TwoDAlphabet:
             MakeCard(subledger, subtag, workspaceDir, toyData)
 
 # -------- STAT METHODS ------------------ #
-    def MLfit(self, subtag, rMin=-1, rMax=10, setParams={}, verbosity=0, usePreviousFit=False, toyData=None):
+    def MLfit(self, subtag, rMin=-1, rMax=10, setParams={}, verbosity=0, usePreviousFit=False, extra=''):
         with cd(self.tag+'/'+subtag):
             _runMLfit(
-                subtag='',
                 blinding=self.options.blindedFit,
                 verbosity=verbosity, 
                 rMin=rMin, rMax=rMax,
                 setParams=setParams,
-                usePreviousFit=usePreviousFit)
+                usePreviousFit=usePreviousFit,
+                extra=extra)
             make_postfit_workspace('')
             # systematic_analyzer_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py card.txt --all -f html > systematics_table.html'
             # execute_cmd(systematic_analyzer_cmd)    
@@ -328,7 +328,7 @@ class TwoDAlphabet:
             plot.nuis_pulls()
             plot.save_post_fit_parametric_vals()
             plot.make_correlation_matrix( # Ignore nuisance parameters that are bins
-                varsToIgnore=self.ledger.alphaParams.name.str.contains('_bin_\d+-\d+').to_list()
+                varsToIgnore=self.ledger.alphaParams.name[self.ledger.alphaParams.name.str.contains('_bin_\d+-\d+')].to_list()
             )
             plot.gen_post_fit_shapes()
             plot.gen_projections(ledger, self, 'b')
@@ -350,7 +350,7 @@ class TwoDAlphabet:
 
         return out
 
-    def GenerateToys(self, name, subtag='', card=None, workspace=None, ntoys=1, seed=123456, expectSignal=0, setParams={}, freezeParams=[], run=True):
+    def GenerateToys(self, name, subtag, card=None, workspace=None, ntoys=1, seed=123456, expectSignal=0, setParams={}, freezeParams=[], run=True):
         if card == None and workspace == None:
             raise IOError('Either card or workspace must be provided relative to the directory where the generation will be run.')
         elif card != None and workspace != None:
@@ -361,9 +361,10 @@ class TwoDAlphabet:
                 card_name = card
             elif isinstance(card, bool) and card == True:
                 card_name = 'card.txt'
-            workspace_file = '%s_gen_workspace.root'%(name if subtag=='' else subtag+'/'+name)
+            workspace_file = '%s_gen_workspace.root'%(name)
             execute_cmd(
-                'text2workspace.py -b {0}/{1} -o {0}/{2} --channel-masks --X-no-jmax'.format(self.tag,card_name, workspace_file)
+                'text2workspace.py -b {0}/{1} -o {0}/{2} --channel-masks --X-no-jmax'.format(
+                    self.tag+'/'+subtag, card_name, workspace_file)
             )
             
             input_opt = '-d %s'%workspace_file
@@ -376,14 +377,15 @@ class TwoDAlphabet:
                 workspace_file = 'initialFitWorkspace.root'
                 input_opt = '-d %s --snapshotName initialFit'%workspace_file
 
-        masks_off = ['%s=0'%mask for mask in self._getMasks(self.tag+'/'+workspace_file)]
-
         run_dir = self.tag+'/'+subtag
+        masks_off = ['%s=0'%mask for mask in self._getMasks(run_dir+'/'+workspace_file)]
+        
         with cd(run_dir):
-            param_vals = ['%s=%s'%(k,v) for k,v in setParams.items()] + masks_off
+            param_vals = ['%s=%s'%(k,v['val']) for k,v in setParams.items()]
+            param_vals.extend(masks_off)
             param_opt = ''
             if len(param_vals) > 0:
-                param_opt = '--setParameters '+','.join(param_vals),
+                param_opt = '--setParameters '+','.join(param_vals)
 
             freeze_opt = ''
             if len(freezeParams) > 0:
@@ -391,7 +393,7 @@ class TwoDAlphabet:
 
             gen_command_pieces = [
                 'combine -M GenerateOnly',
-                 input_opt, param_opt,
+                input_opt, param_opt,
                 '--toysFrequentist --bypassFrequentistFit',
                 '-t %s'%ntoys,
                 '--saveToys -s %s'%seed,
@@ -404,7 +406,9 @@ class TwoDAlphabet:
             else:
                 print ('Not running:\n\t'+' '.join(gen_command_pieces))
 
-        return '%shiggsCombine_%s.GenerateOnly.mH120.%s.root'%(subtag+'/' if subtag!='' else '',name,seed)
+        toyfile_path = '%shiggsCombine_%s.GenerateOnly.mH120.%s.root'%(self.tag+'/'+subtag+'/',name,seed)
+
+        return toyfile_path
 
     def _getMasks(self, filename):
         masked_regions = []
@@ -719,19 +723,20 @@ def MakeCard(ledger, subtag, workspaceDir, toyData=None):
     card_new.close()
     ledger.Save(subtag)
 
-def _runMLfit(subtag, blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False):
+def _runMLfit(blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False, extra=''):
     if usePreviousFit: param_options = ''
     else:              param_options = '--text2workspace "--channel-masks" '
     params_to_set = ','.join(['mask_%s_SIG=1'%r for r in blinding]+['%s=%s'%(p,v) for p,v in setParams.items()]+['r=1'])
     param_options += '--setParameters '+params_to_set
 
-    fit_cmd = 'combine -M FitDiagnostics {card_or_w} {param_options} --saveWorkspace --cminDefaultMinimizerStrategy 0 --rMin {rmin} --rMax {rmax} -v {verbosity}'
+    fit_cmd = 'combine -M FitDiagnostics {card_or_w} {param_options} --saveWorkspace --cminDefaultMinimizerStrategy 0 --rMin {rmin} --rMax {rmax} -v {verbosity} {extra}'
     fit_cmd = fit_cmd.format(
-        card_or_w='initifalFitWorkspace.root --snapshotName initialFit' if usePreviousFit else 'card%s.txt'%subtag,
+        card_or_w='initifalFitWorkspace.root --snapshotName initialFit' if usePreviousFit else 'card.txt',
         param_options=param_options,
         rmin=rMin,
         rmax=rMax,
-        verbosity=verbosity
+        verbosity=verbosity,
+        extra=extra
     )
 
     with open('FitDiagnostics_command.txt','w') as out:
