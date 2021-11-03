@@ -865,7 +865,11 @@ def gen_post_fit_shapes():
     fit_result_file = ROOT.TFile.Open('fitDiagnosticsTest.root')
     goodFitTags = _get_good_fit_results(fit_result_file)
     for t in goodFitTags:
-        shapes_cmd = 'PostFit2DShapesFromWorkspace -w higgsCombineTest.FitDiagnostics.mH120.root -o postfitshapes_{0}.root -f fitDiagnosticsTest.root:fit_{0} --postfit --sampling --samples 100 --print 2> PostFitShapes2D_stderr_{0}.txt'.format(t)
+        if os.path.exists('higgsCombineTest.FitDiagnostics.mH120.root'):
+            workspace_file = 'higgsCombineTest.FitDiagnostics.mH120.root'
+        else:
+            workspace_file = 'higgsCombineTest.FitDiagnostics.mH120.123456.root'
+        shapes_cmd = 'PostFit2DShapesFromWorkspace -w {w} -o postfitshapes_{t}.root -f fitDiagnosticsTest.root:fit_{t} --postfit --samples 100 --print 2> PostFitShapes2D_stderr_{t}.txt'.format(t=t,w=workspace_file)
         execute_cmd(shapes_cmd)
     fit_result_file.Close()
 

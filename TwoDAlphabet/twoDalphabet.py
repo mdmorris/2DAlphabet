@@ -725,7 +725,7 @@ def _runMLfit(subtag, blinding, verbosity, rMin, rMax, setParams, usePreviousFit
 
     execute_cmd(fit_cmd)
 
-def _runLimit(loadFitDir, blindData, verbosity, setParams, location, condor_name=''):
+def _runLimit(loadFitDir, blindData, verbosity, setParams, location):
     fr_path = '../'+loadFitDir+'/fitDiagnosticsTest.root'
     if not os.path.exists(fr_path):
         raise OSError('The file %s does not exist. Please check that MLfit() finished correctly.'%fr_path)
@@ -755,7 +755,13 @@ def get_process_attr(df, procName, attrName):
     return df.loc[df.process.eq(procName)][attrName].iloc[0]
 
 def make_postfit_workspace(d=''):
-    w_f = ROOT.TFile.Open(d+'higgsCombineTest.FitDiagnostics.mH120.root')
+    print ('Making postfit workspace...')
+    
+    if os.path.exists(d+'higgsCombineTest.FitDiagnostics.mH120.root'):
+        w_f = ROOT.TFile.Open(d+'higgsCombineTest.FitDiagnostics.mH120.root')
+    else:
+        w_f = ROOT.TFile.Open(d+'higgsCombineTest.FitDiagnostics.mH120.123456.root')
+    
     w = w_f.Get('w')
     fr_f = ROOT.TFile.Open(d+'fitDiagnosticsTest.root')
     fr = fr_f.Get('fit_b')
