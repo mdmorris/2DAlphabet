@@ -1,4 +1,4 @@
-import argparse, os, itertools, pandas, glob, pickle, sys, re, json
+import argparse, os, itertools, pandas, glob, pickle, sys, re, json, random, copy
 from collections import OrderedDict
 from TwoDAlphabet.config import Config, OrganizedHists
 from TwoDAlphabet.binning import Binning
@@ -307,9 +307,11 @@ class TwoDAlphabet:
             MakeCard(subledger, subtag, workspaceDir, toyData)
 
 # -------- STAT METHODS ------------------ #
-    def MLfit(self, subtag, rMin=-1, rMax=10, setParams={}, verbosity=0, usePreviousFit=False, extra=''):
+    def MLfit(self, subtag, card='card.txt', rMin=-1, rMax=10, setParams={}, verbosity=0, usePreviousFit=False, extra=''):
+        _runDirSetup(self.tag+'/'+subtag)
         with cd(self.tag+'/'+subtag):
             _runMLfit(
+                card=card,
                 blinding=self.options.blindedFit,
                 verbosity=verbosity, 
                 rMin=rMin, rMax=rMax,
@@ -406,7 +408,7 @@ class TwoDAlphabet:
             else:
                 print ('Not running:\n\t'+' '.join(gen_command_pieces))
 
-        toyfile_path = '%shiggsCombine_%s.GenerateOnly.mH120.%s.root'%(self.tag+'/'+subtag+'/',name,seed)
+        toyfile_path = '%s/higgsCombine_%s.GenerateOnly.mH120.%s.root'%(self.tag+'/'+subtag+'/',name,seed)
 
         return toyfile_path
 
@@ -425,35 +427,78 @@ class TwoDAlphabet:
 
         return masked_regions
 
-    def GoodnessOfFit(self):
-        pass
+    def GoodnessOfFit(self, subtag, ntoys, card_or_w='card.txt', freezeSignal=False, seed=123456,
+                            verbosity=0, setParams={}, extra='', condor=False, eosRootfiles=None, njobs=0):
+        # NOTE: There's no way to blind data here - need to evaluate it to get the p-value
+        run_dir = self.tag+'/'+subtag
+        _runDirSetup(run_dir)
+        
+        with cd(run_dir):
+            gof_data_cmd = [
+                'combine -M GoodnessOfFit',
+                '-d '+card_or_w,
+                '--algo=saturated',
+                '' if not freezeSignal else '--fixedSignalStrength %s'%freezeSignal,
+                '-n _gof_data', '-v %s'%verbosity, extra
+            ]
 
+            gof_toy_cmd = copy.deepcopy(gof_data_cmd)
+            gof_toy_cmd.extend([
+                '--toysFrequentist', '-t {ntoys}',
+                '--setParameters '+','.join(['%s=%s'%(p,v) for p,v in setParams.items()]),
+                '-s {seed}'
+            ])
+
+            gof_data_cmd = ' '.join(gof_data_cmd)
+            gof_toy_cmd = ' '.join(gof_toy_cmd).replace('-n _gof_data','-n _gof_toys')
+
+            execute_cmd(gof_data_cmd)
+
+            if not condor:
+                gof_toy_cmd = gof_toy_cmd.format(seed=seed, ntoys=ntoys)
+                execute_cmd(gof_toy_cmd)
+                
+            else:
+                per_job_toys = int(round(ntoys/njobs))
+
+                print ('Running toys on condor... first cleaning potential duplicates...')
+                execute_cmd('rm higgsCombine_gof_toys.GoodnessOfFit.mH120.*.root')
+
+                gof_toy_cmds = [
+                    gof_toy_cmd.format(
+                        ntoys=per_job_toys,
+                        seed=random.randint(0,1000000)
+                    ) for _ in range(njobs)
+                ]
+
+                condor = CondorRunner(
+                    name = self.tag+'_'+subtag+'_gof',
+                    primaryCmds=gof_toy_cmds,
+                    toPkg=run_dir,
+                    runIn=run_dir,
+                    toGrab=run_dir+'/higgsCombine_gof_toys.GoodnessOfFit.mH120.*.root',
+                    eosRootfileTarball=eosRootfiles,
+                    remakeEnv=True
+                )
+                condor.submit()
+            
     def SignalInjection(self, r):
         pass
 
-    def Limit(self, subtag, loadFitDir, blindData=True, verbosity=0, setParams={}, location='', eosRootfiles=''):
+    def Limit(self, subtag, card_or_w='card.txt', blindData=True, verbosity=0,
+                    setParams={}, condor=False, eosRootfiles=None):
         if subtag == '': 
             raise RuntimeError('The subtag for limits must be non-empty so that the limit will be run in a nested directory.')
-        if location == '':
-            print ('Automatically determining whether location is "local" or "condor".')
-            if 'condor' in os.getcwd():
-                location = 'condor'
-            else:
-                location = 'local'
-        elif location not in ['local','condor']:
-            raise RuntimeError('Limit location can only be "", "local", or "condor". If empty string, will determine if condor based on absolute path.')
 
         run_dir = self.tag+'/'+subtag
         _runDirSetup(run_dir)
-        workspace_dir = '' if subtag=='' else '../'
+
         with cd(run_dir):
-            subledger = LoadLedger('')
-            self.MakeCard(subledger, subtag, workspace_dir)
-            limit_cmd = _runLimit(loadFitDir, blindData, verbosity, setParams, location) # runs on this line if location == 'local'
+            limit_cmd = _runLimit(blindData, verbosity, setParams, card_or_w, condor) # runs on this line if location == 'local'
             
-            if location == 'condor':
+            if condor:
                 condor = CondorRunner(
-                    name=self.tag+'_'+subtag,
+                    name=self.tag+'_'+subtag+'_limit',
                     primaryCmds=[limit_cmd],
                     toPkg=run_dir,
                     toGrab=run_dir+'/higgsCombineTest.AsymptoticLimits.mH120.root',
@@ -592,10 +637,10 @@ class Ledger():
         self._saveAlphas(outDir)
 
 def LoadLedger(indir=''):
-    df = pandas.read_csv(indir+'ledger_df.csv')
+    df = pandas.read_csv(indir+'/ledger_df.csv')
     ledger = Ledger(df)
-    ledger.alphaObjs = pandas.read_csv(indir+'ledger_alphaObjs.csv')
-    ledger.alphaParams = pandas.read_csv(indir+'ledger_alphaParams.csv')
+    ledger.alphaObjs = pandas.read_csv(indir+'/ledger_alphaObjs.csv')
+    ledger.alphaParams = pandas.read_csv(indir+'/ledger_alphaParams.csv')
 
     return ledger
 
@@ -723,7 +768,7 @@ def MakeCard(ledger, subtag, workspaceDir, toyData=None):
     card_new.close()
     ledger.Save(subtag)
 
-def _runMLfit(blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False, extra=''):
+def _runMLfit(card, blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False, extra=''):
     if usePreviousFit: param_options = ''
     else:              param_options = '--text2workspace "--channel-masks" '
     params_to_set = ','.join(['mask_%s_SIG=1'%r for r in blinding]+['%s=%s'%(p,v) for p,v in setParams.items()]+['r=1'])
@@ -731,7 +776,7 @@ def _runMLfit(blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False, 
 
     fit_cmd = 'combine -M FitDiagnostics {card_or_w} {param_options} --saveWorkspace --cminDefaultMinimizerStrategy 0 --rMin {rmin} --rMax {rmax} -v {verbosity} {extra}'
     fit_cmd = fit_cmd.format(
-        card_or_w='initifalFitWorkspace.root --snapshotName initialFit' if usePreviousFit else 'card.txt',
+        card_or_w='initifalFitWorkspace.root --snapshotName initialFit' if usePreviousFit else card,
         param_options=param_options,
         rmin=rMin,
         rmax=rMax,
@@ -747,26 +792,22 @@ def _runMLfit(blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False, 
 
     execute_cmd(fit_cmd)
 
-def _runLimit(loadFitDir, blindData, verbosity, setParams, location):
-    fr_path = '../'+loadFitDir+'/fitDiagnosticsTest.root'
-    if not os.path.exists(fr_path):
-        raise OSError('The file %s does not exist. Please check that MLfit() finished correctly.'%fr_path)
-
-    import_fitresult('card.txt', fr_path)
-
+def _runLimit(blindData, verbosity, setParams, card_or_w='card.txt', condor=False):
+    # card_or_w could be `morphedWorkspace.root --snapshotName morphedModel`
     param_options = ''
     if len(setParams) > 0:
         param_options = '--setParameters '+','.join('%s=%s'%(k,v) for k,v in setParams.items())
 
-    limit_cmd = 'combine -M AsymptoticLimits -d morphedWorkspace.root --snapshotName morphedModel --saveWorkspace --cminDefaultMinimizerStrategy 0 {param_opt} {blind_opt} -v {verb}' 
+    limit_cmd = 'combine -M AsymptoticLimits -d {card_or_w} --saveWorkspace --cminDefaultMinimizerStrategy 0 {param_opt} {blind_opt} -v {verb}' 
     limit_cmd = limit_cmd.format(
+        card_or_w=card_or_w,
         blind_opt='--run=blind' if blindData else '',
         param_opt=param_options,
         verb=verbosity
     )
 
     # Run combine if not on condor
-    if location == 'local':   
+    if not condor:   
         with open('Limit_command.txt','w') as out:
             out.write(limit_cmd) 
         execute_cmd(limit_cmd)
