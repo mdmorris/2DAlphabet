@@ -284,30 +284,39 @@ class CondorRunner():
         self.run_in = runIn
         self.to_grab = toGrab
         self.primary_cmds = primaryCmds
+        self.rootfile_tarball_path = eosRootfileTarball
         self.cmssw = os.environ['CMSSW_BASE'].split('/')[-1]
         self.env_tarball_path = make_env_tarball(remakeEnv)
         self.pkg_tarball_path = self._make_pkg_tarball(toPkg) if toPkg != None else ''
         self.run_script_path = self._make_run_script()
         self.run_args_path = self.run_script_path.replace('.sh','_args.txt')
-        self.rootfile_tarball_path = eosRootfileTarball
 
     def submit(self):
-        twoD_dir_base = self.cmssw+'/src/2DAlphabet/TwoDAlphabet/'
+        abs_path = os.getcwd()
+        abs_twoD_dir_base = abs_path[:abs_path.find(self.cmssw)]+self.cmssw+'/src/2DAlphabet/TwoDAlphabet/'
         timestr = time.strftime("%Y%m%d-%H%M%S")
         out_jdl = 'temp_'+timestr+'_jdl'
 
-        execute_cmd("sed 's$TEMPSCRIPT${0}$g' {1}condor/templates/jdl_template > {2}".format(self.run_script_path, twoD_dir_base, out_jdl))
+        execute_cmd("sed 's$TEMPSCRIPT${0}$g' {1}/condor/templates/jdl_template > {2}".format(self.run_script_path, abs_twoD_dir_base, out_jdl))
         execute_cmd("sed -i 's$TEMPTAR${0}$g' {1}".format(self.pkg_tarball_path, out_jdl))
         execute_cmd("sed -i 's$TEMPARGS${0}$g' {1}".format(self.run_args_path, out_jdl))
-        execute_cmd('mkdir notneeded')
+        if not os.path.exists('notneeded/'): execute_cmd('mkdir notneeded')
         execute_cmd("condor_submit "+out_jdl)
         execute_cmd("mv {0} notneeded/".format(out_jdl))
 
     def _make_pkg_tarball(self,to_pkg):
+        start_dir = os.getcwd()
+        out_dir = start_dir+'/notneeded'
+        out_path = '%s/%s_input.tgz'%(out_dir,self.name)
         with cd(os.environ['CMSSW_BASE']+'/src'):
-            execute_cmd('tar -czvf {0}.tgz {1}'.format(self.name, to_pkg))
-            path = os.path.abspath('%s.tgz'%self.name)
-        return path
+            if os.path.exists(out_path):
+                execute_cmd('rm '+out_path)
+            print ('Making package tarball %s.tgz'%self.name)
+            execute_cmd('tar -czf {0}.tgz {1}'.format(self.name, to_pkg))
+            print ('Done')
+            execute_cmd('mv %s.tgz %s'%(self.name,out_path))
+
+        return out_path
 
     def _make_run_script(self):
         blocks = []
@@ -327,11 +336,11 @@ class CondorRunner():
         if self.rootfile_tarball_path != None:
             blocks.append(_unpack_rootfiles.format(rootfile_tarball_path=self.rootfile_tarball_path))
 
-        blocks.append('cd '%self.run_in)
+        blocks.append('cd %s'%self.run_in)
         blocks.append('echo $*')
         blocks.append('$*')
         blocks.append('cd $CMSSW_BASE/src/')
-        blocks.append(_grab_output.format(out_id=self.name, to_grab=self.to_grab))
+        blocks.append(_grab_output.format(out_id=self.name+'_output', to_grab=self.to_grab))
 
         shell_name = 'run_'+self.name+'.sh'
         with open(shell_name,'w') as run_script:
@@ -346,18 +355,22 @@ class CondorRunner():
 
 def make_env_tarball(makeEnv=True):
     dir_base = os.environ['CMSSW_BASE']
-    if not makeEnv:
+    cmssw = dir_base.split('/')[-1]
+    user = os.environ['USER']
+    out_eos_path = 'root://cmseos.fnal.gov//store/user/{user}/{cmssw}_env.tgz'.format(user=user,cmssw=cmssw)
+    if makeEnv:
         with cd(dir_base+'/../'):
-            execute_cmd('tar --exclude-caches-all --exclude-vcs --exclude-caches-all --exclude-vcs -cvzf {cmssw}_env.tgz --exclude=tmp --exclude=".scram" --exclude=".SCRAM"'.format(cmssw=dir_base.split('/')[-1]))
-    relative_path = dir_base+'/../'+dir_base.split('/')[-1] + '_env.tgz'
-    try:
-        return os.path.abspath(relative_path)
-    except:
-        raise OSError('Environment tarball does not exist at %s'%relative_path)
+            if os.path.exists('%s_env.tgz'%cmssw):
+                execute_cmd('rm %s_env.tgz'%cmssw)
+            print ('Making env tarball %s_env.tgz...'%cmssw)
+            execute_cmd('tar --exclude-caches-all --exclude-vcs --exclude-caches-all --exclude-vcs -czf {cmssw}_env.tgz {cmssw} --exclude=tmp --exclude=".scram" --exclude=".SCRAM"'.format(cmssw=cmssw))
+            print ('Done')
+            execute_cmd('xrdcp {cmssw}_env.tgz {out}'.format(cmssw=cmssw,out=out_eos_path))
+    
+    return out_eos_path
 
 # Done in base dir
-_setup_env = '''
-#!/bin/bash
+_setup_env = '''#!/bin/bash
 source /cvmfs/cms.cern.ch/cmsset_default.sh
 xrdcp {env_tarball_path} env_tarball.tgz
 export SCRAM_ARCH={scram_arch}
