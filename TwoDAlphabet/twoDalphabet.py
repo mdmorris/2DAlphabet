@@ -329,7 +329,7 @@ class TwoDAlphabet:
                 ledger = LoadLedger('')
             plot.nuis_pulls()
             plot.save_post_fit_parametric_vals()
-            plot.make_correlation_matrix( # Ignore nuisance parameters that are bins
+            plot.plot_correlation_matrix( # Ignore nuisance parameters that are bins
                 varsToIgnore=self.ledger.alphaParams.name[self.ledger.alphaParams.name.str.contains('_bin_\d+-\d+')].to_list()
             )
             plot.gen_post_fit_shapes()
@@ -430,6 +430,8 @@ class TwoDAlphabet:
     def GoodnessOfFit(self, subtag, ntoys, card_or_w='card.txt', freezeSignal=False, seed=123456,
                             verbosity=0, setParams={}, extra='', condor=False, eosRootfiles=None, njobs=0):
         # NOTE: There's no way to blind data here - need to evaluate it to get the p-value
+        param_str = '' if setParams == {} else '--setParameters '+','.join(['%s=%s'%(p,v) for p,v in setParams.items()])
+
         run_dir = self.tag+'/'+subtag
         _runDirSetup(run_dir)
         
@@ -445,8 +447,7 @@ class TwoDAlphabet:
             gof_toy_cmd = copy.deepcopy(gof_data_cmd)
             gof_toy_cmd.extend([
                 '--toysFrequentist', '-t {ntoys}',
-                '--setParameters '+','.join(['%s=%s'%(p,v) for p,v in setParams.items()]),
-                '-s {seed}'
+                param_str, '-s {seed}'
             ])
 
             gof_data_cmd = ' '.join(gof_data_cmd)
@@ -472,18 +473,65 @@ class TwoDAlphabet:
                 ]
 
                 condor = CondorRunner(
-                    name = self.tag+'_'+subtag+'_gof',
+                    name = self.tag+'_'+subtag+'_gof_toys',
                     primaryCmds=gof_toy_cmds,
                     toPkg=run_dir,
                     runIn=run_dir,
                     toGrab=run_dir+'/higgsCombine_gof_toys.GoodnessOfFit.mH120.*.root',
                     eosRootfileTarball=eosRootfiles,
-                    remakeEnv=True
+                    remakeEnv=False
                 )
                 condor.submit()
             
-    def SignalInjection(self, r):
-        pass
+    def SignalInjection(self, subtag, injectAmount, ntoys, blindData=True, card_or_w='card.txt', rMin=-5, rMax=5, 
+                              seed=123456, verbosity=0, setParams={}, extra='', condor=False, eosRootfiles=None, njobs=0):
+        run_dir = self.tag+'/'+subtag
+        _runDirSetup(run_dir)
+        
+        rinj = str(injectAmount).replace('.','p')
+        param_str = '' if setParams == {} else '--setParameters '+','.join(['%s=%s'%(p,v) for p,v in setParams.items()])
+
+        with cd(run_dir):
+            fit_cmd = [
+                'combine -M FitDiagnostics',
+                '-d '+card_or_w,
+                '--skipBOnlyFit', '--cminDefaultMinimizerStrategy 0',
+                '-t {ntoys}', '--toysFrequentist', '--bypassFrequentistFit' if blindData else '',
+                param_str, '-s {seed}',
+                '--rMin %s'%rMin, '--rMax %s'%rMax,
+                '-n _sigInj_r%s_{seed}'%rinj,
+                '-v %s'%verbosity, extra
+            ]
+
+            fit_cmd = ' '.join(fit_cmd)
+
+            if not condor:
+                fit_cmd = fit_cmd.format(seed=seed, ntoys=ntoys)
+                execute_cmd(fit_cmd)
+                
+            else:
+                per_job_toys = int(round(ntoys/njobs))
+
+                print ('Running toys on condor... first cleaning potential duplicates...')
+                execute_cmd('rm fitDiagnostics_sigInj_r{rinj}_{seed}.root'.format(rinj=rinj,seed=seed))
+
+                fit_cmds = [
+                    fit_cmd.format(
+                        ntoys=per_job_toys,
+                        seed=random.randint(0,1000000)
+                    ) for _ in range(njobs)
+                ]
+
+                condor = CondorRunner(
+                    name = self.tag+'_'+subtag+'_sigInj_r'+rinj,
+                    primaryCmds=fit_cmds,
+                    toPkg=run_dir,
+                    runIn=run_dir,
+                    toGrab='{run_dir}/fitDiagnostics_sigInj_r{rinj}*.root'.format(run_dir=run_dir,rinj=rinj),
+                    eosRootfileTarball=eosRootfiles,
+                    remakeEnv=False
+                )
+                condor.submit()
 
     def Limit(self, subtag, card_or_w='card.txt', blindData=True, verbosity=0,
                     setParams={}, condor=False, eosRootfiles=None):
@@ -554,10 +602,10 @@ class Ledger():
         return [g[0] for g in self.df.groupby(['process','region'])]+[g[0] for g in self.alphaObjs.groupby(['process','region'])]
 
     def GetShapeSystematics(self):
-        return self.df.variation.unique()
+        return self.df.variation.unique().tolist()
 
     def GetAlphaSystematics(self):
-        return self.alphaParams.name.unique()
+        return self.alphaParams.loc[self.alphaParams.alpha_type.eq('func')].name.unique().tolist()
 
     def GetAllSystematics(self):
         return self.GetShapeSystematics()+self.GetAlphaSystematics()

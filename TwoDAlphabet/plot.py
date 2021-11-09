@@ -1,6 +1,7 @@
-import ROOT, os, warnings, pandas, math
+import glob
+import ROOT, os, warnings, pandas, math, time
 from PIL import Image
-from TwoDAlphabet.helpers import set_hist_maximums, execute_cmd
+from TwoDAlphabet.helpers import set_hist_maximums, execute_cmd, cd
 from TwoDAlphabet.binning import stitch_hists_in_x, convert_to_events_per_unit, get_min_bin_width
 from TwoDAlphabet.ext import tdrstyle, CMS_lumi
 
@@ -698,21 +699,21 @@ def make_can(outname, padnames, padx=0, pady=0):
         RuntimeError: If 10 or more subdivisions are requested.
 
     Returns:
-        ROOT.TCanvas: Output canvas.
+        None
     '''
     if padx == 0 or pady == 0:
         if len(padnames) == 1:
-            width = 800; height = 700; padx = 1; pady = 1
+            padx = 1; pady = 1
         elif len(padnames) == 2:
-            width = 1200; height = 700; padx = 2; pady = 1
+            padx = 2; pady = 1
         elif len(padnames) == 3:
-            width = 1800; height = 600; padx = 3; pady = 1
+            padx = 3; pady = 1
         elif len(padnames) == 4:
-            width = 1200; height = 1000; padx = 2; pady = 2
+            padx = 2; pady = 2
         elif len(padnames) <= 6:
-            width = 1600; height = 1000; padx = 3; pady = 2
+            padx = 3; pady = 2
         elif len(padnames) <= 9:
-            width = 1600; height = 1600; padx = 3; pady = 3
+            padx = 3; pady = 3
         else:
             raise RuntimeError('histlist of size %s not currently supported: %s'%(len(padnames),[p.GetName() for p in padnames]))
 
@@ -908,7 +909,7 @@ def _reduced_corr_matrix(fit_result, varsToIgnore=[], varsOfInterest=[]):
 
     return out
 
-def make_correlation_matrix(varsToIgnore):
+def plot_correlation_matrix(varsToIgnore):
     fit_result_file = ROOT.TFile.Open('fitDiagnosticsTest.root')
     if 'b' in _get_good_fit_results(fit_result_file):
         fit_result = fit_result_file.Get("fit_b")
@@ -927,3 +928,120 @@ def make_correlation_matrix(varsToIgnore):
         else:
             warnings.warn('Not able to produce correlation matrix.',RuntimeWarning)
     fit_result_file.Close()
+
+def plot_gof(tag, subtag, seed=123456, condor=False):
+    with cd(tag+'/'+subtag):
+        if condor:
+            tmpdir = 'notneeded/tmp/'
+            execute_cmd('mkdir '+tmpdir) 
+            execute_cmd('cat %s_%s_gof_toys_output_*.tgz | tar zxvf - -i --strip-components 2 -C %s'%(tag,subtag,tmpdir))
+            toy_limit_tree = ROOT.TChain('limit')
+            if len(glob.glob(tmpdir+'higgsCombine_gof_toys.GoodnessOfFit.mH120.*.root')) == 0:
+                raise Exception('No files found')
+            toy_limit_tree.Add(tmpdir+'higgsCombine_gof_toys.GoodnessOfFit.mH120.*.root') 
+            
+        else:
+            toyOutput = ROOT.TFile.Open('higgsCombine_gof_toys.GoodnessOfFit.mH120.{seed}.root'.format(seed=seed))
+            toy_limit_tree = toyOutput.Get('limit')
+
+        # Now to analyze the output
+        # Get observation
+        ROOT.gROOT.SetBatch(True)
+        ROOT.gStyle.SetOptStat(False)
+        gof_data_file = ROOT.TFile.Open('higgsCombine_gof_data.GoodnessOfFit.mH120.root')
+        gof_limit_tree = gof_data_file.Get('limit')
+        gof_limit_tree.GetEntry(0)
+        gof_data = gof_limit_tree.limit
+
+        # Get toys
+        toy_limit_tree.Draw('limit>>hlimit','limit>1.0 && limit<%s && limit != %s'%(gof_data*2.0,gof_data)) 
+        htoy_gof = ROOT.gDirectory.Get('hlimit')
+        time.sleep(1) # if you don't sleep the code moves too fast and won't perform the fit
+        htoy_gof.Fit("gaus")
+
+        # Fit toys and derive p-value
+        gaus = htoy_gof.GetFunction("gaus")
+        pvalue = 1-(1/gaus.Integral(-float("inf"),float("inf")))*gaus.Integral(-float("inf"),gof_data)
+
+        # Write out for reference
+        with open('gof_results.txt','w') as out:
+            out.write('Test statistic in data = '+str(gof_data))
+            out.write('Mean from toys = '+str(gaus.GetParameter(1)))
+            out.write('Width from toys = '+str(gaus.GetParameter(2)))
+            out.write('p-value = '+str(pvalue))
+
+        # Extend the axis if needed
+        if htoy_gof.GetXaxis().GetXmax() < gof_data:
+            print ('Axis limit greater than GOF p value')
+            binwidth = htoy_gof.GetXaxis().GetBinWidth(1)
+            xmin = htoy_gof.GetXaxis().GetXmin()
+            new_xmax = int(gof_data*1.1)
+            new_nbins = int((new_xmax-xmin)/binwidth)
+            toy_limit_tree.Draw('limit>>hlimitrebin('+str(new_nbins)+', '+str(xmin)+', '+str(new_xmax)+')','limit>0.001 && limit<1500') 
+            htoy_gof = ROOT.gDirectory.Get('hlimitrebin')
+            htoy_gof.Fit("gaus")
+            gaus = htoy_gof.GetFunction("gaus")
+
+        # Arrow for observed
+        arrow = ROOT.TArrow(gof_data,0.25*htoy_gof.GetMaximum(),gof_data,0)
+        arrow.SetLineWidth(2)
+
+        # Legend
+        leg = ROOT.TLegend(0.1,0.7,0.4,0.9)
+        leg.SetLineColor(ROOT.kWhite)
+        leg.SetLineWidth(0)
+        leg.SetFillStyle(0)
+        leg.SetTextFont(42)
+        leg.AddEntry(htoy_gof,"toy data","lep")
+        leg.AddEntry(arrow,"observed = %.1f"%gof_data,"l")
+        leg.AddEntry(0,"p-value = %.2f"%(pvalue),"")
+
+        # Draw
+        cout = ROOT.TCanvas('cout','cout',800,700)
+        htoy_gof.SetTitle('')
+        htoy_gof.Draw('pez')
+        arrow.Draw()
+        leg.Draw()
+
+        cout.Print('gof_plot.pdf','pdf')
+        cout.Print('gof_plot.png','png')
+        execute_cmd('rm -r '+tmpdir)
+
+def plot_signalInjection(tag, subtag, injectedAmount, seed=123456, condor=False):
+    with cd(tag+'/'+subtag):
+        if condor:
+            tmpdir = 'notneeded/tmp/'
+            execute_cmd('mkdir '+tmpdir) 
+            execute_cmd('cat %s_%s_sigInj_r%s_output_*.tgz | tar zxvf - -i --strip-components 2 -C %s'%(tag,subtag,injectedAmount,tmpdir))
+            tree_fit_sb = ROOT.TChain('tree_fit_sb')
+            tree_fit_sb.Add(tmpdir+'fitDiagnostics_sigInj_r{rinj}*.root'.format(rinj=injectedAmount)) 
+            
+        else:
+            toyOutput = ROOT.TFile.Open('fitDiagnostics_sigInj_r{rinj}_{seed}.root'.format(rinj=injectedAmount,seed=seed))
+            tree_fit_sb = toyOutput.Get('tree_fit_sb')
+
+        ROOT.gROOT.SetBatch(True)
+        ROOT.gStyle.SetOptStat(False)
+        # Final plotting
+        result_can = ROOT.TCanvas('sigpull_can','sigpull_can',800,700)
+
+        tree_fit_sb.Draw("(r-{rinj})/(rHiErr*(r<{rinj})+rLoErr*(r>{rinj}))>>sigpull(20,-5,5)".format(rinj=injectedAmount),"fit_status>=0")
+        hsigpull = ROOT.gDirectory.Get('sigpull')
+        tree_fit_sb.Draw("(r-{rinj})>>sigstrength(20,-1,1)".format(rinj=injectedAmount),"fit_status>=0")
+        hsignstrength = ROOT.gDirectory.Get('sigstrength')
+
+        hsigpull.Fit("gaus","L")
+        hsigpull.SetTitle('')
+        hsigpull.GetXaxis().SetTitle('(r-%s)/rErr'%injectedAmount)
+        result_can.cd()
+        hsigpull.Draw('pe')
+        result_can.Print('signalInjection_r%s_pull.png'%(str(injectedAmount).replace('.','p')),'png')
+
+        hsignstrength.Fit("gaus","L")
+        hsignstrength.SetTitle('')
+        hsignstrength.GetXaxis().SetTitle('r-%s'%injectedAmount)
+        result_can.cd()
+        hsignstrength.Draw('pe')
+        result_can.Print('signalInjection_r%s.png'%(str(injectedAmount).replace('.','p')),'png')
+
+        execute_cmd('rm -r '+tmpdir)

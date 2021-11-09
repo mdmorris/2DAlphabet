@@ -286,6 +286,8 @@ class CondorRunner():
         self.primary_cmds = primaryCmds
         self.rootfile_tarball_path = eosRootfileTarball
         self.cmssw = os.environ['CMSSW_BASE'].split('/')[-1]
+        if not os.path.exists('notneeded/'): execute_cmd('mkdir notneeded')
+        
         self.env_tarball_path = make_env_tarball(remakeEnv)
         self.pkg_tarball_path = self._make_pkg_tarball(toPkg) if toPkg != None else ''
         self.run_script_path = self._make_run_script()
@@ -300,7 +302,6 @@ class CondorRunner():
         execute_cmd("sed 's$TEMPSCRIPT${0}$g' {1}/condor/templates/jdl_template > {2}".format(self.run_script_path, abs_twoD_dir_base, out_jdl))
         execute_cmd("sed -i 's$TEMPTAR${0}$g' {1}".format(self.pkg_tarball_path, out_jdl))
         execute_cmd("sed -i 's$TEMPARGS${0}$g' {1}".format(self.run_args_path, out_jdl))
-        if not os.path.exists('notneeded/'): execute_cmd('mkdir notneeded')
         execute_cmd("condor_submit "+out_jdl)
         execute_cmd("mv {0} notneeded/".format(out_jdl))
 
@@ -329,7 +330,7 @@ class CondorRunner():
         )
 
         if self.pkg_tarball_path != None:
-            blocks.append(_setup_tar_pkg.format(pkg_tarball=self.pkg_tarball_path.split('/')[-1]))
+            blocks.append(_setup_tar_pkg.format(pkg_tarball=self.pkg_tarball_path.split('/')[-1], cmssw=self.cmssw))
         
         blocks.append('cd %s/src/; eval `scramv1 runtime -sh`'%self.cmssw)
 
@@ -340,7 +341,7 @@ class CondorRunner():
         blocks.append('echo $*')
         blocks.append('$*')
         blocks.append('cd $CMSSW_BASE/src/')
-        blocks.append(_grab_output.format(out_id=self.name+'_output', to_grab=self.to_grab))
+        blocks.append(_grab_output.format(out_id='%s_output_${CONDOR_ID}'%(self.name), to_grab=self.to_grab))
 
         shell_name = 'run_'+self.name+'.sh'
         with open(shell_name,'w') as run_script:
@@ -383,7 +384,7 @@ _setup_tar_pkg = '''
 mkdir tardir; cp {pkg_tarball} tardir/; cd tardir
 tar -xzvf {pkg_tarball}
 rm {pkg_tarball}
-cp -r * ../CMSSW_10_6_14/src/
+cp -r * ../{cmssw}/src/
 cd ../'''
 
 # Done in CMSSW/src
