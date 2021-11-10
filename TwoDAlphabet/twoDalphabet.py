@@ -549,8 +549,32 @@ class TwoDAlphabet:
                 )
                 condor.submit()
                 
-    def Impacts(self):
-        pass
+    def Impacts(self, subtag, rMin=-15, rMax=15, cardOrW='initialFitWorkspace.root --snapshotName initialFit'):
+        impact_nuis_str = '--named='+','.join(self.ledger.GetAllSystematics())
+        # param_str = '' if setParams == {} else '--setParameters '+','.join(['%s=%s'%(p,v) for p,v in setParams.items()])
+        
+        with cd(self.tag+'/'+subtag):
+            if cardOrW.endswith('.txt'):
+                execute_cmd('text2workspace.py -b %s -o prefitWorkspace.root --channel-masks --X-no-jmax'%cardOrW)
+                card_or_w = 'prefitWorkspace.root'
+            else:
+                card_or_w = cardOrW
+
+            base_opts = [
+                '-M Impacts', '--rMin %s'%rMin,
+                '--rMax %s'%rMax, '-d %s'%card_or_w,
+                '--cminDefaultMinimizerStrategy 0 -m 0',
+                impact_nuis_str #param_str,
+                # '-t -1 --bypassFrequentistFit' if blindData else ''
+            ]
+            # Remove old runs if they exist
+            execute_cmd('rm *_paramFit_*.root *_initialFit_*.root')
+            # Build a post-fit workspace
+            execute_cmd('combineTool.py %s --doInitialFit'%(' '.join(base_opts)))
+            execute_cmd('combineTool.py %s --doFits'%(' '.join(base_opts)))
+            # Grab the output
+            execute_cmd('combineTool.py %s -o impacts.json'%(' '.join(base_opts)))
+            execute_cmd('plotImpacts.py -i impacts.json -o impacts')
 
 class Ledger():
     def __init__(self, df):
