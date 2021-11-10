@@ -423,9 +423,9 @@ class TwoDAlphabet:
         return masked_regions
 
     def GoodnessOfFit(self, subtag, ntoys, card_or_w='card.txt', freezeSignal=False, seed=123456,
-                            verbosity=0, setParams={}, extra='', condor=False, eosRootfiles=None, njobs=0):
+                            verbosity=0, extra='', condor=False, eosRootfiles=None, njobs=0):
         # NOTE: There's no way to blind data here - need to evaluate it to get the p-value
-        param_str = '' if setParams == {} else '--setParameters '+','.join(['%s=%s'%(p,v) for p,v in setParams.items()])
+        # param_str = '' if setParams == {} else '--setParameters '+','.join(['%s=%s'%(p,v) for p,v in setParams.items()])
 
         run_dir = self.tag+'/'+subtag
         _runDirSetup(run_dir)
@@ -442,7 +442,7 @@ class TwoDAlphabet:
             gof_toy_cmd = copy.deepcopy(gof_data_cmd)
             gof_toy_cmd.extend([
                 '--toysFrequentist', '-t {ntoys}',
-                param_str, '-s {seed}'
+                '-s {seed}'
             ])
 
             gof_data_cmd = ' '.join(gof_data_cmd)
