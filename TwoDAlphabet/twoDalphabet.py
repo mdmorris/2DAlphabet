@@ -470,7 +470,7 @@ class TwoDAlphabet:
                 condor = CondorRunner(
                     name = self.tag+'_'+subtag+'_gof_toys',
                     primaryCmds=gof_toy_cmds,
-                    toPkg=run_dir,
+                    toPkg=self.tag+'/',
                     runIn=run_dir,
                     toGrab=run_dir+'/higgsCombine_gof_toys.GoodnessOfFit.mH120.*.root',
                     eosRootfileTarball=eosRootfiles,
@@ -520,7 +520,7 @@ class TwoDAlphabet:
                 condor = CondorRunner(
                     name = self.tag+'_'+subtag+'_sigInj_r'+rinj,
                     primaryCmds=fit_cmds,
-                    toPkg=run_dir,
+                    toPkg=self.tag+'/',
                     runIn=run_dir,
                     toGrab='{run_dir}/fitDiagnostics_sigInj_r{rinj}*.root'.format(run_dir=run_dir,rinj=rinj),
                     eosRootfileTarball=eosRootfiles,
@@ -543,7 +543,7 @@ class TwoDAlphabet:
                 condor = CondorRunner(
                     name=self.tag+'_'+subtag+'_limit',
                     primaryCmds=[limit_cmd],
-                    toPkg=run_dir,
+                    toPkg=self.tag+'/',
                     toGrab=run_dir+'/higgsCombineTest.AsymptoticLimits.mH120.root',
                     eosRootfileTarball=eosRootfiles
                 )
