@@ -1,4 +1,4 @@
-import subprocess, json, ROOT, os, copy, time
+import subprocess, json, ROOT, os, copy, time, glob
 from collections import defaultdict
 from contextlib import contextmanager
 
@@ -264,6 +264,21 @@ def replace_multi(s,findreplace):
 
 def unpack_to_line(toUnpack):
     return ' '.join(['{%s:20}'%i for i in range(len(toUnpack))]).format(*toUnpack)
+
+def _combineTool_impacts_fix(fileNameExpected):
+    # Ex. higgsCombine_initialFit_Test.MultiDimFit.mH0.root is needed but higgsCombine_initialFit_Test.MultiDimFit.mH0.123456.root is created if a toy is used.
+    seed_version = '%s.*.root'%('.'.join(fileNameExpected.split('.')[:-1]))
+    potential_files_to_rename = glob.glob(seed_version)
+
+    # Only run if there are seeded files to rename
+    if potential_files_to_rename > 0:
+        all_seeds = list(set([f.split('.')[-2] for f in potential_files_to_rename]))
+        if len(all_seeds) > 1:
+            raise RuntimeError('More than one seed found when trying to move files for combineTool (%s). Clean up the area and try again.'%all_seeds)
+        
+        for f in potential_files_to_rename:
+            new_name = '%s.root'%('.'.join(f.split('.')[:-2]))
+            execute_cmd('mv %s %s'%(f,new_name))
 
 # ----------------- Inline condor submission --------------------
 class CondorRunner():

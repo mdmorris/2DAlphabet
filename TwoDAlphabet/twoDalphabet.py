@@ -2,7 +2,7 @@ import argparse, os, itertools, pandas, glob, pickle, sys, re, random, copy, num
 from collections import OrderedDict
 from TwoDAlphabet.config import Config, OrganizedHists
 from TwoDAlphabet.binning import Binning
-from TwoDAlphabet.helpers import CondorRunner, execute_cmd, parse_arg_dict, unpack_to_line, make_RDH, cd
+from TwoDAlphabet.helpers import CondorRunner, execute_cmd, parse_arg_dict, unpack_to_line, make_RDH, cd, _combineTool_impacts_fix
 from TwoDAlphabet.alphawrap import Generic2D
 from TwoDAlphabet import plot
 import ROOT
@@ -550,11 +550,11 @@ class TwoDAlphabet:
                 )
                 condor.submit()
                 
-    def Impacts(self, subtag, rMin=-15, rMax=15, cardOrW='initialFitWorkspace.root --snapshotName initialFit'):
-        impact_nuis_str = '--named='+','.join(self.ledger.GetAllSystematics())
+    def Impacts(self, subtag, rMin=-15, rMax=15, cardOrW='initialFitWorkspace.root --snapshotName initialFit', extra=''):
         # param_str = '' if setParams == {} else '--setParameters '+','.join(['%s=%s'%(p,v) for p,v in setParams.items()])
-        
         with cd(self.tag+'/'+subtag):
+            subset = LoadLedger('')
+            impact_nuis_str = '--named='+','.join(subset.GetAllSystematics())
             if cardOrW.endswith('.txt'):
                 execute_cmd('text2workspace.py -b %s -o prefitWorkspace.root --channel-masks --X-no-jmax'%cardOrW)
                 card_or_w = 'prefitWorkspace.root'
@@ -565,14 +565,21 @@ class TwoDAlphabet:
                 '-M Impacts', '--rMin %s'%rMin,
                 '--rMax %s'%rMax, '-d %s'%card_or_w,
                 '--cminDefaultMinimizerStrategy 0 -m 0',
-                impact_nuis_str #param_str,
+                impact_nuis_str, extra #param_str,
                 # '-t -1 --bypassFrequentistFit' if blindData else ''
             ]
             # Remove old runs if they exist
             execute_cmd('rm *_paramFit_*.root *_initialFit_*.root')
-            # Build a post-fit workspace
+            # Step 1
             execute_cmd('combineTool.py %s --doInitialFit'%(' '.join(base_opts)))
+            # Dumb hack - combineTool --doFits will go looking for the wrong file if you run on a toy
+            _combineTool_impacts_fix('higgsCombine_initialFit_Test.MultiDimFit.mH0.root')
+            
+            # Step 2
             execute_cmd('combineTool.py %s --doFits'%(' '.join(base_opts)))
+            # Dumb hack - combineTool next step will go looking for the wrong file if you run on a toy
+            _combineTool_impacts_fix('higgsCombine_paramFit_Test_*.MultiDimFit.mH0.root')
+
             # Grab the output
             execute_cmd('combineTool.py %s -o impacts.json'%(' '.join(base_opts)))
             execute_cmd('plotImpacts.py -i impacts.json -o impacts')
