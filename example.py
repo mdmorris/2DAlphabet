@@ -418,19 +418,19 @@ if __name__ == '__main__':
     # This only needs to be run once unless you fundamentally change your working environment.
     # make_env_tarball()
     
-    # test_make('CR')
-    # test_make('SR')
+    test_make('CR')
+    test_make('SR')
     
-    # test_fit('CR')
-    # test_plot('CR')
+    test_fit('CR')
+    test_plot('CR')
 
-    # test_limit('SR')
+    test_limit('SR')
 
-    # test_GoF('CR')
-    # test_SigInj('SR')
+    test_GoF('CR')
+    test_SigInj('SR')
 
-    test_Impacts('SR')
-    # test_generate_for_SR()
+    # test_Impacts('SR') # WIP
+    test_generate_for_SR()
 
     # Run after condor jobs finish
     # test_GoF_plot('CR')
