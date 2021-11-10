@@ -354,7 +354,28 @@ def test_Impacts(SRorCR):
     assert SRorCR == 'SR' # Setup for either SR or CR but don't want to unblind accidentally until ready
     working_area = 'XHYfits_'+SRorCR
     twoD = TwoDAlphabet(working_area, '%s/runConfig.json'%working_area, loadPrevious=True)
-    twoD.Impacts('MX_2000_MY_800_area', blindData=True, setParams=_load_CR_rpf_as_SR('0x0'), cardOrW='card.txt')
+
+    # We need to run impacts in the SR for them to make sense but we can't use the data in the SR while blinded.
+    # So we need a toy to play with instead.
+    poly_order = '0x0'
+    subset = twoD.ledger.select(_select_signal, 'MX_2000_MY_800',poly_order)
+    # Make a new area to play in
+    twoD.MakeCard(subset, 'MX_2000_MY_800_impactArea')
+
+    # Generate the toy
+    toy_file_path = twoD.GenerateToys(
+        'impactToy', 'MX_2000_MY_800_impactArea',
+        card='card.txt', 
+        workspace=None, 
+        ntoys=1, seed=123456, expectSignal=0,
+        setParams=_load_CR_rpf_as_SR(poly_order)
+    )
+    # Run the parameter impacts on the toy with the pre-fit workspace/card
+    twoD.Impacts(
+        'MX_2000_MY_800_impactArea',
+        cardOrW='card.txt',
+        extra='-t 1 --toysFile %s'%toy_file_path.split('/')[-1]
+    )
 
 def test_generate_for_SR():
     '''NOTE: This is an expert-level manipulation that requires understanding the underlying Combine
@@ -365,7 +386,7 @@ def test_generate_for_SR():
     # Load in the SR TwoDAlphabet object
     twoD = TwoDAlphabet('XHYfits_SR', 'XHYfits_SR/runConfig.json', loadPrevious=True)
     subset = twoD.ledger.select(_select_signal, 'MX_2000_MY_800','0x0')
-    params_to_set = _load_CR_rpf_as_SR()
+    params_to_set = _load_CR_rpf_as_SR('0x0')
 
     ###################################
     #-------- Version 1 --------------#
@@ -395,7 +416,7 @@ def test_generate_for_SR():
     # Note that this method will generate frequentist toys but always skip the frequentist fit.
     # So if you'd like to generate from a post-fit workspace, you should fit first
     # and then provide a workspace snapshot
-    twoD.GenerateToys(
+    toy_file_path = twoD.GenerateToys(
         'toys', 'MX_2000_MY_800_toyArea2',
         card='card.txt', workspace=None, # A card or workspace MUST be defined manually or one of these options should be set to True to use a default.
         ntoys=1, seed=123456, expectSignal=0,
@@ -408,7 +429,7 @@ def test_generate_for_SR():
         subtag='MX_2000_MY_800_toyArea2',
         setParams=params_to_set,
         rMin=0,rMax=5,verbosity=0,
-        extra='-t 1 --toysFile=higgsCombine_toys.GenerateOnly.mH120.123456.root'
+        extra='-t 1 --toysFile=%s'%toy_file_path.split('/')[-1]
     )
     # Plot!
     twoD.StdPlots('MX_2000_MY_800_toyArea2',ledger=subset)
@@ -429,7 +450,7 @@ if __name__ == '__main__':
     test_GoF('CR')
     test_SigInj('SR')
 
-    # test_Impacts('SR') # WIP
+    test_Impacts('SR')
     test_generate_for_SR()
 
     # Run after condor jobs finish
