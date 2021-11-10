@@ -1,4 +1,5 @@
 universe = vanilla
+environment = CONDOR_ID=$(Process)
 Executable = TEMPSCRIPT
 Should_Transfer_Files = YES
 WhenToTransferOutput = ON_EXIT
