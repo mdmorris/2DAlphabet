@@ -143,6 +143,10 @@ class Plotter(object):
                     sig  = shapes_file.Get(loc_base.format(r=region, c='SIG', t=time, p=process))
                     high = shapes_file.Get(loc_base.format(r=region, c='HIGH',t=time, p=process))
 
+                    if low == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(loc_base.format(r=region, c='LOW', t=time, p=process),self.fittag))
+                    if sig == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(loc_base.format(r=region, c='SIG', t=time, p=process),self.fittag))
+                    if high == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(loc_base.format(r=region, c='HIGH', t=time, p=process),self.fittag))
+
                     full = stitch_hists_in_x(out2d_name, binning, [low,sig,high], blinded=blinding if process == 'data_obs' else [])
                     full.SetMinimum(0)
                     full.SetTitle('%s, %s, %s'%(process,region,time))
