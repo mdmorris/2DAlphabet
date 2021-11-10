@@ -598,7 +598,7 @@ def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
         legend = ROOT.TLegend(0.65,legend_bottomY,0.90,0.88)
         legend.SetBorderSize(0)
         if not dataOff:
-            legend.AddEntry(data,data.GetTitle().split(',')[0],datastyle)
+            legend.AddEntry(data,'Data',datastyle)
 
         totalBkg.SetMarkerStyle(0)
         totalBkg_err = totalBkg.Clone()
