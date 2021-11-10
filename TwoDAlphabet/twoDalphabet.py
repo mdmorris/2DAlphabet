@@ -148,7 +148,7 @@ class TwoDAlphabet:
             plot.make_systematic_plots(self)
 
 # --------------AlphaObj INTERFACE ------ #
-    def AddAlphaObj(self, process, region, obj, ptype='BKG', color=ROOT.kYellow):
+    def AddAlphaObj(self, process, region, obj, ptype='BKG', color=ROOT.kYellow, title=None):
         '''Start
 
         Args:
@@ -161,24 +161,25 @@ class TwoDAlphabet:
             raise RuntimeError('Can only tack objects of type Generic2D.')
         if ptype not in ['BKG','SIGNAL']:
             raise RuntimeError('Process type (ptype) can only be BKG or SIGNAL.')
+        
+        title_to_use = process if title == None else title
         self.ledger._checkAgainstConfig(process, region)
 
-        # for cat in ['LOW','SIG','HIGH']:
-        rph,norm = obj.RooParametricHist()
+        rph,norm = obj.RooParametricHist(name=process+'_'+region)
         model_obj_row = {
             "process": process,
             "region": region,
-            "obj": rph,
-            "norm": norm,
             "process_type": ptype,
             "color": color,
-            'title': process
+            'title': title_to_use
         }
 
         self.ledger.alphaObjs = self.ledger.alphaObjs.append(model_obj_row, ignore_index=True)
 
-        nuis_obj_cols = ['name', 'obj', 'constraint']
+        nuis_obj_cols = ['name', 'constraint']
         for n in obj.nuisances:
+            d = {c:n[c] for c in nuis_obj_cols}
+            self.ledger.alphaParams = self.ledger.alphaParams.append(d, ignore_index=True)
 
         for rph_cat in rph.values():
             print ('Adding RooParametricHist... %s'%rph_cat.GetName())
@@ -303,11 +304,11 @@ class TwoDAlphabet:
             MakeCard(subledger, subtag, workspaceDir)
 
 # -------- STAT METHODS ------------------ #
-    def MLfit(self, subtag, card='card.txt', rMin=-1, rMax=10, setParams={}, verbosity=0, usePreviousFit=False, extra=''):
+    def MLfit(self, subtag, cardOrW='card.txt', rMin=-1, rMax=10, setParams={}, verbosity=0, usePreviousFit=False, extra=''):
         _runDirSetup(self.tag+'/'+subtag)
         with cd(self.tag+'/'+subtag):
             _runMLfit(
-                card=card,
+                cardOrW=cardOrW,
                 blinding=self.options.blindedFit,
                 verbosity=verbosity, 
                 rMin=rMin, rMax=rMax,
@@ -348,7 +349,7 @@ class TwoDAlphabet:
 
         return out
 
-    def GenerateToys(self, name, subtag, card=None, workspace=None, ntoys=1, seed=123456, expectSignal=0, setParams={}, freezeParams=[], run=True):
+    def GenerateToys(self, name, subtag, card=None, workspace=None, ntoys=1, seed=123456, expectSignal=0, setParams={}, freezeParams=[]):
         if card == None and workspace == None:
             raise IOError('Either card or workspace must be provided relative to the directory where the generation will be run.')
         elif card != None and workspace != None:
@@ -399,10 +400,8 @@ class TwoDAlphabet:
                 '-n _%s'%name,
                 freeze_opt
             ]
-            if run:
-                execute_cmd(' '.join(gen_command_pieces))
-            else:
-                print ('Not running:\n\t'+' '.join(gen_command_pieces))
+            
+            execute_cmd(' '.join(gen_command_pieces))
 
         toyfile_path = '%s/higgsCombine_%s.GenerateOnly.mH120.%s.root'%(self.tag+'/'+subtag+'/',name,seed)
 
@@ -557,7 +556,7 @@ class Ledger():
     def __init__(self, df):
         self.df = df
         self.alphaObjs = pandas.DataFrame(columns=['process','region','obj','norm','process_type','color','combine_idx','title'])
-        self.alphaParams = pandas.DataFrame(columns=['name','obj','constraint'])
+        self.alphaParams = pandas.DataFrame(columns=['name','constraint'])
 
     def append(self, toAppend):
         self.df.append(toAppend, ignore_index=True if isinstance(toAppend, dict) else False)
@@ -570,7 +569,7 @@ class Ledger():
         return new_ledger
 
     def GetRegions(self):
-        return self.df.region.unique()
+        return list(self.df.region.unique())
 
     def GetProcesses(self, ptype='', includeNonConfig=True, includeConfig=True):
         if ptype not in ['','SIGNAL','BKG','DATA']:
@@ -578,20 +577,17 @@ class Ledger():
 
         proc_list = []
         if includeConfig:
-            if ptype == '':
-                to_add = self.df.process.unique()
-            else:
-                to_add = self.df[self.df.process_type.eq(ptype)].process.unique()
-            
-            proc_list.extend(list(to_add))
+            df = self.df
+            if ptype == '': to_add = df.process.unique()
+            else:           to_add = df[df.process_type.eq(ptype)].process.unique()
+            proc_list.extend( list(to_add) )
 
-        if includeNonConfig and self.alphaObjs.process.unique().size > 0:
-            if ptype == '':
-                to_add = self.alphaObjs.process.unique()
-            else:
-                to_add = self.alphaObjs[self.alphaObjs.process_type.eq(ptype)].process.unique()
+        if includeNonConfig and self.alphaObjs.title.unique().size > 0:
+            df = self.alphaObjs
+            if ptype == '': to_add = df.title.unique()
+            else:           to_add = df[df.process_type.eq(ptype)].title.unique()
+            proc_list.extend( list(to_add) )
 
-            proc_list.extend(list(to_add))
         return proc_list
 
     def GetProcRegPairs(self):
@@ -601,7 +597,7 @@ class Ledger():
         return self.df.variation.unique().tolist()
 
     def GetAlphaSystematics(self):
-        return self.alphaParams.loc[self.alphaParams.alpha_type.eq('func')].name.unique().tolist()
+        return self.alphaParams.loc[~self.alphaParams.name.str.contains('_bin_\d+-\d+')].name.unique().tolist()
 
     def GetAllSystematics(self):
         return self.GetShapeSystematics()+self.GetAlphaSystematics()
@@ -635,11 +631,11 @@ class Ledger():
 
     @property
     def nsignals(self):
-        return self.df[self.df.process_type.eq('SIGNAL')].process.nunique() + self.alphaObjs[self.alphaObjs.process_type.eq('SIGNAL')].process.nunique()
+        return self.df[self.df.process_type.eq('SIGNAL')].process.nunique() + self.alphaObjs[self.alphaObjs.process_type.eq('SIGNAL')].title.nunique()
 
     @property
     def nbkgs(self):
-        return self.df[self.df.process_type.eq('BKG')].process.nunique() + self.alphaObjs[self.alphaObjs.process_type.eq('BKG')].process.nunique()
+        return self.df[self.df.process_type.eq('BKG')].process.nunique() + self.alphaObjs[self.alphaObjs.process_type.eq('BKG')].title.nunique()
 
     def _checkAgainstConfig(self, process, region):
         if (process,region) in self.GetProcRegPairs():
@@ -648,8 +644,8 @@ class Ledger():
             raise RuntimeError('Attempting to track an object for region "%s" but that region does not exist among those defined in the config:\n\t%s'%(region,self.GetRegions()))
 
     def _getCombineIdxMap(self):
-        all_signals = self.df[self.df.process_type.eq('SIGNAL')].process.unique().tolist() + self.alphaObjs[self.alphaObjs.process_type.eq('SIGNAL')].process.unique().tolist()
-        all_bkgs    = self.df[self.df.process_type.eq('BKG')].process.unique().tolist()    + self.alphaObjs[self.alphaObjs.process_type.eq('BKG')].process.unique().tolist()
+        all_signals = self.df[self.df.process_type.eq('SIGNAL')].process.unique().tolist() + self.alphaObjs[self.alphaObjs.process_type.eq('SIGNAL')].title.unique().tolist()
+        all_bkgs    = self.df[self.df.process_type.eq('BKG')].process.unique().tolist()    + self.alphaObjs[self.alphaObjs.process_type.eq('BKG')].title.unique().tolist()
 
         signal_map = pandas.DataFrame({'process': all_signals, 'combine_idx': [-1*i for i in range(0,len(all_signals))] })
         bkg_map    = pandas.DataFrame({'process': all_bkgs,    'combine_idx': [i for i in range(1,len(all_bkgs)+1)] })
@@ -658,16 +654,8 @@ class Ledger():
         return out
 
     def _saveAlphas(self,outDir=''):
-        alphaObjs = self.alphaObjs
-        alphaParams = self.alphaParams
-
-        if 'obj' in alphaObjs.columns:
-            alphaObjs = alphaObjs.drop(columns=['obj','norm'])
-        alphaObjs.to_csv(outDir+'/ledger_alphaObjs.csv')
-        
-        if 'obj' in self.alphaParams.columns:
-            alphaParams = alphaParams.drop(columns=['obj'])
-        alphaParams.to_csv(outDir+'/ledger_alphaParams.csv')
+        self.alphaObjs.to_csv(outDir+'/ledger_alphaObjs.csv')
+        self.alphaParams.to_csv(outDir+'/ledger_alphaParams.csv')
 
     def Save(self, outDir):
         if 'index' in self.df.columns:
@@ -681,10 +669,10 @@ class Ledger():
         self._saveAlphas(outDir)
 
 def LoadLedger(indir=''):
-    df = pandas.read_csv(indir+'/ledger_df.csv')
+    df = pandas.read_csv(indir+'ledger_df.csv')
     ledger = Ledger(df)
-    ledger.alphaObjs = pandas.read_csv(indir+'/ledger_alphaObjs.csv')
-    ledger.alphaParams = pandas.read_csv(indir+'/ledger_alphaParams.csv')
+    ledger.alphaObjs = pandas.read_csv(indir+'ledger_alphaObjs.csv')
+    ledger.alphaParams = pandas.read_csv(indir+'ledger_alphaParams.csv')
 
     return ledger
 
@@ -702,7 +690,7 @@ def _runDirSetup(runDir):
     
     return runDir
 
-def MakeCard(ledger, subtag, workspaceDir, toyData=None):
+def MakeCard(ledger, subtag, workspaceDir):
     combine_idx_map = ledger._getCombineIdxMap()
 
     card_new = open('%s/card.txt'%subtag,'w')
@@ -718,20 +706,21 @@ def MakeCard(ledger, subtag, workspaceDir, toyData=None):
     card_new.write('-'*120+'\n')
 
     # Shapes
-    shape_line = 'shapes  {0:20} * {1} w:{0}_$CHANNEL w:{0}_$CHANNEL_$SYSTEMATIC\n'
-    for proc in ledger.GetProcesses(includeNonConfig=False):
-        if proc == 'data_obs': continue
-        card_new.write(shape_line.format(proc, workspaceDir+'base.root'))
-
-    shape_line_nosyst = shape_line.replace(' w:{0}_$CHANNEL_$SYSTEMATIC','')
-    for proc in list(ledger.alphaObjs.process.unique()):
-        card_new.write(shape_line_nosyst.format(proc, workspaceDir+'base.root'))
-
-    # Do data - importing toy if needed
-    if toyData == None:
-        card_new.write(shape_line_nosyst.format('data_obs', workspaceDir+'base.root'))
-    else:
-        card_new.write(shape_line_nosyst.replace(' w:{0}_$CHANNEL','').format('data_obs', toyData))
+    shape_line = 'shapes  {p:20} {r} {file} w:{p}_{r} w:{p}_{r}_$SYSTEMATIC\n'
+    alpha_obj_title_map = {}
+    for proc,reg in ledger.GetProcRegPairs():
+        for cat in ['LOW','SIG','HIGH']:
+            if proc in ledger.alphaObjs.process.unique():
+                this_line = shape_line.replace(' w:{p}_{r}_$SYSTEMATIC','').replace('w:{p}','w:{hname_proc}')
+                title = ledger.alphaObjs[ledger.alphaObjs.process.eq(proc) & ledger.alphaObjs.region.eq(reg)].title.iloc[0]
+                alpha_obj_title_map[(proc,reg)] = title
+                card_new.write(this_line.format(p=title, r=reg+'_'+cat, file=workspaceDir+'base.root', hname_proc=proc))
+            elif proc == 'data_obs':
+                this_line = shape_line.replace(' w:{p}_{r}_$SYSTEMATIC','')
+                card_new.write(this_line.format(p=proc, r=reg+'_'+cat, file=workspaceDir+'base.root'))
+            else:
+                this_line = shape_line
+                card_new.write(this_line.format(p=proc, r=reg+'_'+cat, file=workspaceDir+'base.root'))
 
     card_new.write('-'*120+'\n')
 
@@ -762,6 +751,7 @@ def MakeCard(ledger, subtag, workspaceDir, toyData=None):
         proc, region = pair
         if proc == 'data_obs': continue
         combine_idx = combine_idx_map[combine_idx_map.process.eq(proc)].combine_idx.iloc[0]
+
         for cat in ['LOW','SIG','HIGH']:
             chan = '%s_%s'%(region,cat)
 
@@ -782,12 +772,13 @@ def MakeCard(ledger, subtag, workspaceDir, toyData=None):
     # NOTE: duplicated code but no good way to combine without making things confusing
     for pair,group in ledger.alphaObjs.groupby(['process', 'region']):
         proc,region = pair
-        combine_idx = combine_idx_map[combine_idx_map.process.eq(proc)].combine_idx.iloc[0]
+        combine_idx = combine_idx_map[combine_idx_map.process.eq(alpha_obj_title_map[pair])].combine_idx.iloc[0]
+        
         for cat in ['LOW','SIG','HIGH']:
             chan = '%s_%s'%(region, cat)
 
             bin_line += '{0:20} '.format(chan)
-            processName_line += '{0:20} '.format(proc)
+            processName_line += '{0:20} '.format(alpha_obj_title_map[pair])
             processCode_line += '{0:20} '.format(combine_idx)
             rate_line += '{0:20} '.format('1')
 
@@ -812,7 +803,7 @@ def MakeCard(ledger, subtag, workspaceDir, toyData=None):
     card_new.close()
     ledger.Save(subtag)
 
-def _runMLfit(card, blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False, extra=''):
+def _runMLfit(cardOrW, blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False, extra=''):
     if usePreviousFit: param_options = ''
     else:              param_options = '--text2workspace "--channel-masks" '
     params_to_set = ','.join(['mask_%s_SIG=1'%r for r in blinding]+['%s=%s'%(p,v) for p,v in setParams.items()]+['r=1'])
@@ -820,7 +811,7 @@ def _runMLfit(card, blinding, verbosity, rMin, rMax, setParams, usePreviousFit=F
 
     fit_cmd = 'combine -M FitDiagnostics {card_or_w} {param_options} --saveWorkspace --cminDefaultMinimizerStrategy 0 --rMin {rmin} --rMax {rmax} -v {verbosity} {extra}'
     fit_cmd = fit_cmd.format(
-        card_or_w='initifalFitWorkspace.root --snapshotName initialFit' if usePreviousFit else card,
+        card_or_w='initifalFitWorkspace.root --snapshotName initialFit' if usePreviousFit else cardOrW,
         param_options=param_options,
         rmin=rMin,
         rmax=rMax,

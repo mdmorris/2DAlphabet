@@ -132,7 +132,7 @@ class Generic2D(object):
         '''
         return self._manipulate(name,other,'/')
 
-    def RooParametricHist(self):
+    def RooParametricHist(self,name=''):
         '''Produce a RooParametricHist2D filled with this object's binVars.
 
         Returns:
@@ -143,6 +143,7 @@ class Generic2D(object):
         for cat in _subspace:
             cat_name = self.name+'_'+cat
             cat_hist = self.binning.CreateHist(cat_name+'_temp',cat)
+            obj_name = '%s_%s'%(name if name != '' else self.name, cat)
 
             self.binArgLists[cat] = RooArgList()
             for ybin in range(1,len(self.binning.ybinList)):
@@ -151,12 +152,12 @@ class Generic2D(object):
                     self.binArgLists[cat].add(self.binVars[bin_name])
 
             out_rph[cat] = RooParametricHist2D(
-                        cat_name, cat_name,
+                        obj_name, obj_name,
                         self.binning.xVars[cat],
                         self.binning.yVar,
                         self.binArgLists[cat], cat_hist
             )
-            out_add[cat] = RooAddition(cat_name+'_norm',cat_name+'_norm',self.binArgLists[cat])
+            out_add[cat] = RooAddition(obj_name+'_norm',obj_name+'_norm',self.binArgLists[cat])
         return out_rph, out_add
 
     def getBinVal(self,xbin,ybin):
@@ -203,10 +204,10 @@ class ParametricFunction(Generic2D):
 
         \code{.json}
             {0: {
-                'constraint': 'flatParam' or 'param <mu> <sigma>'
-                'MIN' = -1000
-                'MAX' = 1000
-                'NOM' = 0
+                'constraint': 'flatParam' or 'param <mu> <sigma>',
+                'MIN' = -1000,
+                'MAX' = 1000,
+                'NOM' = 0,
                 'ERROR' = 0.1
             } }
         \endcode
