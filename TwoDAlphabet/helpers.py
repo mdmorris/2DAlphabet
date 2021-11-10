@@ -31,16 +31,23 @@ def ascii_encode_dict(data):
     Returns:
         dict: Dict encoded with ascii instead of unicode.
     '''
-    def ascii_encode(x):
+    def _ascii_encode(x):
         if isinstance(x, unicode):
             return x.encode('ascii')
         elif isinstance(x, dict):
             return ascii_encode_dict(x)
         elif isinstance(x, list):
-            return [s.encode('ascii') for s in x]
+            out = []
+            for s in x:
+                if isinstance(s, unicode):
+                    out.append(s.encode('ascii'))
+                else:
+                    out.append(s)
+            return out
         else:
             return x
-    return dict(map(ascii_encode, pair) for pair in data.items())
+
+    return dict(map(_ascii_encode, pair) for pair in data.items())
 
 def arg_dict_to_list(indict):
     '''Convert dictionary of arguments into a list of

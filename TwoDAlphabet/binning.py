@@ -260,7 +260,7 @@ def binlist_to_bindict(binList, sigLow, sigHigh):
     return_bins = {'LOW':[],'SIG':[],'HIGH':[]}
     for s in [sigLow,sigHigh]:
         if s not in binList:
-            raise ValueError('The signal region edges must be in the list of bin edges. The value %s is not in the provided list of bin edges.'%s)
+            raise ValueError('The signal region edges must be in the list of bin edges. The value %s is not in the provided list of bin edges (%s).'%(s,binList))
     for b in binList:
         if b <= sigLow:
             return_bins['LOW'].append(b)
