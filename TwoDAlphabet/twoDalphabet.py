@@ -1,4 +1,4 @@
-import argparse, os, itertools, pandas, glob, pickle, sys, re, json, random, copy
+import argparse, os, itertools, pandas, glob, pickle, sys, re, random, copy, numpy
 from collections import OrderedDict
 from TwoDAlphabet.config import Config, OrganizedHists
 from TwoDAlphabet.binning import Binning
@@ -179,6 +179,7 @@ class TwoDAlphabet:
         nuis_obj_cols = ['name', 'constraint']
         for n in obj.nuisances:
             d = {c:n[c] for c in nuis_obj_cols}
+            d['owner'] = process+'_'+region
             self.ledger.alphaParams = self.ledger.alphaParams.append(d, ignore_index=True)
 
         for rph_cat in rph.values():
@@ -380,7 +381,7 @@ class TwoDAlphabet:
         masks_off = ['%s=0'%mask for mask in self._getMasks(run_dir+'/'+workspace_file)]
         
         with cd(run_dir):
-            param_vals = ['%s=%s'%(k,v['val']) for k,v in setParams.items()]
+            param_vals = ['%s=%s'%(k,v) for k,v in setParams.items()]
             param_vals.extend(masks_off)
             param_opt = ''
             if len(param_vals) > 0:
@@ -580,16 +581,30 @@ class Ledger():
     def __init__(self, df):
         self.df = df
         self.alphaObjs = pandas.DataFrame(columns=['process','region','obj','norm','process_type','color','combine_idx','title'])
-        self.alphaParams = pandas.DataFrame(columns=['name','constraint'])
+        self.alphaParams = pandas.DataFrame(columns=['name','constraint','owner'])
 
     def append(self, toAppend):
         self.df.append(toAppend, ignore_index=True if isinstance(toAppend, dict) else False)
 
     def select(self,f,*args):
-        eval_lamba = lambda row: f(row,args)
-        df = self.df.loc[self.df.apply(eval_lamba, axis=1)]
+        def _kept_owner(row, owner_names):
+            if row.owner in owner_names:
+                return True
+            else:
+                return False
+
+        eval_lambda = lambda row: f(row,args)
+        df = self.df.loc[self.df.apply(eval_lambda, axis=1)]
         new_ledger = Ledger(df)
-        new_ledger.alphaObjs = self.alphaObjs.loc[self.alphaObjs.apply(eval_lamba, axis=1)]
+        new_ledger.alphaObjs = self.alphaObjs.loc[self.alphaObjs.apply(eval_lambda, axis=1)]
+        owner_names = new_ledger.alphaObjs.apply(lambda owner_row: owner_row.process+'_'+owner_row.region, axis=1).to_list()
+
+        new_ledger.alphaParams = self.alphaParams.loc[ # Keep params if owner object was kept
+                                        self.alphaParams.apply(
+                                            lambda row: _kept_owner(row, owner_names),
+                                            axis=1
+                                        )
+                                    ]
         return new_ledger
 
     def GetRegions(self):
@@ -618,7 +633,9 @@ class Ledger():
         return [g[0] for g in self.df.groupby(['process','region'])]+[g[0] for g in self.alphaObjs.groupby(['process','region'])]
 
     def GetShapeSystematics(self):
-        return self.df.variation.unique().tolist()
+        systs = self.df.variation.unique()
+        systs = numpy.delete(systs, numpy.where(systs == 'nominal'))
+        return systs.tolist()
 
     def GetAlphaSystematics(self):
         return self.alphaParams.loc[~self.alphaParams.name.str.contains('_bin_\d+-\d+')].name.unique().tolist()
@@ -721,7 +738,7 @@ def MakeCard(ledger, subtag, workspaceDir):
     # imax (bins), jmax (backgrounds+signals), kmax (systematics) 
     imax = 3*len(ledger.GetRegions()) # pass, fail for each 'X' axis category    
     jmax = ledger.nbkgs + ledger.nsignals -1
-    kmax = len(ledger.GetShapeSystematics())-1 # -1 for nominal, does not include alphaParams
+    kmax = len(ledger.GetShapeSystematics()) # does not include alphaParams
     channels = ['_'.join(r) for r in itertools.product(ledger.GetRegions(),['LOW','SIG','HIGH'])]
     
     card_new.write('imax %s\n'%imax)      
