@@ -56,6 +56,7 @@ class TwoDAlphabet:
                 self.tag+'/', self.binnings,
                 self.GetHistMap(), readOnly=False
             )
+            self.workspace = self._makeWorkspace()
 
         else:
             self.binnings = pickle.load(open(self.tag+'/binnings.p','rb'))
@@ -65,7 +66,9 @@ class TwoDAlphabet:
             )
             # Does not contain the RooFit objects - just meta info
             self.ledger = LoadLedger(self.tag+'/')
-        
+
+            self.workspace = None
+            
         if self.options.debugDraw is False:
             ROOT.gROOT.SetBatch(True)
 
@@ -128,12 +131,16 @@ class TwoDAlphabet:
             out = parser.parse_args([])
         return out
 
-    def _saveOut(self):
+    def Save(self):
         '''Save to project directory:
         - the full model table in csv (and markdown if py3)
         - the binnings dictionary (with objects)
         - the alphaObjs and alphaParams dictionaries (without objects)
         '''
+        fworkspace = ROOT.TFile.Open(self.tag+'/base.root','RECREATE')
+        fworkspace.cd()
+        self.workspace.Write()
+
         pickle.dump(self.binnings,open(self.tag+'/binnings.p','wb'))
         self.ledger.Save(self.tag)
 
@@ -172,7 +179,13 @@ class TwoDAlphabet:
 
         nuis_obj_cols = ['name', 'obj', 'constraint']
         for n in obj.nuisances:
-            self.ledger.alphaParams = self.ledger.alphaParams.append({c:n[c] for c in nuis_obj_cols}, ignore_index=True)
+
+        for rph_cat in rph.values():
+            print ('Adding RooParametricHist... %s'%rph_cat.GetName())
+            getattr(self.workspace,'import')(rph_cat,ROOT.RooFit.RecycleConflictNodes(),ROOT.RooFit.Silence())
+        for norm_cat in norm.values():
+            print ('Adding RooParametricHist norm... %s'%norm_cat.GetName())
+            getattr(self.workspace,'import')(norm_cat,ROOT.RooFit.RecycleConflictNodes(),ROOT.RooFit.Silence())
 
 # --------------- GETTERS --------------- #
     def InitQCDHists(self):
@@ -282,29 +295,12 @@ class TwoDAlphabet:
             rdh = make_RDH(self.organizedHists.Get(hname), var_lists[binningName][cat])
             getattr(workspace,'import')(rdh)
 
-        for rph in self.ledger.alphaObjs.obj:
-            for rph_cat in rph.values():
-                print ('Adding RooParametricHist... %s'%rph_cat.GetName())
-                getattr(workspace,'import')(rph_cat,ROOT.RooFit.RecycleConflictNodes(),ROOT.RooFit.Silence())
-        for norm in self.ledger.alphaObjs.norm:
-            for norm_cat in norm.values():
-                print ('Adding RooParametricHist norm... %s'%norm_cat.GetName())
-                getattr(workspace,'import')(norm_cat,ROOT.RooFit.RecycleConflictNodes(),ROOT.RooFit.Silence())
+        return workspace
 
-        out = ROOT.TFile.Open('base.root','RECREATE')
-        out.cd()
-        workspace.Write()
-        out.Close()
-
-    def Construct(self):
-        with cd(self.tag):
-            self._makeWorkspace()
-        self._saveOut()
-
-    def MakeCard(self, subledger, subtag, workspaceDir='../', toyData=None):
+    def MakeCard(self, subledger, subtag, workspaceDir='../'):
         with cd(self.tag):
             _runDirSetup(subtag)
-            MakeCard(subledger, subtag, workspaceDir, toyData)
+            MakeCard(subledger, subtag, workspaceDir)
 
 # -------- STAT METHODS ------------------ #
     def MLfit(self, subtag, card='card.txt', rMin=-1, rMax=10, setParams={}, verbosity=0, usePreviousFit=False, extra=''):
