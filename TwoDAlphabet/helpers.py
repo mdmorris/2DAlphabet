@@ -314,7 +314,7 @@ class CondorRunner():
         timestr = time.strftime("%Y%m%d-%H%M%S")
         out_jdl = 'temp_'+timestr+'_jdl'
 
-        execute_cmd("sed 's$TEMPSCRIPT${0}$g' {1}/condor/templates/jdl_template > {2}".format(self.run_script_path, abs_twoD_dir_base, out_jdl))
+        execute_cmd("sed 's$TEMPSCRIPT${0}$g' {1}/condor/jdl_template > {2}".format(self.run_script_path, abs_twoD_dir_base, out_jdl))
         execute_cmd("sed -i 's$TEMPTAR${0}$g' {1}".format(self.pkg_tarball_path, out_jdl))
         execute_cmd("sed -i 's$TEMPARGS${0}$g' {1}".format(self.run_args_path, out_jdl))
         execute_cmd("condor_submit "+out_jdl)

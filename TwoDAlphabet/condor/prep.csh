@@ -1,1 +1,0 @@
-# Code to put your input rootfiles referenced in configs onto a condor-friendly storage area
