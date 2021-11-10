@@ -121,7 +121,7 @@ class Plotter(object):
             self.slices['x'][region] = {'vals': binning.xSlices,'idxs':binning.xSliceIdx}
             self.slices['y'][region] = {'vals': binning.ySlices,'idxs':binning.ySliceIdx}
             
-            for process in self.ledger.GetProcesses()+['TotalBkg', 'data_obs']:
+            for process in self.ledger.GetProcesses()+['TotalBkg']:
                 if process != 'TotalBkg':
                     color = self.ledger.GetProcessColor(process)
                     proc_type = self.ledger.GetProcessType(process)
@@ -255,7 +255,6 @@ class Plotter(object):
             binning,_ = self.twoD.GetBinningFor(region)
 
             for logyFlag in [False, True]:
-
                 ordered_bkgs = self._order_df_on_proc_list(
                                             group[group.process_type.eq('BKG')], proc_type='BKG',
                                             alphaBottom=(not logyFlag))
