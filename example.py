@@ -51,7 +51,7 @@ def _select_signal(row, args):
         return True
 
 def _load_CR_rpf(poly_order):
-    twoD_CRonly = TwoDAlphabet('XHYfits_CR','XHYbbWW.json', loadPrevious=True)
+    twoD_CRonly = TwoDAlphabet('XHYfits_CR','example_config.json', loadPrevious=True)
     params_to_set = twoD_CRonly.GetParamsOnMatch('rpf.*'+poly_order, 'MX_2000_MY_800_area', 'b')
     return {k:v['val'] for k,v in params_to_set.items()}
 
@@ -101,7 +101,7 @@ def test_make(SRorCR):
     assert SRorCR in ['SR', 'CR'] # quick sanity check
 
     fr = {}
-    if SRorCR == 'SR': # XHYbbWW.json is setup for the CR so setup a find-replace dictionary to make the SR version if needed.
+    if SRorCR == 'SR': # example_config.json is setup for the CR so setup a find-replace dictionary to make the SR version if needed.
         fr = {'CR_loose':'SR_loose', 'CR_fail': 'SR_fail', 'CR_pass':'SR_pass'}
 
     # Create the twoD object which starts by reading the JSON config and input arguments to
@@ -110,7 +110,7 @@ def test_make(SRorCR):
     # is also saved as runConfig.json. This means, if you want to share your analysis with
     # someone, they can grab everything they need from this one spot - no need to have access to
     # the original files! (Note though that you'd have to change the config to point to organized_hists.root).
-    twoD = TwoDAlphabet('XHYfits_'+SRorCR, 'XHYbbWW.json', findreplace=fr, loadPrevious=False)
+    twoD = TwoDAlphabet('XHYfits_'+SRorCR, 'example_config.json', findreplace=fr, loadPrevious=False)
     qcd_hists = twoD.InitQCDHists() # Create the data - BKGs histograms
 
     # This loop will only run once since the only regions are CR_pass, CR_fail, CR_loose (or the SR versions)
