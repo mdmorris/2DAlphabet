@@ -3,15 +3,12 @@
 import setuptools, sys
 
 requires = [
-      'pytest',
-      'pytest-cov',
-      'recommonmark',
       'pandas',
       'Pillow'
 ]
 if sys.version_info.major == 3:
-      requires.append('doxypypy')
-
+    requires.extend(['doxypypy','pytest','pytest-cov'])
+    
 setuptools.setup(name='TwoDAlphabet',
       version='2.0',
       description='Framework for performing 2D binned-likelihood fits with one background derived from a transfer function.',
