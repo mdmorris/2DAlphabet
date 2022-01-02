@@ -322,8 +322,8 @@ class ParametricFunction(Generic2D):
         y_range = self.binning.ybinList[-1] - y_min
         
         # Remap to [-1,1]
-        x_center_mapped = float((x_center - x_min))/x_range #float cast prevents returning zero if bin edges are ints
-        y_center_mapped = float((y_center - y_min))/y_range
+        x_center_mapped = float(x_center - x_min)/x_range #float cast prevents returning zero if bin edges are ints
+        y_center_mapped = float(y_center - y_min)/y_range
 
         return x_center_mapped,y_center_mapped
 
