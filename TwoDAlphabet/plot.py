@@ -895,14 +895,14 @@ def _reduced_corr_matrix(fit_result, varsToIgnore=[], varsOfInterest=[]):
 
     nFinalParams = len(finalParamsDict.keys())
     out = ROOT.TH2D('correlation_matrix','correlation_matrix',nFinalParams,0,nFinalParams,nFinalParams,0,nFinalParams)
-    out_txt = open('correlation_matrix.txt','w')
+    out_txt = ''
 
     for out_x_index, paramXName in enumerate(sorted(finalParamsDict.keys())):
         cm_index_x = finalParamsDict[paramXName]
         for out_y_index, paramYName in enumerate(sorted(finalParamsDict.keys())):
             cm_index_y = finalParamsDict[paramYName]
             if cm_index_x > cm_index_y:
-                out_txt.write('%s:%s = %s\n'%(paramXName,paramYName,CM[cm_index_x][cm_index_y]))
+                out_txt += '%s:%s = %s\n'%(paramXName,paramYName,CM[cm_index_x][cm_index_y])
             out.Fill(out_x_index+0.5,out_y_index+0.5,CM[cm_index_x][cm_index_y])
 
         out.GetXaxis().SetBinLabel(out_x_index+1,finalPars.at(cm_index_x).GetName())
@@ -910,14 +910,14 @@ def _reduced_corr_matrix(fit_result, varsToIgnore=[], varsOfInterest=[]):
     out.SetMinimum(-1)
     out.SetMaximum(+1)
 
-    return out
+    return out, out_txt
 
 def plot_correlation_matrix(varsToIgnore):
     fit_result_file = ROOT.TFile.Open('fitDiagnosticsTest.root')
-    if 'b' in _get_good_fit_results(fit_result_file):
-        fit_result = fit_result_file.Get("fit_b")
+    for fittag in _get_good_fit_results(fit_result_file):
+        fit_result = fit_result_file.Get("fit_"+fittag)
         if hasattr(fit_result,'correlationMatrix'):
-            corrMtrx = _reduced_corr_matrix(fit_result, varsToIgnore=varsToIgnore)
+            corrMtrx, corrTxt = _reduced_corr_matrix(fit_result, varsToIgnore=varsToIgnore)
             corrMtrxCan = ROOT.TCanvas('c','c',1400,1000)
             corrMtrxCan.cd()
             corrMtrxCan.SetBottomMargin(0.22)
@@ -927,9 +927,14 @@ def plot_correlation_matrix(varsToIgnore):
             corrMtrx.GetXaxis().SetLabelSize(0.01)
             corrMtrx.GetYaxis().SetLabelSize(0.01)
             corrMtrx.Draw('colz text')
-            corrMtrxCan.Print('correlation_matrix.png','png')
+            corrMtrxCan.Print('plots_fit_%s/correlation_matrix.png'%fittag,'png')
+
+            with open('plots_fit_%s/correlation_matrix.txt'%fittag,'w') as corrTxtFile:
+                corrTxtFile.write(corrTxt)
+
         else:
             warnings.warn('Not able to produce correlation matrix.',RuntimeWarning)
+
     fit_result_file.Close()
 
 def plot_gof(tag, subtag, seed=123456, condor=False):
