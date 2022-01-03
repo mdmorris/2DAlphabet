@@ -77,7 +77,7 @@ def parse_arg_dict(parser,indict):
     new_namespace.__dict__.update(indict)
     return new_namespace
 
-def execute_cmd(cmd,dryrun=False): # pragma: no cover
+def execute_cmd(cmd,dryrun=False,out=None): # pragma: no cover
     '''Print and execute a command-line command via subprocess.call().
     If dryrun==True, only print.
 
@@ -87,6 +87,7 @@ def execute_cmd(cmd,dryrun=False): # pragma: no cover
     '''
     print ('Executing: '+cmd)
     if not dryrun:
+        if out: cmd = cmd + ' | tee %s'%out
         subprocess.call([cmd],shell=True)
 
 @contextmanager
