@@ -877,7 +877,10 @@ def gen_post_fit_shapes():
         execute_cmd(shapes_cmd)
     fit_result_file.Close()
 
-def _reduced_corr_matrix(fit_result, varsToIgnore=[], varsOfInterest=[]):
+def _reduced_corr_matrix(fit_result, varsToIgnore=[], varsOfInterest=[], threshold=0):
+    if threshold < 0:
+        raise ValueError('Threshold for correlation matrix values to plot must be a positive number.')
+
     ROOT.gStyle.SetOptStat(0)
     # ROOT.gStyle.SetPaintTextFormat('.3f')
     CM = fit_result.correlationMatrix()
@@ -899,6 +902,10 @@ def _reduced_corr_matrix(fit_result, varsToIgnore=[], varsOfInterest=[]):
 
     for out_x_index, paramXName in enumerate(sorted(finalParamsDict.keys())):
         cm_index_x = finalParamsDict[paramXName]
+
+        if not any([abs(CM[cm_index_x][cm_index_y]) > threshold for cm_index_y in range(nParams) if cm_index_y != cm_index_x]):
+            continue
+
         for out_y_index, paramYName in enumerate(sorted(finalParamsDict.keys())):
             cm_index_y = finalParamsDict[paramYName]
             if cm_index_x > cm_index_y:
@@ -912,12 +919,12 @@ def _reduced_corr_matrix(fit_result, varsToIgnore=[], varsOfInterest=[]):
 
     return out, out_txt
 
-def plot_correlation_matrix(varsToIgnore):
+def plot_correlation_matrix(varsToIgnore, threshold=0):
     fit_result_file = ROOT.TFile.Open('fitDiagnosticsTest.root')
     for fittag in _get_good_fit_results(fit_result_file):
         fit_result = fit_result_file.Get("fit_"+fittag)
         if hasattr(fit_result,'correlationMatrix'):
-            corrMtrx, corrTxt = _reduced_corr_matrix(fit_result, varsToIgnore=varsToIgnore)
+            corrMtrx, corrTxt = _reduced_corr_matrix(fit_result, varsToIgnore=varsToIgnore, threshold=threshold)
             corrMtrxCan = ROOT.TCanvas('c','c',1400,1000)
             corrMtrxCan.cd()
             corrMtrxCan.SetBottomMargin(0.22)

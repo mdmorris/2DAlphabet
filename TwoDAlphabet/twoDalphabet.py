@@ -328,7 +328,8 @@ class TwoDAlphabet:
             plot.nuis_pulls()
             plot.save_post_fit_parametric_vals()
             plot.plot_correlation_matrix( # Ignore nuisance parameters that are bins
-                varsToIgnore=self.ledger.alphaParams.name[self.ledger.alphaParams.name.str.contains('_bin_\d+-\d+')].to_list()
+                varsToIgnore=self.ledger.alphaParams.name[self.ledger.alphaParams.name.str.contains('_bin_\d+-\d+')].to_list(),
+                threshold=0 # change this to reduce the size of the correlation matrix to only those variables with correlations above a threshold
             )
             plot.gen_post_fit_shapes()
             plot.gen_projections(ledger, self, 'b')
@@ -873,7 +874,7 @@ def _runMLfit(cardOrW, blinding, verbosity, rMin, rMax, setParams, usePreviousFi
     if os.path.isfile('fitDiagnosticsTest.root'):
         execute_cmd('rm fitDiagnosticsTest.root')
 
-    execute_cmd(fit_cmd)
+    execute_cmd(fit_cmd, out='FitDiagnostics.log')
 
 def _runLimit(blindData, verbosity, setParams, card_or_w='card.txt', condor=False):
     # card_or_w could be `morphedWorkspace.root --snapshotName morphedModel`
