@@ -1,11 +1,11 @@
 Getting Started {#getting-started}
 ===============
 
-\tableofcontents{html}
+\tableofcontents
 
 # Installation {#install}
 
-2D Alphabet can only be used in a CMSSW environment. The Higgs Analysis
+2D Alphabet can only be used in a CMSSW environment where the Higgs Analysis
 Combine Tool must be installed. Please follow the instructions below to
 checkout a 2D Alphabet-friendly version of Combine. These instructions are
 based off of the [Combine documentation](http://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/) 
@@ -53,11 +53,11 @@ r = RooParametricHist2D()
 
 # JSON Configuration Files {#config}
 
-The goal of the JSON is to have an easily understandable and configurable input
+The goal of the JSON configuration file is to have an easily understandable and configurable input
 that allows the
 2D Alphabet software to read and organize analysis files and histograms to its
 liking while also giving the user the ability to easily configure values like
-bin sizes and ranges without lots of command line options. This means that while
+bin sizes and ranges without lots of command line options. This means that, while
 the user is encouraged to add what they need, there are some keys and values
 that must stay the same. These static strings are always in capital letters
 to make them easy to distinguish. The six static sections are described below.
@@ -80,6 +80,377 @@ The user must be careful they don't accidentally use strings in the JSON
 that are identical to keys in `GLOBAL` so accidental substitutions don't happen.
 This means keys in `GLOBAL` should be at least partially descriptive 
 (single character keys would be a bad idea). 
+
+## Describing existing histograms {#config-prs}
+
+2D Alphabet assumes that any analysis histogram can be described using three
+descriptors:
+
+- the physics "process" (ex. data, ttbar, signal, etc),
+- the selection region (ex. signal region, control region, validation region, etc),
+- the variation in a systematic uncertainty (ex. nominal/no variation, uncertainty varied up, uncertainty varied down, etc)
+
+Of course, some regions have different physics processes than others and some
+systematic uncertainties only apply for a subset of processes or regions. Thus,
+the set of all histograms for the analysis is not simply the cross product of
+all processes, regions, and systematic variations.
+
+To account for this in the config, there needs to be meta information provided that describes
+exactly the combinations that should be considered. Thus, as the three sections for these descriptors
+are shown, you will see information cross section boundaries to inform the construction of
+the final statistical model.
+
+Let's start with `PROCESSES`.
+
+### `PROCESSES`
+
+In this section, the user can define as many processes as they need. At a minimum,
+one must define exactly one data source and at least one signal. The data 
+process name should be `"data_obs"` which is the name expected by Combine.
+The signal can be named what you please. Background can likewise be defined
+but are not necessary for 2D Alphabet to work. 
+
+Please note two important things: 
+1. If you plan to define a data-driven background (defined by a transfer function or similar parametric form),
+   you do not include that background here. The config should only reference processes for which you intend
+   to use histogram templates.
+2. Combine always requires that there be an observation (data), a background
+   estimate, and a signal sample. In addition to the above, that means that not
+   including a background in the config necessitates that you define a parameteric
+   background model later.
+
+Each key in `PROCESSES` is the name of each process of interest and is paired with a sub-dictionary
+of information about the process.
+- `"TYPE"`: one of `"DATA"`, `"BKG"`, or `"SIGNAL"`
+- `"TITLE"`: the "pretty" title to include in plot legends (support's ROOT's LaTeX formatting),
+- `"COLOR"`: the ROOT color code to use for plotting (fill color for backgrounds, line color for signals),
+- `"SCALE"`: a factor by which to scale the normalization of all templates of this process,
+- `"LOC"`: the path to the histogram, ex. `"path/file.root:histo_name"`,
+- `"SYSTEMATICS"`: a list of strings that correspond to a subset of the names of systematic variations
+  in the `SYSTEMATICS` section;
+
+The following is an example `PROCESSES` section:
+
+```json
+{
+  "PROCESSES": {
+    "data_obs": {
+      "TYPE": "DATA",
+      "TITLE": "Data",
+      "COLOR": 1,
+      "SCALE": 1.0,
+      "LOC": "/to/my/rootfiles/selection_data_obs.root:hist2D_$region",
+      "SYSTEMATICS":[]
+    },
+    "signal": {
+      "TYPE": "SIGNAL",
+      "TITLE": "m_{X} = 2000, m_{Y} = 800 (GeV)",
+      "COLOR": 1,
+      "SCALE": 1.0,
+      "LOC":"/to/my/rootfiles/selection_signal.root:hist2D_$region",
+      "SYSTEMATICS":["lumi","TriggerEff18","Pileup18","jer18","jes18","jmr18","jms18"]
+    },
+    "ttbar_18": {
+      "TYPE": "BKG",
+      "TITLE": "t#bar{t}",
+      "COLOR": 2,
+      "SCALE": 1.0,
+      "LOC":"/to/my/rootfiles/selection_ttbar_18.root:hist2D_$region",
+      "SYSTEMATICS":["lumi","ttbar_xsec","TriggerEff18","Pileup18","jer18","jes18","jmr18","jms18"],
+    } 
+  }
+}
+```
+
+Most of this should seem self-explanatory except for the `"LOC"` values which have some strange strings.
+Specifically, they use a reserved substitiuion string - `$region` - which is a stand-in to mean that 
+the histogram names change per region and the region names (defined as the keys in the `REGIONS` section)
+should be subsituted to find the actual histograms.
+
+There are two more of these reserved substitution strings - `$process` and `$syst`. We'll see `$syst` later
+but we can use them here as well to avoid the redundancy of the `PROCESSES` keys if we'd like. For example,
+
+```python
+"LOC":"/to/my/rootfiles/selection_ttbar_18.root:hist2D_$region",
+```
+can change to
+```python
+"LOC":"/to/my/rootfiles/selection_$process.root:hist2D_$region",
+```
+with no loss of information and a potential reduction in possible mistakes.
+
+Now that you know this, I can explain the last option that exists for the sub-dictionaries - `"ALIAS"`.
+By default, 2D Alphabet will use the process key (ie. "data_obs", "signal", "ttbar_18") for the substitution
+to `$process`. If you'd prefer something different, you can specify an `"ALIAS"` which is used instead.
+By specifying an `"ALIAS"`,
+one can specify separate input and output names for the same process - the input (what appears in histogram paths)
+will be the `"ALIAS"` while the output will be the outer key for the process name.
+
+For example, I sometimes run on a subset of data (say, just 2018 data) and the file for that subset would
+require the `$process` to be `Data_18`.
+To avoid having to rename the file to include `data_obs` just to please Combine, the outer key
+can be `data_obs` (so Combine is happy) and the `"ALIAS"` can be `Data_18`.
+
+### `REGIONS` {#config-regions}
+The `REGIONS` section is far simpler in structure and, now that the reserved substitution strings
+have been introduced, perhaps a bit more intuitive. Let's start with a simple example building off
+of the `PROCESSES` section example:
+
+```json
+{
+  "REGIONS": {
+    "SignalRegion_fail": {
+      "PROCESSES": ["signal"],
+      "BINNING": "default"
+    },
+    "SignalRegion_loose": {
+      "PROCESSES": ["signal"],
+      "BINNING": "default"
+    },
+    "SignalRegion_pass": {
+      "PROCESSES": ["signal", "ttbar"],
+      "BINNING": "default"
+    }
+  }
+}
+```
+You should think of this section as a way of listing out the regions, what processes appear
+in each, and the binning scheme you want. If it weren't for all of the meta information like
+color, titles, etc plus the systematic variations, this section would describe the analysis
+in its entirety!
+
+As you can see, each region is named with a key and these keys are what will be used for the
+`$region` substituions we saw in the `PROCESSES` `"LOC"` areas. However, they will only be used for the
+substitution when there is a match with a process listed in the sub-dictionary! Looking at the example above,
+there will only be one histogram loaded for `ttbar` - the one for region "SignalRegion_pass"!
+Whereas the `signal` will have histograms for all three regions.
+In this way, you can control what appears in each region.
+
+The new concept introduced here is the `"BINNING"` key which names a binning scheme described in the
+dedicated `"BINNING"` section described below. In this case, each region will be binned according to
+what has been defined in the `"default"` scheme. However, multiple schemes can be defined and assigned
+to different regions (for example, if you have a validation region which populates a different phase space or has better/worse statistics).
+
+### `SYSTEMATICS` {#config-syst}
+
+The `SYSTEMATICS` section of the config is the simplest because it only describes
+the variations themselves, not how they connect to any process or region.
+
+The simplest type of variation is a symmetric, log-normal. A good example
+is the Run 2 luminosity uncertinaty of 1.6% which can be defined with:
+```json
+{
+  "SYSTEMATICS": {
+    "lumi": {
+      "VAL": 1.016
+    }  
+}
+```
+The `"VAL"` key can map to any floating point number but note that it is on a log scale
+and should be a value greater than one.
+
+An asymmetric, log-normal can be added by specifying up and down variations like so (+5%/-7%):
+```json
+{
+  "SYSTEMATICS": {
+    "lumi": {
+      "VAL": 1.016
+    },
+    "asym": {
+      "VALUP": 1.05,
+      "VALDOWN": 0.93
+    }
+}
+```
+
+For both log-normal types, the values will be used directly in the Combine card so any rules
+set by Combine must be followed.
+
+The third type of variation is shape-based. In other words, the bins of the histogram are not
+fully correlated as with the normalization uncertainties and the user will input up and down
+variations of the shape that correspond to changing the underlying parameter by \$f\sigma\$f
+standard deviation of uncertainty. Typically, \$f\sigma\$f is 1. In this case, a shape uncertainty
+may look like the following:
+
+```json
+{
+  "SYSTEMATICS": {
+    "shape_syst": {
+      "UP":   "/to/my/rootfiles/selection_$process.root:hist2D_$region__$syst_up",
+      "DOWN": "/to/my/rootfiles/selection_$process.root:hist2D_$region__$syst_down",
+      "SIGMA": 1.0
+    }
+}
+```
+
+Note that the `"UP"` and `"DOWN"` keys map to strings with a scheme to find the template histograms.
+Specifically, `$process`, `$region`, and `$syst` are reserved substitution keys that will be replaced
+by actual sets or process, region, and systematic variation. The values that will be substituted are the
+keys of the respective sections. Say for example that you have the following JSON config structure:
+```json
+{
+  "PROCESSES": {
+    "data_obs": {...},
+    "signal": {...},
+    "bkg": {...}
+  },
+  "REGIONS": {
+    "SignalRegion": {...}
+  },
+  "SYSTEMATICS": {
+    "shape_syst": {
+      "UP":   "/to/my/rootfiles/selection_$process.root:hist2D_$region__$syst_up",
+      "DOWN": "/to/my/rootfiles/selection_$process.root:hist2D_$region__$syst_down",
+      "SIGMA": 1.0
+    }
+  }
+}
+
+```
+
+
+
+In fact, "path", "FILE", "HIST_UP", and "HIST_DOWN" are all variables defined by the **user** in the
+`GLOBAL` section of the config that we'll see later. To give some context though, here is an example
+`GLOBAL` section:
+
+```json
+"GLOBAL": {
+    "FILE": "selection_$process.root",
+    "FILE_UP": "selection_$process_$syst_up.root",
+    "FILE_DOWN": "selection_$process_$syst_down.root",
+    "HIST": "hist2D_$region__nominal",
+    "HIST_UP": "hist2D_$region__$syst_up",
+    "HIST_DOWN": "hist2D_$region__$syst_down",
+    "path": "/go/to/my/rootfiles/"
+}
+```
+
+There are three variables defined in these strings that are reserved exclusively by 2D Alphabet
+but which you are free to use when writing schemes for .
+
+In the above scheme, the user is saying that the
+histograms can be found inside the same file as the nominal shape. One could likewise specify
+```json
+{
+  "SYSTEMATICS": {
+    "shape_syst": {
+      "UP": "path/FILE_UP:HIST",
+      "DOWN": "path/FILE_DOWN:HIST",
+      "SIGMA": 1.0
+    }
+}
+```
+which implies that there are different files for each variation but with the same name for the histogram
+as the nominal variation. Again, we just want to describe the systematic variation
+generally, not for a specific process or region. If your histograms don't follow such a pattern
+or a pattern which is impossible to scheme, you are encouraged to rename them.
+
+Note also that `"SIGMA"` currently maps to 1 since the templates are always expected to be the result of
+one standard deviation variations of the underlying parameter.
+There are cases where it may be useful to change the underlying
+constraint on-the-fly. To accomplish this, the user may change `"SIGMA"` to a different value which will change
+*the factor by which to scale the unit Gaussian constraint*. This is a convention chosen by Combine and
+can be read about [here](https://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/part2/settinguptheanalysis/#binned-shape-analysis).
+This means, if one wants to treat the templates as 2 standard deviation variations, `"SIGMA"`
+should be 1/2 - or 0.5.
+
+The final option which has not been shown so far is `"ALIAS"`. Modifying the above example,
+
+```json
+{
+  "SYSTEMATICS": {
+    "shape_syst_16": {
+      "ALIAS": "ShapeSyst",
+      "UP": "path/FILE:HIST_UP",
+      "DOWN": "path/FILE:HIST_DOWN",
+      "SIGMA": 1.0
+    },
+    "shape_syst_17": {
+      "ALIAS": "ShapeSyst",
+      "UP": "path/FILE:HIST_UP",
+      "DOWN": "path/FILE:HIST_DOWN",
+      "SIGMA": 1.0
+    },
+    "shape_syst_18": {
+      "ALIAS": "ShapeSyst",
+      "UP": "path/FILE:HIST_UP",
+      "DOWN": "path/FILE:HIST_DOWN",
+      "SIGMA": 1.0
+    }
+}
+```
+let's say this is 
+
+
+
+
+
+
+## `BINNING` {#config-binning}
+This dictionary is the opportunity to define the axis binning of the user's space.
+The binning values are split into x and y axis definitions where the x-axis describes
+the variable whose signal region is blinded. Note that 2D Alphabet can rebin
+and reduce the ranges of the input axes for you. The binning in each axis cannot be
+beyond the range of the input histogram (hopefully, this is obvious) but it can be a
+subset of the input range. The number of bins are restricted to be equal to or less
+than the input number of bins (hopefully, this is also obvious). Additionally, any newly
+defined bin edges must line up with input bin edges (ie. there's no bin splitting).
+
+The signal bounds only apply to the `X` axis and must exist within the `X` axis range
+defined in the configuration file so that there are always three regions defined
+with non-zero width. Only the signal region will be blinded during the fitting
+and plotting. The options to perform this blinding are described in the [`OPTIONS` section](OPTIONS).
+
+For either axis, there are two options for binning: constant width and variable width.
+To use variable bins, provided a list of bin edges to the `BINS` key. To have 
+2D Alphabet calculate the bin edges with constant bin width, use the `MIN`, `MAX`, and
+`NBINS` keys (as you would in a `TH1` definition).
+
+An example formatting of the `BINNING` section is provided here.
+
+```json
+"X":
+    "NAME": <name of internal variable on the x-axis>, # string
+    "TITLE": <title to appear in plots with this axis>, # string
+    "MIN": <lower bound of x-axis>, # float
+    "MAX": <upper bound of x-axis>, # float
+    "NBINS": <number of x bins from MIN to MAX>, # int
+    "SIGSTART": <lower bound of signal region of x-axis>, # int
+    "SIGEND": <upper bound of signal region of x-axis> # int
+"Y"`
+    "NAME": name of your variable on the y-axis, # string
+    "TITLE": title that you'd like to appear in plots with this axis, # string
+    "BINS": [<edge1>, <edge2>,...<edgeN>] # [float]
+```
+
+Because the `X` axis is split into three portions (`LOW`, `SIG`, `HIGH`), one can also
+define binning per region of the `X` axis. `BINS` can be used as well as `MIN`, `MAX`, `NBINS` like so:
+
+```json
+"X":
+    "NAME": <name of internal variable on the x-axis>, # string
+    "TITLE": <title to appear in plots with this axis>, # string
+    "LOW": {
+        "MIN": <lower bound of x-axis>, # float
+        "MAX": <upper bound of x-axis>, # float
+        "NBINS": <number of x bins from MIN to MAX> # int
+    }
+    "SIG": {
+        "MIN": <lower bound of x-axis>, # float
+        "MAX": <upper bound of x-axis>, # float
+        "NBINS": <number of x bins from MIN to MAX> # int
+    }
+    "HIGH": {
+        "MIN": <lower bound of x-axis>, # float
+        "MAX": <upper bound of x-axis>, # float
+        "NBINS": <number of x bins from MIN to MAX> # int
+    }
+    "SIGSTART": <lower bound of signal region of x-axis>, # int
+    "SIGEND": <upper bound of signal region of x-axis> # int
+```
+
+
 
 ## `OPTIONS` {#config-options}
 
@@ -152,259 +523,8 @@ working on the 2D Alphabet code or debugging a fit.
   "sigStart", "sigEnd", "freezeFail", "blindedFit", "blindedPlots", "newXbins", "full_x_bins",
   "newYbins", "rpf", "rpfVarNames", "organizedDict", "floatingBins". I cannot think
   of a good use for this option that would not also be dangerous or overcome by just re-running!
-        
-## `PROCESS` {#config-process}
+     
 
-In this section, the user can define as many processes as they need. This 
-includes data, background simulation, and signal simulation. Please note two 
-important things: 
-1. You should NOT define the non-resonant background that is meant to be 
-   estimated from data ("multijet"). That background is naturally defined by
-   the difference between data and the other backgrounds defined here.
-2. Combine always requires that there be an observation (data), a background
-   estimate, and a signal sample. This means that your configuration file
-   must contain data (code 1) and signal (code 0). The codes classify the
-   processes and are defined below. 
-
-Each key in `PROCESS` is the name of each process of interest. Please name
-your data as `data_obs`. This is a Combine convention that 2D Alphabet maintains.
-Each process name is a key for a sub-dictionary that specifies
-- `"TITLE":`
-- `"FILE":` the path to the file containing the nominal pass and fail histograms for the process (string);
-- `"HISTPASS":` the name of the histogram in the above file with the passing distribution (string);
-- `"HISTFAIL":` the name of the histogram in the above file with the failing distribution (string);
-- `"SYSTEMATICS":` a list of strings that correspond to the names of systematics
-  in `SYSTEMATIC` (note `SYSTEMATIC` not `SYSTEMATICS`) that are applicable 
-  to this process (list of strings);
-- `"CODE":` a way to classify the treatment of the process: 0 (signal), 1 (data), 2 (background simulation)
-
-Here is an example PROCESS dictionary section:
-
-```json
-"PROCESS": {
-    "data_obs": {
-        "FILE": "data_tau32medium_default.root",
-        "HISTPASS": "MtwvMtPass",
-        "HISTFAIL": "MtwvMtFail",
-        "SYSTEMATICS":[],
-        "CODE": 1
-    },
-    "ttbar": {
-        "TITLE":"t#bar{t}",
-        "FILE":"ttbar_tau32medium_default.root",
-        "HISTPASS":"MtwvMtPass",
-        "HISTFAIL":"MtwvMtFail",
-        "SYSTEMATICS":["syst1","syst2","syst3","syst4"],
-        "COLOR": 2,
-        "CODE": 2
-    },
-    "signalLH2400": {
-        "TITLE":"b*_{LH} (2.4 TeV)",
-        "FILE": "signalLH2400_tau32medium_default.root",
-        "HISTPASS": "MtwvMtPass",
-        "HISTFAIL": "MtwvMtFail",
-        "SYSTEMATICS":["syst1","syst3","syst5","jmr17","jms17"],
-        "CODE": 0,
-        "COLOR": 0
-    }
-```
-
-## `BINNING` {#config-binning}
-This dictionary is the opportunity to define the axis binning of the user's space.
-The binning values are split into x and y axis definitions where the x-axis describes
-the variable whose signal region is blinded. Note that 2D Alphabet can rebin
-and reduce the ranges of the input axes for you. The binning in each axis cannot be
-beyond the range of the input histogram (hopefully, this is obvious) but it can be a
-subset of the input range. The number of bins are restricted to be equal to or less
-than the input number of bins (hopefully, this is also obvious). Additionally, any newly
-defined bin edges must line up with input bin edges (ie. there's no bin splitting).
-
-The signal bounds only apply to the `X` axis and must exist within the `X` axis range
-defined in the configuration file so that there are always three regions defined
-with non-zero width. Only the signal region will be blinded during the fitting
-and plotting. The options to perform this blinding are described in the [`OPTIONS` section](OPTIONS).
-
-For either axis, there are two options for binning: constant width and variable width.
-To use variable bins, provided a list of bin edges to the `BINS` key. To have 
-2D Alphabet calculate the bin edges with constant bin width, use the `MIN`, `MAX`, and
-`NBINS` keys (as you would in a `TH1` definition).
-
-An example formatting of the `BINNING` section is provided here.
-
-```json
-"X":
-    "NAME": <name of internal variable on the x-axis>, # string
-    "TITLE": <title to appear in plots with this axis>, # string
-    "MIN": <lower bound of x-axis>, # float
-    "MAX": <upper bound of x-axis>, # float
-    "NBINS": <number of x bins from MIN to MAX>, # int
-    "SIGSTART": <lower bound of signal region of x-axis>, # int
-    "SIGEND": <upper bound of signal region of x-axis> # int
-"Y"`
-    "NAME": name of your variable on the y-axis, # string
-    "TITLE": title that you'd like to appear in plots with this axis, # string
-    "BINS": [<edge1>, <edge2>,...<edgeN>] # [float]
-```
-
-Because the `X` axis is split into three portions (`LOW`, `SIG`, `HIGH`), one can also
-define binning per region of the `X` axis. `BINS` can be used as well as `MIN`, `MAX`, `NBINS` like so:
-
-```json
-"X":
-    "NAME": <name of internal variable on the x-axis>, # string
-    "TITLE": <title to appear in plots with this axis>, # string
-    "LOW": {
-        "MIN": <lower bound of x-axis>, # float
-        "MAX": <upper bound of x-axis>, # float
-        "NBINS": <number of x bins from MIN to MAX> # int
-    }
-    "SIG": {
-        "MIN": <lower bound of x-axis>, # float
-        "MAX": <upper bound of x-axis>, # float
-        "NBINS": <number of x bins from MIN to MAX> # int
-    }
-    "HIGH": {
-        "MIN": <lower bound of x-axis>, # float
-        "MAX": <upper bound of x-axis>, # float
-        "NBINS": <number of x bins from MIN to MAX> # int
-    }
-    "SIGSTART": <lower bound of signal region of x-axis>, # int
-    "SIGEND": <upper bound of signal region of x-axis> # int
-```
-
-## `FIT` {#config-fit}
-This section defines the values of the fit parameters for the transfer
-function from the fail region to the passing (or pass-fail ratio). The
-2D fit can accommodate any functional form. Each parameter in equation
-should be marked with a @ symbol (RooFit convention) starting at 0. Each
-parameter should also be specified with range and if desired an error 
-(which does not establish a constraint but just an initial step size 
-in the minimization). 
-
-An example section which uses a polynomial in both directions (of 
-different orders) is provided below. The range of each parameter
-is -10 to 10 with a starting (`NOMINAL`) value of 1.0 and step size
-(`ERROR`) of 0.1.
-
-To accommodate for the potential of a negative transfer function value
-in all or part of the 2D space (which would be unphysical and make 
-Combine very mad), the `FORM` provided is wrapped in `max(FORM, 1e-9)`.
-Thus, one should always check in the plots that the final parameters
-do not produce a ~0 transfer function in large portions of the space.
-The fit result will not be stable. This can be addressed by reducing
-the ranges (`MIN`/`MAX`) of the parameters or changing the functional 
-form.
-
-```json
-"FIT": {
-    "FORM":"(@0+@1*x**1+@2*x**2)*(1+@3*y)",
-    "0": {
-        "NOMINAL": 1.0,
-        "MIN":-10.0,
-        "MAX":10.0,
-        "ERROR":0.1
-    },
-    "1": {
-        "NOMINAL": 1.0,
-        "MIN":-10.0,
-        "MAX":10.0,
-        "ERROR":0.1
-    },
-    "2": {
-        "NOMINAL": 1.0,
-        "MIN":-10.0,
-        "MAX":10.0,
-        "ERROR":0.1
-    },
-    "3": {
-        "NOMINAL": 1.0,
-        "MIN":-10.0,
-        "MAX":10.0,
-        "ERROR":0.1
-    }
-}
-```
-
-## `SYSTEMATIC` {#config-syst}
-Because it bears repeating, please note the difference between this section, `SYSTEMATIC`,
-and the list of `SYSTEMATICS` defined inside the `PROCESS` dictionary. The `SYSTEMATIC`
-dictionary is a place to define as many systematics as a user may need. Similar to the
-processes, each key in `SYSTEMATIC` is the name of the systematic in the analysis and each
-is classified by a code that determines how the systematic will be treated. However, the
-dictionary the user defines for a given systematic is different depending on what type it is.
-The self-explanatory codes are 1 and 2 which are log-normal uncertainties on the normalization.
-Less obvious are codes 2 and 3 which are for shape based uncertainties (and thus have
-corresponding histograms) and are either in the same file as the process's nominal histogram
-(code 2) or in a separate file (code 3). Additionally, they have a scale value which allows
-the user to change the Gaussian constraint on the shape. For no change in the constraint, use 1.0.
-If you have templates representing a 2 $$\sigma$$ shift, use 0.5 to properly constrain
-the associated nuisance parameter during the shape interpolation with Combine.
-
-### Symmetric, log-normal {#config-syst-sym}
-```json
-"CODE": 0,
-"VAL": <uncertainty> # float
-```
-
-### Asymmetric, log-normal {#config-syst-asym}
-
-```json
-"CODE": 1,
-"VALUP": <+1 $$\sigma$$ uncertainty>, # float
-"VALDOWN": <-1 $$\sigma$$ uncertainty> # float
-```
-
-### Shape based uncertainty, in same file as nominal histogram {#config-syst-shape1}
-```json
-"CODE: 2",
-"HISTPASS_UP": <name of hist (in same file as nominal hist) for +1 sig uncertainty in pass distribution>, # string
-"HISTPASS_DOWN": <name of hist (in same file as nominal hist) for -1 sig uncertainty in pass distribution>, # string
-"HISTFAIL_UP": <name of hist (in same file as nominal hist) for +1 sig uncertainty in fail distribution>, # string
-"HISTFAIL_DOWN": <name of the hist (in same file as nominal hist) for -1 sig uncertainty in fail distribution>, # string
-"SCALE": <scale value to change scale of nuisance constraint> # float
-```
-
-### Shape based uncertainty, in different file as nominal histogram {#config-syst-shape2}
-
-This is the more flexible
-but also more complicated option. The user can specify files three different ways. 
-
-1. By using `FILEUP` and `FILEDOWN` to pick a file that *every* process can pull the shape
-   uncertainty histograms from. 
-2. Use keys of the form `FILEUP_<proc>` 
-   where `<proc>` matches the name of a process that is defined in the `PROCESS` dictionary and
-   has this shape uncertainty associated with it. This allows each systematic and process to come
-   from a separate file. 
-3. Use keys of the form `FILEUP_*` where the * acts
-   as a wild card for the process and must also exist in the file name where the process would
-   normally be written. For example, if a $$t\bar{t}$$ distribution with +1 $$\sigma$$ pileup
-   uncertainty is stored in `ttbar_pileup_up.root` and the corresponding signal distributions
-   are in `signal_pileup_up.root`, one can use the key-value pair `"FILE_UP_*":"*_pileup_up.root"`.
-
-The user can also specify histogram names in four different ways.
-1. `HISTPASS` and `HISTFAIL` which allows the user to specify only two histogram
-   names if they don't change between "up" and "down" shapes. 
-2. The second is if the "up" and "down" shapes *do* have different histogram names
-   and uses the form `HISTPASS_UP` `HISTFAIL_UP`. 
-3. The totally generic way allows the user to use the form `HISTPASS_UP_<proc>` where `<proc>`
-   matches the name of a process that is defined in the `PROCESS` dictionary and has this
-   shape uncertainty associated with it. 
-4. The "*" wildcard can be used in place of `<proc>` just as with the file keys.
-   
-Below is an example of the totally generic way (3).
-
-```json
-"CODE": 3,
-"FILEUP_<proc>": </path/to/fileup_<proc>_up.root>, # string
-"FILEDOWN_<proc>": </path/to/filedown_<proc>_down.root>, # string
-"HISTPASS_UP": <name of hist (in same file as nominal hist) for +1 sig uncertainty in pass distribution>, # string
-"HISTPASS_DOWN": <name of hist (in same file as nominal hist) for -1 sig uncertainty in pass distribution>, # string
-"HISTFAIL_UP": <name of hist (in same file as nominal hist) for +1 sig uncertainty in fail distribution>, # string
-"HISTFAIL_DOWN": <name of the hist (in same file as nominal hist) for -1 sig uncertainty in fail distribution>, # string
-"SCALE": <scale value to change scale of nuisance constraint> # float
-```
-
-The various options lead to flexibility but the more organized you are, the easier it is to write the configuration file!
 
 # Python Interface {#python}
 
