@@ -640,8 +640,12 @@ class Ledger():
     def GetProcRegPairs(self):
         return [g[0] for g in self.df.groupby(['process','region'])]+[g[0] for g in self.alphaObjs.groupby(['process','region'])]
 
-    def GetShapeSystematics(self):
-        systs = self.df.variation.unique()
+    def GetShapeSystematics(self, drop_norms=False):
+        if drop_norms:
+            systs = self.df.loc[self.df.syst_type.eq('shapes')]
+        else:
+            systs = self.df
+        systs = systs.variation.unique()
         systs = numpy.delete(systs, numpy.where(systs == 'nominal'))
         return systs.tolist()
 

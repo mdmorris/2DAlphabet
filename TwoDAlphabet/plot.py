@@ -742,7 +742,7 @@ def gen_projections(ledger, twoD, fittag):
     plotter.plot_pre_vs_post()
     # plotter.plot_transfer_funcs()
 
-def make_systematic_plots(configObj):
+def make_systematic_plots(twoD):
     '''Make plots of the systematic shape variations of each process based on those
     processes and systematic shapes specified in the config. Shapes are presented 
     as projections onto 1D axis where no selection has been made on the axis not
@@ -750,21 +750,25 @@ def make_systematic_plots(configObj):
     '''
     c = ROOT.TCanvas('c','c',800,700)
 
-    for pair, group in configObj.df.groupby(['process','region']):
-        p,r = pair
-        nominal_full = configObj.organizedHists.Get(process=p,region=r,systematic='')
-        binning = configObj.organizedHists.BinningLookup(nominal_full.GetName())
+    for (p,r), _ in twoD.df.groupby(['process','region']):
+        if p == 'data_obs': continue
+
+        nominal_full = twoD.organizedHists.Get(process=p,region=r,systematic='')
+        binning, _ = twoD.GetBinningFor(r)
+
         for axis in ['X','Y']:
             nominal = getattr(nominal_full,'Projection'+axis)('%s_%s_%s_%s'%(p,r,'nom','proj'+axis))
-            for s, _ in group.loc[group.variation.ne('nominal')].groupby('variation'):
-                up = getattr(configObj.organizedHists.Get(process=p,region=r,systematic=s+'Up'),'Projection'+axis)('%s_%s_%s_%s'%(p,r,s+'Up','proj'+axis))
-                down = getattr(configObj.organizedHists.Get(process=p,region=r,systematic=s+'Down'),'Projection'+axis)('%s_%s_%s_%s'%(p,r,s+'Down','proj'+axis))
+            for s in twoD.ledger.GetShapeSystematics(drop_norms=True):
+                up = getattr(twoD.organizedHists.Get(process=p,region=r,systematic=s+'Up'),'Projection'+axis)('%s_%s_%s_%s'%(p,r,s+'Up','proj'+axis))
+                down = getattr(twoD.organizedHists.Get(process=p,region=r,systematic=s+'Down'),'Projection'+axis)('%s_%s_%s_%s'%(p,r,s+'Down','proj'+axis))
 
                 c.cd()
                 nominal.SetLineColor(ROOT.kBlack)
                 nominal.SetFillColor(ROOT.kYellow-9)
                 up.SetLineColor(ROOT.kRed)
+                up.SetFillColorAlpha(ROOT.kWhite, 0)
                 down.SetLineColor(ROOT.kBlue)
+                down.SetFillColorAlpha(ROOT.kWhite, 0)
 
                 up.SetLineStyle(9)
                 down.SetLineStyle(9)
@@ -783,7 +787,7 @@ def make_systematic_plots(configObj):
                 up.Draw('same hist')
                 down.Draw('same hist')
 
-                c.Print(configObj.projPath+'/UncertPlots/Uncertainty_%s_%s_%s_%s.png'%(p,r,s,'proj'+axis),'png')
+                c.Print(twoD.tag+'/UncertPlots/Uncertainty_%s_%s_%s_%s.png'%(p,r,s,'proj'+axis),'png')
 
 def _make_pull_plot(data, bkg):
     pull = data.Clone(data.GetName()+"_pull")
