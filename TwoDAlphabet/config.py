@@ -430,6 +430,10 @@ class OrganizedHists():
             if systematic != '':
                 histname+='_'+systematic
 
+        all_histnames = [k.GetName() for k in self.file.GetListOfKeys()]
+        if histname not in all_histnames:
+            raise NameError('Histogram %s does not exist.'%(histname))
+
         return self.file.Get(histname)
 
     def GetHistNames(self):
