@@ -62,25 +62,6 @@ the user is encouraged to add what they need, there are some keys and values
 that must stay the same. These static strings are always in capital letters
 to make them easy to distinguish. The six static sections are described below.
 
-## `GLOBAL` {#config-global}
-This section is designed to help users with large configuration file
-names by allowing them to create JSON-wide variables. For example,
-if all of your files are located in `/long/path/to/my/files/`, you 
-can store this string in the GLOBAL dictionary with a custom key 
-(let's say `path`). Now instead of having to write the full directory
-path for every process and systematic, the user can just write `path`.
-This simplifies the JSON and also has the standard advantages of using
-variables over several instances of the same object.
-
-This functionality works by searching all strings in the JSON for instances
-of each key in `GLOBAL` and replacing the key with its corresponding dictionary value.
-Note that it does not work for booleans or integers/floats.
-
-The user must be careful they don't accidentally use strings in the JSON
-that are identical to keys in `GLOBAL` so accidental substitutions don't happen.
-This means keys in `GLOBAL` should be at least partially descriptive 
-(single character keys would be a bad idea). 
-
 ## Describing existing histograms {#config-prs}
 
 2D Alphabet assumes that any analysis histogram can be described using three
@@ -233,8 +214,12 @@ to different regions (for example, if you have a validation region which populat
 
 ### `SYSTEMATICS` {#config-syst}
 
-The `SYSTEMATICS` section of the config is the simplest because it only describes
-the variations themselves, not how they connect to any process or region.
+Finally, the `SYSTEMATICS` section of the config describes the how to account for variations
+in parameters due to systematic uncertainties and connects back to the `PROCESSES` and `REGIONS`
+sections with some of the tools we've learned already.
+
+Note that the systematic uncertainties corresponding to each key are considered
+entirely uncorrelated with each other in the final model!
 
 The simplest type of variation is a symmetric, log-normal. A good example
 is the Run 2 luminosity uncertinaty of 1.6% which can be defined with:
@@ -269,8 +254,10 @@ set by Combine must be followed.
 The third type of variation is shape-based. In other words, the bins of the histogram are not
 fully correlated as with the normalization uncertainties and the user will input up and down
 variations of the shape that correspond to changing the underlying parameter by \$f\sigma\$f
-standard deviation of uncertainty. Typically, \$f\sigma\$f is 1. In this case, a shape uncertainty
-may look like the following:
+standard deviation of uncertainty. Typically, \$f\sigma\$f is 1. Combine will map these
+variations to a unit Gaussian penalty term and create functional forms of the bin values
+that smoothly interpolate between and extrapolate beyond the templates.
+For 2D Alphabet, a shape uncertainty may be implemented like the following:
 
 ```json
 {
@@ -285,66 +272,7 @@ may look like the following:
 
 Note that the `"UP"` and `"DOWN"` keys map to strings with a scheme to find the template histograms.
 Specifically, `$process`, `$region`, and `$syst` are reserved substitution keys that will be replaced
-by actual sets or process, region, and systematic variation. The values that will be substituted are the
-keys of the respective sections. Say for example that you have the following JSON config structure:
-```json
-{
-  "PROCESSES": {
-    "data_obs": {...},
-    "signal": {...},
-    "bkg": {...}
-  },
-  "REGIONS": {
-    "SignalRegion": {...}
-  },
-  "SYSTEMATICS": {
-    "shape_syst": {
-      "UP":   "/to/my/rootfiles/selection_$process.root:hist2D_$region__$syst_up",
-      "DOWN": "/to/my/rootfiles/selection_$process.root:hist2D_$region__$syst_down",
-      "SIGMA": 1.0
-    }
-  }
-}
-
-```
-
-
-
-In fact, "path", "FILE", "HIST_UP", and "HIST_DOWN" are all variables defined by the **user** in the
-`GLOBAL` section of the config that we'll see later. To give some context though, here is an example
-`GLOBAL` section:
-
-```json
-"GLOBAL": {
-    "FILE": "selection_$process.root",
-    "FILE_UP": "selection_$process_$syst_up.root",
-    "FILE_DOWN": "selection_$process_$syst_down.root",
-    "HIST": "hist2D_$region__nominal",
-    "HIST_UP": "hist2D_$region__$syst_up",
-    "HIST_DOWN": "hist2D_$region__$syst_down",
-    "path": "/go/to/my/rootfiles/"
-}
-```
-
-There are three variables defined in these strings that are reserved exclusively by 2D Alphabet
-but which you are free to use when writing schemes for .
-
-In the above scheme, the user is saying that the
-histograms can be found inside the same file as the nominal shape. One could likewise specify
-```json
-{
-  "SYSTEMATICS": {
-    "shape_syst": {
-      "UP": "path/FILE_UP:HIST",
-      "DOWN": "path/FILE_DOWN:HIST",
-      "SIGMA": 1.0
-    }
-}
-```
-which implies that there are different files for each variation but with the same name for the histogram
-as the nominal variation. Again, we just want to describe the systematic variation
-generally, not for a specific process or region. If your histograms don't follow such a pattern
-or a pattern which is impossible to scheme, you are encouraged to rename them.
+by actual sets or process, region, and systematic variation just as before.
 
 Note also that `"SIGMA"` currently maps to 1 since the templates are always expected to be the result of
 one standard deviation variations of the underlying parameter.
@@ -355,37 +283,100 @@ can be read about [here](https://cms-analysis.github.io/HiggsAnalysis-CombinedLi
 This means, if one wants to treat the templates as 2 standard deviation variations, `"SIGMA"`
 should be 1/2 - or 0.5.
 
-The final option which has not been shown so far is `"ALIAS"`. Modifying the above example,
+Finally, note that in the above scheme, the user is saying that the
+histograms can be found inside the same file as the nominal shape. One could likewise specify
+```json
+{
+  "SYSTEMATICS": {
+    "shape_syst": {
+      "UP": "/to/my/rootfiles/selection_$process_$syst_up.root:hist2D_$region",
+      "DOWN": "/to/my/rootfiles/selection_$process_$syst_down.root:hist2D_$region",
+      "SIGMA": 1.0
+    }
+}
+```
+which means that there are different files for each variation but with the same name for the histogram
+as the nominal variation. Again, we just want to describe the systematic variation
+generally, not for a specific process or region. If your histograms don't follow such a pattern
+or a pattern which is impossible to scheme, you are encouraged to rename them.
+
+In addition to the above, the `SYSTEMATICS` section also makes use of `"ALIAS"`, just like the `PROCESSES` section. Modifying the above example,
 
 ```json
 {
   "SYSTEMATICS": {
     "shape_syst_16": {
       "ALIAS": "ShapeSyst",
-      "UP": "path/FILE:HIST_UP",
-      "DOWN": "path/FILE:HIST_DOWN",
+      "UP": "/to/my/rootfiles/selection_$process_$syst_up.root:hist2D_$region",
+      "DOWN": "/to/my/rootfiles/selection_$process_$syst_down.root:hist2D_$region",
       "SIGMA": 1.0
     },
     "shape_syst_17": {
       "ALIAS": "ShapeSyst",
-      "UP": "path/FILE:HIST_UP",
-      "DOWN": "path/FILE:HIST_DOWN",
+      "UP": "/to/my/rootfiles/selection_$process_$syst_up.root:hist2D_$region",
+      "DOWN": "/to/my/rootfiles/selection_$process_$syst_down.root:hist2D_$region",
       "SIGMA": 1.0
     },
     "shape_syst_18": {
       "ALIAS": "ShapeSyst",
-      "UP": "path/FILE:HIST_UP",
-      "DOWN": "path/FILE:HIST_DOWN",
+      "UP": "/to/my/rootfiles/selection_$process_$syst_up.root:hist2D_$region",
+      "DOWN": "/to/my/rootfiles/selection_$process_$syst_down.root:hist2D_$region",
       "SIGMA": 1.0
     }
 }
 ```
-let's say this is 
+This will use the `"ALIAS"` as the substitution for `$syst` but name the uncertainty as the key
+(`"shape_syst_16"`, `"shape_syst_17"`, `"shape_syst_18"`). Since the systematics are tied to the
+processes in the `PROCESSES` section, one can split the systematic uncertainties to be uncorrelated
+per process (per year in this case).
 
+## `GLOBAL` {#config-global}
+This section is designed to help users with large configuration file
+names by allowing them to create JSON-wide variables. For example,
+if all of your files are located in `/long/path/to/my/files/`, you 
+can store this string in the GLOBAL dictionary with a custom key 
+(let's say `path`). Now instead of having to write the full directory
+path for every process and systematic, the user can just write `path`.
+This simplifies the JSON and also has the standard advantages of using
+variables over several instances of the same object.
 
+This functionality works by searching all strings in the JSON for instances
+of each key in `GLOBAL` and replacing the key with its corresponding dictionary value.
+Note that it does not work for booleans or integers/floats.
 
+The user must be careful they don't accidentally use strings in the JSON
+that are identical to keys in `GLOBAL` so accidental substitutions don't happen.
+This means keys in `GLOBAL` should be at least partially descriptive 
+(single character keys would be a bad idea). 
 
+This also means that many of the histogram path schemes can be standardized
+for later simplification. Consider the following `GLOBAL` section:
 
+```json
+"GLOBAL": {
+    "FILE": "selection_$process.root",
+    "FILE_UP": "selection_$process_$syst_up.root",
+    "FILE_DOWN": "selection_$process_$syst_down.root",
+    "HIST": "hist2D_$region__nominal",
+    "HIST_UP": "hist2D_$region__$syst_up",
+    "HIST_DOWN": "hist2D_$region__$syst_down",
+    "path": "/go/to/my/rootfiles"
+}
+```
+
+Note that these are all variables defined by the **user**.
+With this, the previous `SYSTEMATIC` section example can simply change to,
+
+```json
+{
+  "SYSTEMATICS": {
+    "shape_syst": {
+      "UP": "path/FILE_UP:HIST",
+      "DOWN": "path/FILE_DOWN:HIST",
+      "SIGMA": 1.0
+    }
+}
+```
 
 ## `BINNING` {#config-binning}
 This dictionary is the opportunity to define the axis binning of the user's space.
