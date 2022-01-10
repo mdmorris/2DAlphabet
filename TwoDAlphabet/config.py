@@ -6,7 +6,7 @@ pp = pprint.PrettyPrinter(indent=4)
 from TwoDAlphabet.helpers import copy_update_dict, open_json, parse_arg_dict, replace_multi
 from TwoDAlphabet.binning import Binning, copy_hist_with_new_bins, get_bins_from_hist
 
-_protected_keys = ["PROCESSES","SYSTEMATICS","REGIONS","BINNING","OPTIONS","GLOBAL","SCALE","COLOR","TYPE","X","Y","NAME","TITLE","BINS","NBINS","LOW","HIGH"]
+_protected_keys = ["PROCESSES","SYSTEMATICS","REGIONS","BINNING","OPTIONS","GLOBAL","SCALE","COLOR","TYPE","X","Y","TITLE","BINS","NBINS","LOW","HIGH"]
 _syst_col_defaults = {
     # 'variation': nan,
     'lnN': nan,
@@ -187,7 +187,7 @@ class Config:
                 out_df = out_df.append(pandas.Series({'process':data_key,'region':r, 'binning':self._section('REGIONS')[r]['BINNING']}),ignore_index=True)
 
             for p in self._section('REGIONS')[r]['PROCESSES']:
-                if p not in self._section('PROCESSES'):
+                if p not in self._section('PROCESSES') and len([kglobal for kglobal in self._section('GLOBAL') if kglobal in p]) == 0:
                     raise RuntimeError('Process "%s" listed for region "%s" not defined in PROCESSES section.'%(p,r))
                 
                 row_format = lambda c: {

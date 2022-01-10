@@ -629,10 +629,10 @@ class Ledger():
             else:           to_add = df[df.process_type.eq(ptype)].process.unique()
             proc_list.extend( list(to_add) )
 
-        if includeNonConfig and self.alphaObjs.title.unique().size > 0:
+        if includeNonConfig and self.alphaObjs.process.unique().size > 0:
             df = self.alphaObjs
-            if ptype == '': to_add = df.title.unique()
-            else:           to_add = df[df.process_type.eq(ptype)].title.unique()
+            if ptype == '': to_add = df.process.unique()
+            else:           to_add = df[df.process_type.eq(ptype)].process.unique()
             proc_list.extend( list(to_add) )
 
         return proc_list
@@ -722,10 +722,10 @@ class Ledger():
         self._saveAlphas(outDir)
 
 def LoadLedger(indir=''):
-    df = pandas.read_csv(indir+'ledger_df.csv')
+    df = pandas.read_csv(indir+'ledger_df.csv', index_col=0)
     ledger = Ledger(df)
-    ledger.alphaObjs = pandas.read_csv(indir+'ledger_alphaObjs.csv')
-    ledger.alphaParams = pandas.read_csv(indir+'ledger_alphaParams.csv')
+    ledger.alphaObjs = pandas.read_csv(indir+'ledger_alphaObjs.csv', index_col=0)
+    ledger.alphaParams = pandas.read_csv(indir+'ledger_alphaParams.csv', index_col=0)
 
     return ledger
 
