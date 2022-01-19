@@ -139,22 +139,17 @@ class Plotter(object):
                 for time in ['prefit','postfit']:
                     # 2D distributions first
                     out2d_name = '%s_%s_%s_2D'%(process,region,time)
+                    low  = shapes_file.Get(loc_base.format(r=region, c='LOW', t=time, p=process))
+                    sig  = shapes_file.Get(loc_base.format(r=region, c='SIG', t=time, p=process))
+                    high = shapes_file.Get(loc_base.format(r=region, c='HIGH',t=time, p=process))
 
-                    low_name = loc_base.format(r=region, c='LOW', t=time, p=proc_title)
-                    sig_name = loc_base.format(r=region, c='SIG', t=time, p=proc_title)
-                    high_name = loc_base.format(r=region, c='HIGH',t=time, p=proc_title)
-                    
-                    low  = shapes_file.Get(low_name)
-                    sig  = shapes_file.Get(sig_name)
-                    high = shapes_file.Get(high_name)
-
-                    if low == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(low_name, self.fittag))
-                    if sig == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(sig_name, self.fittag))
-                    if high == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(high_name, self.fittag))
+                    if low == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(loc_base.format(r=region, c='LOW', t=time, p=process),self.fittag))
+                    if sig == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(loc_base.format(r=region, c='SIG', t=time, p=process),self.fittag))
+                    if high == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(loc_base.format(r=region, c='HIGH', t=time, p=process),self.fittag))
 
                     full = stitch_hists_in_x(out2d_name, binning, [low,sig,high], blinded=blinding if process == 'data_obs' else [])
                     full.SetMinimum(0)
-                    full.SetTitle('%s, %s, %s'%(proc_title,region,time))
+                    full.SetTitle('%s, %s, %s'%(process,region,time))
 
                     self.root_out.WriteTObject(full,full.GetName())
 
@@ -164,7 +159,7 @@ class Plotter(object):
                         slices = self.slices['x' if proj == 'Y' else 'y'][region]
 
                         for islice in range(3):
-                            hname = out_proj_name.format(p=proc_title,r=region,t=time,x=proj.lower(),i=islice)
+                            hname = out_proj_name.format(p=process,r=region,t=time,x=proj.lower(),i=islice)
                             start,stop = _get_start_stop(islice,slices['idxs'])
                             
                             hslice = getattr(full,'Projection'+proj)(hname,start,stop,'e')
