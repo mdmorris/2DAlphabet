@@ -110,6 +110,8 @@ class Plotter(object):
         shapes_file = ROOT.TFile.Open('postfitshapes_%s.root'%self.fittag)
         loc_base = '{r}_{c}_{t}/{p}'
 
+        proc_reg_pairs = self.ledger.GetProcRegPairs()+[('TotalBkg', r) for r in self.ledger.GetRegions()]
+
         for region in self.ledger.GetRegions():
             binning,_ = self.twoD.GetBinningFor(region)
             if len(self.twoD.options.blindedPlots) > 0:
@@ -122,6 +124,10 @@ class Plotter(object):
             self.slices['y'][region] = {'vals': binning.ySlices,'idxs':binning.ySliceIdx}
             
             for process in self.ledger.GetProcesses()+['TotalBkg']:
+                # Skip processes not in this region
+                if process not in [pair[0] for pair in proc_reg_pairs if pair[1] == region]:
+                    continue
+                
                 if process != 'TotalBkg':
                     color = self.ledger.GetProcessColor(process)
                     proc_type = self.ledger.GetProcessType(process)
@@ -139,17 +145,22 @@ class Plotter(object):
                 for time in ['prefit','postfit']:
                     # 2D distributions first
                     out2d_name = '%s_%s_%s_2D'%(process,region,time)
-                    low  = shapes_file.Get(loc_base.format(r=region, c='LOW', t=time, p=process))
-                    sig  = shapes_file.Get(loc_base.format(r=region, c='SIG', t=time, p=process))
-                    high = shapes_file.Get(loc_base.format(r=region, c='HIGH',t=time, p=process))
 
-                    if low == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(loc_base.format(r=region, c='LOW', t=time, p=process),self.fittag))
-                    if sig == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(loc_base.format(r=region, c='SIG', t=time, p=process),self.fittag))
-                    if high == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(loc_base.format(r=region, c='HIGH', t=time, p=process),self.fittag))
+                    low_name = loc_base.format(r=region, c='LOW', t=time, p=process)
+                    sig_name = loc_base.format(r=region, c='SIG', t=time, p=process)
+                    high_name = loc_base.format(r=region, c='HIGH',t=time, p=process)
+                    
+                    low  = shapes_file.Get(low_name)
+                    sig  = shapes_file.Get(sig_name)
+                    high = shapes_file.Get(high_name)
+
+                    if low == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(low_name, self.fittag))
+                    if sig == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(sig_name, self.fittag))
+                    if high == None: raise IOError('Could not find histogram %s in postfitshapes_%s.root'%(high_name, self.fittag))
 
                     full = stitch_hists_in_x(out2d_name, binning, [low,sig,high], blinded=blinding if process == 'data_obs' else [])
                     full.SetMinimum(0)
-                    full.SetTitle('%s, %s, %s'%(process,region,time))
+                    full.SetTitle('%s, %s, %s'%(proc_title,region,time))
 
                     self.root_out.WriteTObject(full,full.GetName())
 
@@ -216,7 +227,7 @@ class Plotter(object):
             process_order = proclist
 
         process_order_df = pandas.DataFrame({'process':process_order})
-        return process_order_df.merge(df,on='process',how='outer')
+        return process_order_df.merge(df,on='process',how='inner')
 
     def plot_2D_distributions(self):
         '''Take the saved 2D distributions and plot them together on sub-pads

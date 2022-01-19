@@ -745,7 +745,6 @@ def _runDirSetup(runDir):
 
 def MakeCard(ledger, subtag, workspaceDir):
     combine_idx_map = ledger._getCombineIdxMap()
-    print ('DEBUG:\n%s'%combine_idx_map)
 
     card_new = open('%s/card.txt'%subtag,'w')
     # imax (bins), jmax (backgrounds+signals), kmax (systematics) 
