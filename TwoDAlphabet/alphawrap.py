@@ -190,7 +190,7 @@ class Generic2D(object):
             RooFormulaVar: RooFit object for the requested bin.
         '''
         if c == '': # using a global xbin that needs to be translated
-            c, xbin = self.binning.xcatFromGlobal(xbin)
+            xbin, c = self.binning.xcatFromGlobal(xbin)
         formula_name = '%s_bin_%s-%s'%(self.name+'_'+c,xbin,ybin)
         return self.binVars[formula_name]
             
