@@ -328,10 +328,10 @@ class ParametricFunction(Generic2D):
         return x_center_mapped,y_center_mapped
 
     def setFuncParam(self,parIdx,value):
-        '''Set the value of a given 
+        '''Set the value of a given ROOT.RooRealVar object within a ParametricFunction
 
         Args:
-            parIdx (int,str): Parameter index to access.
+            parIdx (int,str): Parameter index to access, or parameter name.
             value (float): Value to assign.
 
         Raises:
@@ -342,8 +342,14 @@ class ParametricFunction(Generic2D):
         '''
         parfound = False
         for i,n in enumerate(self.nuisances):
-            if n['name'].endswith('_par%s'%parIdx):
-                self.nuisances[i].setVal(value)
+            # user supplies full parameter name, e.g. 'Background_CR_rpfT_par0'
+            if n['name'] == parIdx:
+                self.nuisances[i]['obj'].setVal(value)
+                parfound = True
+                break
+            # user supplies only parameter index, e.g. '0', 0
+            elif n['name'].endswith('_par%s'%parIdx):   
+                self.nuisances[i]['obj'].setVal(value)
                 parfound = True
                 break
         if parfound == False:
