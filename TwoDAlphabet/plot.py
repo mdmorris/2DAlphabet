@@ -249,7 +249,7 @@ class Plotter(object):
 
             make_can('{d}/{p}_{r}_2D'.format(d=self.dir,p=process,r=region), [out_file_name%('prefit')+'.png', out_file_name%('postfit')+'.png'])
 
-    def plot_projections(self):
+    def plot_projections(self, prefit=False):
         '''Plot comparisons of data and the post-fit background model and signal
         using the 1D projections. Canvases are grouped based on projection axis.
         The canvas rows are separate selection regions while the columns 
@@ -257,6 +257,7 @@ class Plotter(object):
 
         Args:
             logyFlag (bool): If True, set the y-axis to be log scale.
+            prefit (bool): If True, plot prefit distributions. Else, plot postfit 
 
         Returns:
             None
@@ -271,7 +272,7 @@ class Plotter(object):
                                             alphaBottom=(not logyFlag))
                 signals = group[group.process_type.eq('SIGNAL')]
 
-                for proj in ['postfit_projx','postfit_projy']:
+                for proj in ['prefit_projx','prefit_projy'] if prefit else ['postfit_projx','postfit_projy']:
                     for islice in range(3):
                         projn = proj+str(islice)
                         sig_projn = projn
@@ -302,7 +303,7 @@ class Plotter(object):
                         pads = pads.append({'pad':out_pad_name+'.png', 'region':region, 'proj':projn, 'logy':logyFlag}, ignore_index=True)
 
         for logy in ['','_logy']:
-            for proj in ['postfit_projx','postfit_projy']:
+            for proj in ['prefit_projx','prefit_projy'] if prefit else ['postfit_projx','postfit_projy']:
                 these_pads = pads.loc[pads.proj.str.contains(proj)]
                 if logy == '':
                     these_pads = these_pads.loc[these_pads.logy.eq(False)]
@@ -746,10 +747,10 @@ def _get_start_stop(i,slice_idxs):
     stop  = slice_idxs[i+1]
     return start, stop
 
-def gen_projections(ledger, twoD, fittag):
+def gen_projections(ledger, twoD, fittag, prefit=False):
     plotter = Plotter(ledger, twoD, fittag)
     plotter.plot_2D_distributions()
-    plotter.plot_projections()
+    plotter.plot_projections(prefit)
     plotter.plot_pre_vs_post()
     # plotter.plot_transfer_funcs()
 
