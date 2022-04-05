@@ -320,7 +320,7 @@ class TwoDAlphabet:
             # systematic_analyzer_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py card.txt --all -f html > systematics_table.html'
             # execute_cmd(systematic_analyzer_cmd)    
 
-    def StdPlots(self, subtag, ledger=None, prefit=False):
+    def StdPlots(self, subtag, ledger=None):
         run_dir = self.tag+'/'+subtag
         with cd(run_dir):
             if ledger == None:
@@ -332,8 +332,8 @@ class TwoDAlphabet:
                 threshold=0 # change this to reduce the size of the correlation matrix to only those variables with correlations above a threshold
             )
             plot.gen_post_fit_shapes()
-            plot.gen_projections(ledger, self, 'b', prefit)
-            plot.gen_projections(ledger, self, 's', prefit)
+            plot.gen_projections(ledger, self, 'b')
+            plot.gen_projections(ledger, self, 's')
             
     def GetParamsOnMatch(self, regex='', subtag='', b_or_s='b'):
         out = {}
