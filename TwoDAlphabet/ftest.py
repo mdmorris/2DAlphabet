@@ -1,3 +1,5 @@
+from ROOT import TFile
+
 def FtestInfoLookup(projInfoDict):
     nrpfparams = 0
     nbins = 0
