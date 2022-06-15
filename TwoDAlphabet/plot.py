@@ -1035,19 +1035,24 @@ def plot_gof(tag, subtag, seed=123456, condor=False):
 
         cout.Print('gof_plot.pdf','pdf')
         cout.Print('gof_plot.png','png')
-        execute_cmd('rm -r '+tmpdir)
+
+	if condor:
+            execute_cmd('rm -r '+tmpdir)
 
 def plot_signalInjection(tag, subtag, injectedAmount, seed=123456, condor=False):
+    # if injectedAmount is not an integer, need to look for different file
+    # see: https://github.com/lcorcodilos/2DAlphabet/blob/e089ed1da63172770726b3e6f406c11e611e057d/TwoDAlphabet/twoDalphabet.py#L488
+    injectedName = str(injectedAmount).replace('.','p')
     with cd(tag+'/'+subtag):
         if condor:
             tmpdir = 'notneeded/tmp/'
             execute_cmd('mkdir '+tmpdir) 
-            execute_cmd('cat %s_%s_sigInj_r%s_output_*.tgz | tar zxvf - -i --strip-components 2 -C %s'%(tag,subtag,injectedAmount,tmpdir))
+            execute_cmd('cat %s_%s_sigInj_r%s_output_*.tgz | tar zxvf - -i --strip-components 2 -C %s'%(tag,subtag,injectedName,tmpdir))
             tree_fit_sb = ROOT.TChain('tree_fit_sb')
-            tree_fit_sb.Add(tmpdir+'fitDiagnostics_sigInj_r{rinj}*.root'.format(rinj=injectedAmount)) 
+            tree_fit_sb.Add(tmpdir+'fitDiagnostics_sigInj_r{rinj}*.root'.format(rinj=injectedName)) 
             
         else:
-            toyOutput = ROOT.TFile.Open('fitDiagnostics_sigInj_r{rinj}_{seed}.root'.format(rinj=injectedAmount,seed=seed))
+            toyOutput = ROOT.TFile.Open('fitDiagnostics_sigInj_r{rinj}_{seed}.root'.format(rinj=injectedName,seed=seed))
             tree_fit_sb = toyOutput.Get('tree_fit_sb')
 
         ROOT.gROOT.SetBatch(True)
@@ -1074,4 +1079,5 @@ def plot_signalInjection(tag, subtag, injectedAmount, seed=123456, condor=False)
         hsignstrength.Draw('pe')
         result_can.Print('signalInjection_r%s.png'%(str(injectedAmount).replace('.','p')),'png')
 
-        execute_cmd('rm -r '+tmpdir)
+	if condor:
+            execute_cmd('rm -r '+tmpdir)
