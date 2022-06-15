@@ -497,7 +497,8 @@ class TwoDAlphabet:
                 param_str, '-s {seed}',
                 '--rMin %s'%rMin, '--rMax %s'%rMax,
                 '-n _sigInj_r%s_{seed}'%rinj,
-                '-v %s'%verbosity, extra
+                '-v %s'%verbosity, '--expectSignal={}'.format(injectAmount),
+		extra
             ]
 
             fit_cmd = ' '.join(fit_cmd)
