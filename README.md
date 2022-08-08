@@ -1,3 +1,18 @@
+# Installation
+As of 8/8/2022, the HiggsAnalysis-CombinedLimit tool has been updated to reflect Lucas' ParametricHist changes. However, Combine has not, necessitating the small script in the sixth step.
+```
+export SCRAM_ARCH=slc7_amd64_gcc700
+cmsrel CMSSW_10_6_14
+cd CMSSW_10_6_14/src
+cmsenv
+git clone https://github.com/ammitra/2DAlphabet.git
+git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
+curl -s https://raw.githubusercontent.com/lcorcodilos/CombineHarvester/master/CombineTools/scripts/sparse-checkout-ssh.sh | bash
+scram b clean; scram b -j 4
+cmsenv
+```
+Please be aware that calling `scram` with more than 4 cores is frowned upon when using the LPC cluster.
+
 Welcome to 2DAlphabet's documentation!  {#mainpage}
 =======================================
 2D Alphabet is a framework to construct the workspace for a specific type of
