@@ -13,6 +13,15 @@ cmsenv
 ```
 Please be aware that calling `scram` with more than 4 cores is frowned upon when using the LPC cluster.
 
+It's helpful to create a virtual environment for working with 2DAlphabet:
+```
+python -m virtualenv twoD-env
+source twoD-env/bin/activate
+cd 2DAlphabet
+<git checkout <branch> >
+python setup.py develop
+```
+
 Welcome to 2DAlphabet's documentation!  {#mainpage}
 =======================================
 2D Alphabet is a framework to construct the workspace for a specific type of
