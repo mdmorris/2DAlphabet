@@ -1039,7 +1039,7 @@ def plot_gof(tag, subtag, seed=123456, condor=False):
 	if condor:
             execute_cmd('rm -r '+tmpdir)
 
-def plot_signalInjection(tag, subtag, injectedAmount, seed=123456, condor=False):
+def plot_signalInjection(tag, subtag, injectedAmount, seed=123456, stats=True, condor=False):
     # if injectedAmount is not an integer, need to look for different file
     # see: https://github.com/lcorcodilos/2DAlphabet/blob/e089ed1da63172770726b3e6f406c11e611e057d/TwoDAlphabet/twoDalphabet.py#L488
     injectedName = str(injectedAmount).replace('.','p')
@@ -1056,7 +1056,10 @@ def plot_signalInjection(tag, subtag, injectedAmount, seed=123456, condor=False)
             tree_fit_sb = toyOutput.Get('tree_fit_sb')
 
         ROOT.gROOT.SetBatch(True)
-        ROOT.gStyle.SetOptStat(False)
+        if stats:
+	    ROOT.gStyle.SetOptStat(True)
+	else:
+	    ROOT.gStyle.SetOptStat(False)
         # Final plotting
         result_can = ROOT.TCanvas('sigpull_can','sigpull_can',800,700)
 
