@@ -329,7 +329,8 @@ class TwoDAlphabet:
             plot.save_post_fit_parametric_vals()
             plot.plot_correlation_matrix( # Ignore nuisance parameters that are bins
                 varsToIgnore=self.ledger.alphaParams.name[self.ledger.alphaParams.name.str.contains('_bin_\d+-\d+')].to_list(),
-                threshold=0 # change this to reduce the size of the correlation matrix to only those variables with correlations above a threshold
+                threshold=0, # change this to reduce the size of the correlation matrix to only those variables with correlations above a threshold
+		corrText=False # change this if you want the correlation matrix to write the number values to each grid square (often there are too many parameters and looks ugly/useless)
             )
             plot.gen_post_fit_shapes()
             plot.gen_projections(ledger, self, 'b', prefit)
@@ -425,7 +426,7 @@ class TwoDAlphabet:
         return masked_regions
 
     def GoodnessOfFit(self, subtag, ntoys, card_or_w='card.txt', freezeSignal=False, seed=123456,
-                            verbosity=0, extra='', condor=False, eosRootfiles=None, njobs=0):
+                            verbosity=0, extra='', condor=False, eosRootfiles=None, njobs=0, makeEnv=False):
         # NOTE: There's no way to blind data here - need to evaluate it to get the p-value
         # param_str = '' if setParams == {} else '--setParameters '+','.join(['%s=%s'%(p,v) for p,v in setParams.items()])
 
@@ -469,6 +470,9 @@ class TwoDAlphabet:
                     ) for _ in range(njobs)
                 ]
 
+		if not makeEnv:
+		    print('\nWARNING: running toys on condor but not making CMSSW env tarball. If you want/need to make a tarball of your current CMSSW environment, run GoodnessOfFit() with makeEnv=True')
+
                 condor = CondorRunner(
                     name = self.tag+'_'+subtag+'_gof_toys',
                     primaryCmds=gof_toy_cmds,
@@ -476,12 +480,12 @@ class TwoDAlphabet:
                     runIn=run_dir,
                     toGrab=run_dir+'/higgsCombine_gof_toys.GoodnessOfFit.mH120.*.root',
                     eosRootfileTarball=eosRootfiles,
-                    remakeEnv=False
+                    remakeEnv=makeEnv
                 )
                 condor.submit()
             
     def SignalInjection(self, subtag, injectAmount, ntoys, blindData=True, card_or_w='card.txt', rMin=-5, rMax=5, 
-                              seed=123456, verbosity=0, setParams={}, extra='', condor=False, eosRootfiles=None, njobs=0):
+                              seed=123456, verbosity=0, setParams={}, extra='', condor=False, eosRootfiles=None, njobs=0, makeEnv=False):
         run_dir = self.tag+'/'+subtag
         _runDirSetup(run_dir)
         
@@ -520,6 +524,9 @@ class TwoDAlphabet:
                     ) for _ in range(njobs)
                 ]
 
+		if not makeEnv:
+		    print('\nWARNING: running toys on condor but not making CMSSW env tarball. If you want/need to make a tarball of your current CMSSW environment, run SignalInjection() with makeEnv=True')
+
                 condor = CondorRunner(
                     name = self.tag+'_'+subtag+'_sigInj_r'+rinj,
                     primaryCmds=fit_cmds,
@@ -532,7 +539,7 @@ class TwoDAlphabet:
                 condor.submit()
 
     def Limit(self, subtag, card_or_w='card.txt', blindData=True, verbosity=0,
-                    setParams={}, condor=False, eosRootfiles=None):
+                    setParams={}, condor=False, eosRootfiles=None, makeEnv=False):
         if subtag == '': 
             raise RuntimeError('The subtag for limits must be non-empty so that the limit will be run in a nested directory.')
 
@@ -543,12 +550,15 @@ class TwoDAlphabet:
             limit_cmd = _runLimit(blindData, verbosity, setParams, card_or_w, condor) # runs on this line if location == 'local'
             
             if condor:
+		if not makeEnv:
+		    print('\nWARNING: running toys on condor but not making CMSSW env tarball. If you want/need to make a tarball of your current CMSSW environment, run Limit() with makeEnv=True')
                 condor = CondorRunner(
                     name=self.tag+'_'+subtag+'_limit',
                     primaryCmds=[limit_cmd],
                     toPkg=self.tag+'/',
                     toGrab=run_dir+'/higgsCombineTest.AsymptoticLimits.mH120.root',
-                    eosRootfileTarball=eosRootfiles
+                    eosRootfileTarball=eosRootfiles,
+		    remakeEnv=makeEnv
                 )
                 condor.submit()
                 
