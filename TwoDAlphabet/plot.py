@@ -934,7 +934,7 @@ def _reduced_corr_matrix(fit_result, varsToIgnore=[], varsOfInterest=[], thresho
 
     return out, out_txt
 
-def plot_correlation_matrix(varsToIgnore, threshold=0):
+def plot_correlation_matrix(varsToIgnore, threshold=0, corrText=False):
     fit_result_file = ROOT.TFile.Open('fitDiagnosticsTest.root')
     for fittag in _get_good_fit_results(fit_result_file):
         fit_result = fit_result_file.Get("fit_"+fittag)
@@ -948,8 +948,9 @@ def plot_correlation_matrix(varsToIgnore, threshold=0):
 
             corrMtrx.GetXaxis().SetLabelSize(0.01)
             corrMtrx.GetYaxis().SetLabelSize(0.01)
-            corrMtrx.Draw('colz text')
+            corrMtrx.Draw('colz text' if corrText else 'colz')
             corrMtrxCan.Print('plots_fit_%s/correlation_matrix.png'%fittag,'png')
+	    corrMtrxCan.Print('plots_fit_%s/correlation_matrix.pdf'%fittag,'pdf')
 
             with open('plots_fit_%s/correlation_matrix.txt'%fittag,'w') as corrTxtFile:
                 corrTxtFile.write(corrTxt)
