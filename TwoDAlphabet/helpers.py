@@ -336,7 +336,7 @@ class CondorRunner():
             if os.path.exists(out_path):
                 execute_cmd('rm '+out_path)
             print ('Making package tarball %s.tgz'%self.name)
-            execute_cmd('tar -czf {0}.tgz {1}'.format(self.name, to_pkg))
+            execute_cmd('tar --exclude=*.tgz -czf {0}.tgz {1}'.format(self.name, to_pkg))
             print ('Done')
             execute_cmd('mv %s.tgz %s'%(self.name,out_path))
 
