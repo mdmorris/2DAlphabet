@@ -1,5 +1,14 @@
 # Installation
 As of 8/8/2022, the HiggsAnalysis-CombinedLimit tool has been updated to reflect Lucas' ParametricHist changes. However, Combine has not, necessitating the small script in the sixth step.
+
+First, ensure that you have [SSH keys tied to your github account](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent) and that they've been added to the ssh-agent:
+```
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_xyz
+```
+
+Then, you can run the following steps:
+
 ```
 export SCRAM_ARCH=slc7_amd64_gcc700
 cmsrel CMSSW_10_6_14
@@ -13,13 +22,20 @@ cmsenv
 ```
 Please be aware that calling `scram` with more than 4 cores is frowned upon when using the LPC cluster.
 
-It's helpful to create a virtual environment for working with 2DAlphabet:
+Finally, we create a virtual environment in which to install 2DAlphabet:
 ```
 python -m virtualenv twoD-env
 source twoD-env/bin/activate
 cd 2DAlphabet
 <git checkout <branch> >
 python setup.py develop
+```
+
+At this point, you should have 2DAlphabet installed! Now, you just have to run the following steps whenever you log back on to the LPC or lxplus:
+```
+cd /path/to/CMSSW_10_6_14/src
+cmsenv
+source twoD-env/bin/activate
 ```
 
 Welcome to 2DAlphabet's documentation!  {#mainpage}
