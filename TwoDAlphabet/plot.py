@@ -256,8 +256,7 @@ class Plotter(object):
         are the different slices of the un-plotted axis.
 
         Args:
-            logyFlag (bool): If True, set the y-axis to be log scale.
-
+	    prefit (bool): If True, will plot the prefit distributions instead of postfit. Defaults to False.
         Returns:
             None
         '''
@@ -297,7 +296,7 @@ class Plotter(object):
                         
                         make_pad_1D(out_pad_name, data=this_data, bkgs=these_bkgs, signals=these_signals,
                                     subtitle=slice_str, totalBkg=this_totalbkg,
-                                    logyFlag=logyFlag, year=self.twoD.options.year,
+                                    logyFlag=logyFlag, year=self.twoD.options.year, preVsPost=False,
                                     extraText='', savePDF=True, savePNG=True, ROOTout=False)
                         pads = pads.append({'pad':out_pad_name+'.png', 'region':region, 'proj':projn, 'logy':logyFlag}, ignore_index=True)
 
@@ -310,7 +309,7 @@ class Plotter(object):
                     these_pads = these_pads.loc[these_pads.logy.eq(True)]
                 
                 these_pads = these_pads.sort_values(by=['region','proj']).pad.to_list()
-                out_can_name = '{d}/{proj}{logy}'.format(d=self.dir, proj=proj,logy=logy)
+                out_can_name = '{d}/{proj}{logy}'.format(d=self.dir, proj=proj, logy=logy)
                 make_can(out_can_name, these_pads)
         
     def plot_pre_vs_post(self):
@@ -325,10 +324,12 @@ class Plotter(object):
                     projn = proj+str(islice)
                     post = self.Get('%s_%s_postfit_%s'%(process,region,projn))
                     post.SetLineColor(ROOT.kBlack)
-                    post.SetTitle('          Postfit, '+process)
+                    post.SetTitle('          Postfit,'+process)	# spaces are for legend aesthetics
 
                     pre = self.Get('%s_%s_prefit_%s'%(process,region,projn))
+		    pre.SetLineColor(ROOT.kRed)
                     pre.SetTitle('Prefit, '+process)
+
                     slice_edges = (
                         self.slices['x' if 'y' in proj else 'y'][region]['vals'][islice],
                         binning.xtitle if 'y' in proj else binning.ytitle,
@@ -341,15 +342,17 @@ class Plotter(object):
                     make_pad_1D(
                         out_pad_name, 
                         post, [pre], totalBkg=pre, subtitle=slice_str, savePDF=True, savePNG=True, 
-                        datastyle='histe', year=self.twoD.options.year, extraText=''
+                        datastyle='histe', year=self.twoD.options.year, extraText='',
+			preVsPost=True	# This tells make_pad_1D() that we're not passing in data distributions but rather a non-data postfit dist and to relabel the legend
                     )
                     
                     pads = pads.append({'pad':out_pad_name+'.png','process':process,'region':region,'proj':projn}, ignore_index=True)
 
-        for process, padgroup in pads.groupby('process'):
-            these_pads = padgroup.sort_values(by=['region','proj']).pad.to_list()
-            make_can('{d}/{p}_{proj}'.format(d=self.dir, p=process,proj=proj), these_pads)
-        
+	    for process, padgroup in pads.groupby('process'):
+		these_pads = padgroup.sort_values(by=['region','proj']).pad.to_list()
+		make_can('{d}/{p}_{proj}'.format(d=self.dir, p=process,proj=proj), these_pads)
+
+
     def plot_transfer_funcs(self):
         raise NotImplementedError()
         # # Need to sample the space to get the Rp/f with proper errors (1000 samples)
@@ -518,7 +521,7 @@ def make_pad_2D(outname, hist, style='lego', logzFlag=False, ROOTout=None,
 
 def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
             totalBkg=None, logyFlag=False, ROOTout=None, savePDF=False, savePNG=False,
-            dataOff=False, datastyle='pe X0', year=1, addSignals=True, extraText='Preliminary'):
+            dataOff=False, preVsPost=False, datastyle='pe X0', year=1, addSignals=True, extraText='Preliminary'):
     '''Make a pad holding a 1D plot with standardized formatting conventions.
 
     Args:
@@ -534,6 +537,7 @@ def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
         savePDF (bool, optional): Save to PDF. Defaults to True.
         savePNG (bool, optional): Save to PNG. Defaults to True.
         dataOff (bool, optional): Turn off the data from plotting. Defaults to False.
+	preVsPost (bool, optional): Incoming data histogram is postfit distribution of non-data process. If True, renames legend entry. See plot_pre_vs_post().
         datastyle (str, optional): ROOT drawing style for the data. Defaults to 'pe X0'.
         year (int, optional): Luminosity formatting. Options are 16, 17, 18, 1 (full Run 2), 2 (16+17+18). Defaults to 1.
         addSignals (bool, optional): If True, multiple signals will be added together and plotted as one. If False, signals are plotted individually. Defaults to True.
@@ -561,7 +565,7 @@ def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
         data.SetMarkerColorAlpha(ROOT.kBlack,0 if dataOff else 1)
         data.SetMarkerStyle(8)
     if 'hist' in datastyle.lower():
-        data.SetFillColorAlpha(0,0)
+	data.SetFillColorAlpha(0,0)
 
     data.SetTitleOffset(1.15,"xy")
     data.GetYaxis().SetTitleOffset(1.04)
@@ -609,7 +613,10 @@ def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
         legend = ROOT.TLegend(0.65,legend_bottomY,0.90,0.88)
         legend.SetBorderSize(0)
         if not dataOff:
-            legend.AddEntry(data,'Data',datastyle)
+	    if preVsPost:
+		legend.AddEntry(data,'Postfit',datastyle)
+	    else:
+		legend.AddEntry(data,'Data',datastyle)
 
         totalBkg.SetMarkerStyle(0)
         totalBkg_err = totalBkg.Clone()
@@ -618,7 +625,12 @@ def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
         totalBkg_err.SetLineWidth(0)
         totalBkg_err.SetFillColor(ROOT.kBlack)
         totalBkg_err.SetFillStyle(3354)
-        legend.AddEntry(totalBkg_err,'Total bkg unc.','F')
+	if preVsPost:
+	    # Determine whether we're plotting uncertainty on Prefit or Postfit distribution (plot_pre_vs_post() uses prefit unc)
+	    isPrefit = 1 if 'Prefit' in totalBkg.GetTitle() else 0
+	    legend.AddEntry(totalBkg_err,'Total {} unc.'.format('prefit' if isPrefit else 'postfit'), 'F')
+	else:
+	    legend.AddEntry(totalBkg_err,'Total bkg unc.','F')
 
         sigs_to_plot = signals
         # Can add together for total signal
@@ -690,7 +702,7 @@ def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
         subtitle_tex.DrawLatex(0.208,0.74,subtitle)
 
         sub_pad.cd()
-        pull = _make_pull_plot(data,totalBkg)
+        pull = _make_pull_plot(data, totalBkg, preVsPost) # If plotting pre vs postfit dists, ensure the Y axis of pull plot reflects this
         pull.Draw('hist')
         pad.cd()
     
@@ -746,8 +758,13 @@ def _get_start_stop(i,slice_idxs):
     stop  = slice_idxs[i+1]
     return start, stop
 
-def gen_projections(ledger, twoD, fittag, prefit=False):
-    plotter = Plotter(ledger, twoD, fittag)
+def gen_projections(ledger, twoD, fittag, loadExisting=False, prefit=False):
+    '''
+    Optional Args:
+	loadExisting (bool): Flag to load existing projections instead of remaking everything. Defaults to False.
+	prefit	     (bool): Flag to plot prefit distributions instead of postfit. Defaults to False.
+    '''
+    plotter = Plotter(ledger, twoD, fittag, loadExisting)
     plotter.plot_2D_distributions()
     plotter.plot_projections(prefit)
     plotter.plot_pre_vs_post()
@@ -800,7 +817,7 @@ def make_systematic_plots(twoD):
 
                 c.Print(twoD.tag+'/UncertPlots/Uncertainty_%s_%s_%s_%s.png'%(p,r,s,'proj'+axis),'png')
 
-def _make_pull_plot(data, bkg):
+def _make_pull_plot(data, bkg, preVsPost=False):
     pull = data.Clone(data.GetName()+"_pull")
     pull.Add(bkg,-1)
     
@@ -825,7 +842,7 @@ def _make_pull_plot(data, bkg):
             pull.SetBinContent(ibin, 0.0 )
 
     pull.SetFillColor(ROOT.kBlue)
-    pull.SetTitle(";"+data.GetXaxis().GetTitle()+";(Data-Bkg)/#sigma")
+    pull.SetTitle(";"+data.GetXaxis().GetTitle()+";({})/#sigma".format('Post-Pre' if preVsPost else 'Data-Bkg'))
     pull.SetStats(0)
 
     pull.GetYaxis().SetRangeUser(-2.9,2.9)
@@ -836,7 +853,7 @@ def _make_pull_plot(data, bkg):
 
     pull.GetXaxis().SetLabelSize(0.13)
     pull.GetXaxis().SetTitleSize(0.15)
-    pull.GetYaxis().SetTitle("(Data-Bkg)/#sigma")
+    pull.GetYaxis().SetTitle("({})/#sigma".format('Post-Pre' if preVsPost else 'Data-Bkg'))
     return pull
 
 def _get_good_fit_results(tfile):
