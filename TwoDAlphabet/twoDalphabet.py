@@ -305,7 +305,7 @@ class TwoDAlphabet:
             MakeCard(subledger, subtag, workspaceDir)
 
 # -------- STAT METHODS ------------------ #
-    def MLfit(self, subtag, cardOrW='card.txt', rMin=-1, rMax=10, setParams={}, verbosity=0, usePreviousFit=False, extra=''):
+    def MLfit(self, subtag, cardOrW='card.txt', rMin=-1, rMax=10, setParams={}, verbosity=0, usePreviousFit=False, defMinStrat=0, extra=''):
         _runDirSetup(self.tag+'/'+subtag)
         with cd(self.tag+'/'+subtag):
             _runMLfit(
@@ -315,12 +315,17 @@ class TwoDAlphabet:
                 rMin=rMin, rMax=rMax,
                 setParams=setParams,
                 usePreviousFit=usePreviousFit,
+		defMinStrat=defMinStrat,
                 extra=extra)
             make_postfit_workspace('')
             # systematic_analyzer_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/systematicsAnalyzer.py card.txt --all -f html > systematics_table.html'
             # execute_cmd(systematic_analyzer_cmd)    
 
     def StdPlots(self, subtag, ledger=None, prefit=False):
+	'''
+	Args:
+	    prefit (bool): If True, plots the prefit distributions instead of postfit. Defaults to False.
+	'''
         run_dir = self.tag+'/'+subtag
         with cd(run_dir):
             if ledger == None:
@@ -485,7 +490,7 @@ class TwoDAlphabet:
                 condor.submit()
             
     def SignalInjection(self, subtag, injectAmount, ntoys, blindData=True, card_or_w='card.txt', rMin=-5, rMax=5, 
-                              seed=123456, verbosity=0, setParams={}, extra='', condor=False, eosRootfiles=None, njobs=0, makeEnv=False):
+                              seed=123456, verbosity=0, setParams={}, defMinStrat=0, extra='', condor=False, eosRootfiles=None, njobs=0, makeEnv=False):
         run_dir = self.tag+'/'+subtag
         _runDirSetup(run_dir)
         
@@ -496,7 +501,7 @@ class TwoDAlphabet:
             fit_cmd = [
                 'combine -M FitDiagnostics',
                 '-d '+card_or_w,
-                '--skipBOnlyFit', '--cminDefaultMinimizerStrategy 0',
+                '--skipBOnlyFit', '--cminDefaultMinimizerStrategy {}'.format(defMinStrat),
                 '-t {ntoys}', '--toysFrequentist', '--bypassFrequentistFit' if blindData else '',
                 param_str, '-s {seed}',
                 '--rMin %s'%rMin, '--rMax %s'%rMax,
@@ -562,7 +567,7 @@ class TwoDAlphabet:
                 )
                 condor.submit()
                 
-    def Impacts(self, subtag, rMin=-15, rMax=15, cardOrW='initialFitWorkspace.root --snapshotName initialFit', extra=''):
+    def Impacts(self, subtag, rMin=-15, rMax=15, cardOrW='initialFitWorkspace.root --snapshotName initialFit', defMinStrat=0, extra=''):
         # param_str = '' if setParams == {} else '--setParameters '+','.join(['%s=%s'%(p,v) for p,v in setParams.items()])
         with cd(self.tag+'/'+subtag):
             subset = LoadLedger('')
@@ -576,7 +581,7 @@ class TwoDAlphabet:
             base_opts = [
                 '-M Impacts', '--rMin %s'%rMin,
                 '--rMax %s'%rMax, '-d %s'%card_or_w,
-                '--cminDefaultMinimizerStrategy 0 -m 0',
+                '--cminDefaultMinimizerStrategy {} -m 0'.format(defMinStrat),
                 impact_nuis_str, extra #param_str,
                 # '-t -1 --bypassFrequentistFit' if blindData else ''
             ]
@@ -867,16 +872,26 @@ def MakeCard(ledger, subtag, workspaceDir):
     card_new.close()
     ledger.Save(subtag)
 
-def _runMLfit(cardOrW, blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False, extra=''):
+def _runMLfit(cardOrW, blinding, verbosity, rMin, rMax, setParams, usePreviousFit=False, defMinStrat=0, extra=''):
+    '''
+    defMinStrat (int): sets the cminDefaultMinimizerStrategy option for the ML fit
+	0: speed	(evaluate function less often)
+	1: balance
+	2: robustness	(waste function calls to get precise answers)
+    Hesse (error/correlation estimation) will be run only if the strategy is 1 or 2
+    '''
+    if defMinStrat not in [0, 1, 2]:
+	raise RuntimeError("Invalid cminDefaultMinimizerStrategy passed ({}) - please ensure that defMinStrat = 0, 1, or 2".format(defMinStrat))
     if usePreviousFit: param_options = ''
     else:              param_options = '--text2workspace "--channel-masks" '
     params_to_set = ','.join(['mask_%s_SIG=1'%r for r in blinding]+['%s=%s'%(p,v) for p,v in setParams.items()]+['r=1'])
     param_options += '--setParameters '+params_to_set
 
-    fit_cmd = 'combine -M FitDiagnostics {card_or_w} {param_options} --saveWorkspace --cminDefaultMinimizerStrategy 0 --rMin {rmin} --rMax {rmax} -v {verbosity} {extra}'
+    fit_cmd = 'combine -M FitDiagnostics {card_or_w} {param_options} --saveWorkspace --cminDefaultMinimizerStrategy {defMinStrat} --rMin {rmin} --rMax {rmax} -v {verbosity} {extra}'
     fit_cmd = fit_cmd.format(
         card_or_w='initifalFitWorkspace.root --snapshotName initialFit' if usePreviousFit else cardOrW,
         param_options=param_options,
+	defMinStrat=defMinStrat,
         rmin=rMin,
         rmax=rMax,
         verbosity=verbosity,
