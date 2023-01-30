@@ -23,6 +23,7 @@ Please be aware that calling `scram` with more than 4 cores is frowned upon when
 
 Finally, we create a virtual environment in which to install 2DAlphabet:
 ```
+cd $CMSSW_BASE/src
 python -m virtualenv twoD-env
 source twoD-env/bin/activate
 cd 2DAlphabet
