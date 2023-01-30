@@ -10,14 +10,13 @@ ssh-add ~/.ssh/id_xyz
 Then, you can run the following steps:
 
 ```
-export SCRAM_ARCH=slc7_amd64_gcc700
-cmsrel CMSSW_10_6_14
-cd CMSSW_10_6_14/src
+cmsrel CMSSW_11_3_4
+cd CMSSW_11_3_4/src
 cmsenv
 git clone https://github.com/ammitra/2DAlphabet.git
 git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
 curl -s https://raw.githubusercontent.com/lcorcodilos/CombineHarvester/master/CombineTools/scripts/sparse-checkout-ssh.sh | bash
-scram b clean; scram b -j 4
+scramv1 b clean; scramv1 b -j 4
 cmsenv
 ```
 Please be aware that calling `scram` with more than 4 cores is frowned upon when using the LPC cluster.
