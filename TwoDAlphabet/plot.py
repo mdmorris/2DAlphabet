@@ -5,6 +5,10 @@ from TwoDAlphabet.helpers import set_hist_maximums, execute_cmd, cd
 from TwoDAlphabet.binning import stitch_hists_in_x, convert_to_events_per_unit, get_min_bin_width
 from TwoDAlphabet.ext import tdrstyle, CMS_lumi
 
+
+yellow = ROOT.kOrange - 4
+red = ROOT.kRed + 2
+
 class Plotter(object):
     '''Class to manage output distributions, manipulate them, and provide access to plotting
     standard groups of distributions.
@@ -130,6 +134,10 @@ class Plotter(object):
                 
                 if process != 'TotalBkg':
                     color = self.ledger.GetProcessColor(process)
+                    
+                    if 'TTbar' in process:
+                        color = ROOT.kRed + 2
+                    
                     proc_type = self.ledger.GetProcessType(process)
                     proc_title = self.ledger.GetProcessTitle(process)
                 else:
@@ -327,7 +335,7 @@ class Plotter(object):
                     post.SetTitle('          Postfit,'+process)	# spaces are for legend aesthetics
 
                     pre = self.Get('%s_%s_prefit_%s'%(process,region,projn))
-		    pre.SetLineColor(ROOT.kRed)
+		    pre.SetLineColor(red)
                     pre.SetTitle('Prefit, '+process)
 
                     slice_edges = (
@@ -727,6 +735,8 @@ def make_can(outname, padnames, padx=0, pady=0):
     Returns:
         None
     '''
+    
+
     if padx == 0 or pady == 0:
         if len(padnames) == 1:
             padx = 1; pady = 1
@@ -740,6 +750,18 @@ def make_can(outname, padnames, padx=0, pady=0):
             padx = 3; pady = 2
         elif len(padnames) <= 9:
             padx = 3; pady = 3
+        elif len(padnames) <= 12:
+            padx = 4; pady = 3
+        elif len(padnames) <= 16:
+            padx = 4; pady = 4
+        elif len(padnames) > 30:
+            padx = 6; pady = 6
+        elif len(padnames) > 36:
+            padx = 7; pady = 7
+        elif len(padnames) > 49:
+            padx = 8; pady = 8
+        elif len(padnames) > 64:
+            padx = 10; pady = 10
         else:
             raise RuntimeError('histlist of size %s not currently supported: %s'%(len(padnames),[p.GetName() for p in padnames]))
 
@@ -792,8 +814,8 @@ def make_systematic_plots(twoD):
 
                 c.cd()
                 nominal.SetLineColor(ROOT.kBlack)
-                nominal.SetFillColor(ROOT.kYellow-9)
-                up.SetLineColor(ROOT.kRed)
+                nominal.SetFillColor(yellow)
+                up.SetLineColor(red)
                 up.SetFillColorAlpha(ROOT.kWhite, 0)
                 down.SetLineColor(ROOT.kBlue)
                 down.SetFillColorAlpha(ROOT.kWhite, 0)
@@ -841,7 +863,7 @@ def _make_pull_plot(data, bkg, preVsPost=False):
         else:
             pull.SetBinContent(ibin, 0.0 )
 
-    pull.SetFillColor(ROOT.kBlue)
+    pull.SetFillColor(ROOT.kGray) #pull.SetFillColor(ROOT.kBlue)
     pull.SetTitle(";"+data.GetXaxis().GetTitle()+";({})/#sigma".format('Post-Pre' if preVsPost else 'Data-Bkg'))
     pull.SetStats(0)
 

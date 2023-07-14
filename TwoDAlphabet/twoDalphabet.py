@@ -7,6 +7,10 @@ from TwoDAlphabet.alphawrap import Generic2D
 from TwoDAlphabet import plot
 import ROOT
 
+
+
+yellow = ROOT.kOrange - 4
+
 class TwoDAlphabet:
     '''Class to injest and organize inputs.
     '''
@@ -44,6 +48,11 @@ class TwoDAlphabet:
 
         if not loadPrevious:
             self._setupProjDir()
+            
+            
+            print('filename', self.df.iloc[0].source_filename)
+            print('histname', self.df.iloc[0].source_histname)
+            
             template_file = ROOT.TFile.Open(self.df.iloc[0].source_filename)
             template = template_file.Get(self.df.iloc[0].source_histname)
             template.SetDirectory(0)
@@ -148,7 +157,7 @@ class TwoDAlphabet:
             plot.make_systematic_plots(self)
 
 # --------------AlphaObj INTERFACE ------ #
-    def AddAlphaObj(self, process, region, obj, ptype='BKG', color=ROOT.kYellow, title=None):
+    def AddAlphaObj(self, process, region, obj, ptype='BKG', color=yellow, title=None):
         '''Start
 
         Args:
@@ -253,6 +262,8 @@ class TwoDAlphabet:
 
     def GetBinningFor(self, region):
         for r,b in self._binningMap.items():
+            
+            
             if r == region:
                 return self.binnings[b], b
         

@@ -18,6 +18,9 @@ def open_json(f):
         dict: JSON opened as a python dictionary.
     '''
     with open(f) as fInput_config:
+        
+        print('filename', f)
+        
         input_config = json.load(fInput_config, object_hook=ascii_encode_dict)  # Converts most of the unicode to ascii
 
     return input_config

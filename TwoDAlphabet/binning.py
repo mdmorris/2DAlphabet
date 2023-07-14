@@ -438,6 +438,7 @@ def copy_hist_with_new_bins(copyName,XorY,inHist,new_bins):
     rebin_array = array.array('f',new_bins)
     rebin_nbins = len(rebin_array)-1 
 
+
     # Use copyName with _temp to avoid overwriting if inHist has the same name
     # We can do this at the end but not before we're finished with inHist
     if XorY == "X":
