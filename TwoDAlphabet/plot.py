@@ -251,9 +251,9 @@ class Plotter(object):
             process, region = pr[0], pr[1]
             out_file_name = '{d}/base_figs/{p}_{r}_%s_2D'.format(d=self.dir,p=process,r=region)
             make_pad_2D(outname=out_file_name%('prefit'), hist=self.Get('{p}_{r}_{t}'.format(p=process,r=region,t='prefit_2D')),
-                            year=self.twoD.options.year, savePDF=True, savePNG=True)
+                            year=self.twoD.options.year, savePDF=True, savePNG=True, extraText='Work In Progress')
             make_pad_2D(outname=out_file_name%('postfit'), hist=self.Get('{p}_{r}_{t}'.format(p=process,r=region,t='postfit_2D')),
-                            year=self.twoD.options.year, savePDF=True, savePNG=True)
+                            year=self.twoD.options.year, savePDF=True, savePNG=True, extraText='Work In Progress')
 
             make_can('{d}/{p}_{r}_2D'.format(d=self.dir,p=process,r=region), [out_file_name%('prefit')+'.png', out_file_name%('postfit')+'.png'])
 
@@ -268,6 +268,9 @@ class Plotter(object):
         Returns:
             None
         '''
+        
+        print('self.twoD.options.year', self.twoD.options.year)
+        
         pads = pandas.DataFrame()
         for region, group in self.df.groupby('region'):
             binning,_ = self.twoD.GetBinningFor(region)
@@ -517,6 +520,7 @@ def make_pad_2D(outname, hist, style='lego', logzFlag=False, ROOTout=None,
     if 'lego' in style.lower():
         hist.GetZaxis().SetTitleOffset(1.4)
 
+    hist.SetTitle('')
     hist.Draw(style)
     
     CMS_lumi.extraText = extraText
@@ -555,15 +559,29 @@ def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
         ROOT.TPad: Output pad.
     '''
 
-    def _draw_extralumi_tex():
+    def _draw_extralumi_tex(year):
         lumiE = ROOT.TLatex()
         lumiE.SetNDC()
         lumiE.SetTextAngle(0)
         lumiE.SetTextColor(ROOT.kBlack)
         lumiE.SetTextFont(42)
         lumiE.SetTextAlign(31) 
-        lumiE.SetTextSize(0.7*0.1)
-        lumiE.DrawLatex(1-0.05,1-0.1+0.2*0.1,"137 fb^{-1} (13 TeV)")
+        lumiE.SetTextSize(0.06)
+        if year==16:
+            lumiE.DrawLatex(1-0.05,1-0.1+0.2*0.1,"35.9 fb^{-1}, 2016 (13 TeV)")
+        elif year==17:
+            lumiE.DrawLatex(1-0.05,1-0.1+0.2*0.1,"41.5 fb^{-1}, 2017 (13 TeV)")
+        elif year==18:
+            lumiE.DrawLatex(1-0.05,1-0.1+0.2*0.1,"60 fb^{-1}, 2018 (13 TeV)")
+        elif year==2 or year==1:
+            lumiE.DrawLatex(1-0.05,1-0.1+0.2*0.1,"137 fb^{-1}, Run 2 (13 TeV)")
+            
+
+        print('am I plotting from EOS 2?')
+
+        
+        lumiE.DrawLatex(0.62,0.82,"\it{Work} \it{In} \it{Progress}")
+
 
     pad = _make_pad_gen(outname)
 
@@ -698,7 +716,10 @@ def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
         CMS_lumi.cmsTextSize = 0.9
         CMS_lumi.cmsTextOffset = 2
         CMS_lumi.lumiTextSize = 0.9
-        CMS_lumi.CMS_lumi(main_pad, year, 11)
+        CMS_lumi.CMS_lumi(main_pad, 16, 11)
+#         CMS_lumi.CMS_lumi(main_pad, year, 11)
+
+        _draw_extralumi_tex(year)
         
         subtitle_tex = ROOT.TLatex()
         subtitle_tex.SetNDC()
@@ -808,7 +829,7 @@ def make_systematic_plots(twoD):
 
         for axis in ['X','Y']:
             nominal = getattr(nominal_full,'Projection'+axis)('%s_%s_%s_%s'%(p,r,'nom','proj'+axis))
-            for s in twoD.ledger.GetShapeSystematics(drop_norms=True):
+            for s in twoD.ledger.GetShapeSystematics(drop_norms=False): #drop_norms=True
                 up = getattr(twoD.organizedHists.Get(process=p,region=r,systematic=s+'Up'),'Projection'+axis)('%s_%s_%s_%s'%(p,r,s+'Up','proj'+axis))
                 down = getattr(twoD.organizedHists.Get(process=p,region=r,systematic=s+'Down'),'Projection'+axis)('%s_%s_%s_%s'%(p,r,s+'Down','proj'+axis))
 
@@ -867,7 +888,7 @@ def _make_pull_plot(data, bkg, preVsPost=False):
     pull.SetTitle(";"+data.GetXaxis().GetTitle()+";({})/#sigma".format('Post-Pre' if preVsPost else 'Data-Bkg'))
     pull.SetStats(0)
 
-    pull.GetYaxis().SetRangeUser(-2.9,2.9)
+    pull.GetYaxis().SetRangeUser(-3.0,3.0)
     pull.GetYaxis().SetTitleOffset(0.4)                             
     pull.GetYaxis().SetLabelSize(0.13)
     pull.GetYaxis().SetTitleSize(0.12)

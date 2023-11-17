@@ -673,7 +673,11 @@ class Ledger():
         else:
             systs = self.df
         systs = systs.variation.unique()
+        
         systs = numpy.delete(systs, numpy.where(systs == 'nominal'))
+        
+#         print(systs)
+        
         return systs.tolist()
 
     def GetAlphaSystematics(self):
