@@ -13,7 +13,7 @@ Then, you can run the following steps:
 cmsrel CMSSW_11_3_4
 cd CMSSW_11_3_4/src
 cmsenv
-git clone https://github.com/ammitra/2DAlphabet.git
+git clone https://github.com/mdmorris/2DAlphabet.git
 git clone https://github.com/cms-analysis/HiggsAnalysis-CombinedLimit.git HiggsAnalysis/CombinedLimit
 curl -s https://raw.githubusercontent.com/lcorcodilos/CombineHarvester/master/CombineTools/scripts/sparse-checkout-ssh.sh | bash
 scramv1 b clean; scramv1 b -j 4
