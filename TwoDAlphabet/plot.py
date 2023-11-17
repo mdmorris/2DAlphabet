@@ -576,9 +576,6 @@ def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
         elif year==2 or year==1:
             lumiE.DrawLatex(1-0.05,1-0.1+0.2*0.1,"137 fb^{-1}, Run 2 (13 TeV)")
             
-
-        print('am I plotting from EOS 2?')
-
         
         lumiE.DrawLatex(0.62,0.82,"\it{Work} \it{In} \it{Progress}")
 
