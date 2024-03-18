@@ -9,7 +9,8 @@ import ROOT
 
 
 
-yellow = ROOT.kOrange - 4
+# yellow = ROOT.kOrange - 4
+yellow = ROOT.kYellow
 
 class TwoDAlphabet:
     '''Class to injest and organize inputs.
@@ -572,7 +573,7 @@ class TwoDAlphabet:
                     name=self.tag+'_'+subtag+'_limit',
                     primaryCmds=[limit_cmd],
                     toPkg=self.tag+'/',
-                    toGrab=run_dir+'/higgsCombineTest.AsymptoticLimits.mH120.root',
+                    toGrab=run_dir+'/higgsCombine.Test.AsymptoticLimits.mH120.root',
                     eosRootfileTarball=eosRootfiles,
 		    remakeEnv=makeEnv
                 )

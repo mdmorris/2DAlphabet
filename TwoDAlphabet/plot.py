@@ -6,8 +6,11 @@ from TwoDAlphabet.binning import stitch_hists_in_x, convert_to_events_per_unit, 
 from TwoDAlphabet.ext import tdrstyle, CMS_lumi
 
 
-yellow = ROOT.kOrange - 4
-red = ROOT.kRed + 2
+# yellow = ROOT.kOrange - 4
+# red = ROOT.kRed + 2
+
+yellow = ROOT.kYellow
+red = ROOT.kRed
 
 class Plotter(object):
     '''Class to manage output distributions, manipulate them, and provide access to plotting
@@ -136,7 +139,7 @@ class Plotter(object):
                     color = self.ledger.GetProcessColor(process)
                     
                     if 'TTbar' in process:
-                        color = ROOT.kRed + 2
+                        color = red
                     
                     proc_type = self.ledger.GetProcessType(process)
                     proc_title = self.ledger.GetProcessTitle(process)
@@ -574,10 +577,11 @@ def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
         elif year==18:
             lumiE.DrawLatex(1-0.05,1-0.1+0.2*0.1,"60 fb^{-1}, 2018 (13 TeV)")
         elif year==2 or year==1:
-            lumiE.DrawLatex(1-0.05,1-0.1+0.2*0.1,"137 fb^{-1}, Run 2 (13 TeV)")
+            lumiE.DrawLatex(1-0.05,1-0.1+0.2*0.1,"138 fb^{-1}, Run 2 (13 TeV)")
             
         
         lumiE.DrawLatex(0.62,0.82,"\it{Work} \it{In} \it{Progress}")
+        lumiE.DrawLatex(0.8,0.5,"$|\Delta y| > 1$")
 
 
     pad = _make_pad_gen(outname)
@@ -885,7 +889,7 @@ def _make_pull_plot(data, bkg, preVsPost=False):
     pull.SetTitle(";"+data.GetXaxis().GetTitle()+";({})/#sigma".format('Post-Pre' if preVsPost else 'Data-Bkg'))
     pull.SetStats(0)
 
-    pull.GetYaxis().SetRangeUser(-3.0,3.0)
+    pull.GetYaxis().SetRangeUser(-2.99,2.99)
     pull.GetYaxis().SetTitleOffset(0.4)                             
     pull.GetYaxis().SetLabelSize(0.13)
     pull.GetYaxis().SetTitleSize(0.12)
@@ -1138,6 +1142,7 @@ def plot_signalInjection(tag, subtag, injectedAmount, seed=123456, stats=True, c
         hsignstrength.GetXaxis().SetTitle('r-%s'%injectedAmount)
         result_can.cd()
         hsignstrength.Draw('pe')
+        print tag+'/'+subtag+'signalInjection_r%s.png'%(str(injectedAmount).replace('.','p')),'png'
         result_can.Print('signalInjection_r%s.png'%(str(injectedAmount).replace('.','p')),'png')
 
 	if condor:
