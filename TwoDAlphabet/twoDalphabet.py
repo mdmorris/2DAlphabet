@@ -51,8 +51,8 @@ class TwoDAlphabet:
             self._setupProjDir()
             
             
-            print('filename', self.df.iloc[0].source_filename)
-            print('histname', self.df.iloc[0].source_histname)
+            print 'filename', self.df.iloc[0].source_filename
+            print 'histname', self.df.iloc[0].source_histname
             
             template_file = ROOT.TFile.Open(self.df.iloc[0].source_filename)
             template = template_file.Get(self.df.iloc[0].source_histname)
@@ -60,6 +60,7 @@ class TwoDAlphabet:
 
             self.binnings = {}
             for kbinning in config._section('BINNING').keys():
+                print 'kbinning', kbinning
                 self.binnings[kbinning] = Binning(kbinning, config._section('BINNING')[kbinning], template)
 
             self.organizedHists = OrganizedHists(
@@ -212,11 +213,34 @@ class TwoDAlphabet:
             data_hist = self.organizedHists.Get(process='data_obs',region=region,systematic='')
             qcd = data_hist.Clone(data_hist.GetName().replace('data_obs','qcd'))
             qcd.SetDirectory(0)
+            
+            print 'data_hist.GetEntries()', data_hist.GetEntries()
 
             bkg_sources = group.loc[group.process_type.eq('BKG') & group.variation.eq('nominal')]['process']
             for process_name in bkg_sources.to_list():
+                print(process_name, region)
                 bkg_hist = self.organizedHists.Get(process=process_name,region=region,systematic='')
+                print 'bkg_hist.GetEntries()', bkg_hist.GetEntries()
+                
+                
                 qcd.Add(bkg_hist,-1)
+                
+
+                # hardcoding fix for bins where mc ttbar > data
+                # if qcd is < 0 in a bin, set bin content to 0
+                for i in range(qcd.ProjectionX().GetNbinsX()):
+                    for j in range(qcd.ProjectionY().GetNbinsX()):
+                        
+                        # set bin content to 0 if negative
+                        # reset uncertainty to cloned data uncertainty
+                        bc = qcd.GetBinContent(i,j)
+                        if bc < 0:
+                            qcd.SetBinContent(i,j,0.00001)
+                            qcd.SetBinError(i, j,  data_hist.GetBinError(i,j))
+                        
+                        
+     
+
 
             out[region] = qcd
             
@@ -319,6 +343,12 @@ class TwoDAlphabet:
 # -------- STAT METHODS ------------------ #
     def MLfit(self, subtag, cardOrW='card.txt', rMin=-1, rMax=10, setParams={}, verbosity=0, usePreviousFit=False, defMinStrat=0, extra=''):
         _runDirSetup(self.tag+'/'+subtag)
+        
+        print 'self.options'
+        print self.options
+        print ''
+        
+        
         with cd(self.tag+'/'+subtag):
             _runMLfit(
                 cardOrW=cardOrW,
@@ -350,6 +380,7 @@ class TwoDAlphabet:
 		corrText=False # change this if you want the correlation matrix to write the number values to each grid square (often there are too many parameters and looks ugly/useless)
             )
             plot.gen_post_fit_shapes()
+#             plot.gen_projections(ledger, self, 'b', loadExisting=True, prefit=False)
             plot.gen_projections(ledger, self, 'b', prefit)
             plot.gen_projections(ledger, self, 's', prefit)
             
@@ -777,13 +808,17 @@ def _runDirSetup(runDir):
 
 def MakeCard(ledger, subtag, workspaceDir):
     combine_idx_map = ledger._getCombineIdxMap()
-
+    
+    
     card_new = open('%s/card.txt'%subtag,'w')
     # imax (bins), jmax (backgrounds+signals), kmax (systematics) 
     imax = 3*len(ledger.GetRegions()) # pass, fail for each 'X' axis category    
     jmax = ledger.nbkgs + ledger.nsignals -1
     kmax = len(ledger.GetShapeSystematics()) # does not include alphaParams
     channels = ['_'.join(r) for r in itertools.product(ledger.GetRegions(),['LOW','SIG','HIGH'])]
+    
+    
+    if '1_area' in subtag: jmax = jmax - 1
     
     card_new.write('imax %s\n'%imax)      
     card_new.write('jmax %s\n'%jmax)
@@ -792,8 +827,14 @@ def MakeCard(ledger, subtag, workspaceDir):
 
     # Shapes
     shape_line = 'shapes  {p:20} {r} {file} w:{p}_{r} w:{p}_{r}_$SYSTEMATIC\n'
+    
     alpha_obj_title_map = {}
     for proc,reg in ledger.GetProcRegPairs():
+        
+        if '1_area' in subtag:
+            if '_10' in proc: continue
+            
+        
         for cat in ['LOW','SIG','HIGH']:
             if proc in ledger.alphaObjs.process.unique():
                 this_line = shape_line.replace(' w:{p}_{r}_$SYSTEMATIC','').replace('w:{p}','w:{hname_proc}')
@@ -833,9 +874,20 @@ def MakeCard(ledger, subtag, workspaceDir):
 
     # Work with template bkgs first
     for pair, group in ledger.df.groupby(['process','region']):
+        
         proc, region = pair
+        
         if proc == 'data_obs': continue
+                
+        if '1_area' in subtag:
+            if '_10' in proc: continue
+            
+            
+            
         combine_idx = combine_idx_map[combine_idx_map.process.eq(proc)].combine_idx.iloc[0]
+        
+        if '1_area' in subtag:
+            if '_1' in proc: combine_idx += 1
 
         for cat in ['LOW','SIG','HIGH']:
             chan = '%s_%s'%(region,cat)
@@ -853,10 +905,21 @@ def MakeCard(ledger, subtag, workspaceDir):
 
                 syst_lines[syst] += '{0:20} '.format(syst_effect)
 
+
     # Now work with alpha objects
     # NOTE: duplicated code but no good way to combine without making things confusing
+    
+    isCentral = False
+    
     for pair,group in ledger.alphaObjs.groupby(['process', 'region']):
         proc,region = pair
+        
+        if 'cen' in region:
+            isCentral = True
+        
+        if '1_area' in subtag:
+            if '_10' in proc: continue
+        
         combine_idx = combine_idx_map[combine_idx_map.process.eq(alpha_obj_title_map[pair])].combine_idx.iloc[0]
         
         for cat in ['LOW','SIG','HIGH']:
@@ -869,6 +932,8 @@ def MakeCard(ledger, subtag, workspaceDir):
 
             for syst in syst_lines.keys():
                 syst_lines[syst] += '{0:20} '.format('-')
+                
+                
 
     card_new.write(bin_line+'\n')
     card_new.write(processName_line+'\n')
@@ -876,7 +941,10 @@ def MakeCard(ledger, subtag, workspaceDir):
     card_new.write(rate_line+'\n')
     card_new.write('-'*120+'\n')
     for line_key in syst_lines.keys():
-        card_new.write(syst_lines[line_key]+'\n')
+        if 'ttag_pt' in syst_lines[line_key]:
+            card_new.write(syst_lines[line_key].replace('shapes','shapeU')+'\n')
+        else:    
+            card_new.write(syst_lines[line_key].replace('shapes','shape')+'\n')
 
     ######################################################
     # Mark floating values as flatParams                 #
@@ -884,6 +952,17 @@ def MakeCard(ledger, subtag, workspaceDir):
     ######################################################
     for param in ledger.alphaParams.itertuples():
         card_new.write('{0:40} {1}\n'.format(param.name, param.constraint))
+       
+    
+
+        
+    new_proc = ''
+    for proc,reg in ledger.GetProcRegPairs():
+        
+        # keep 10 TeV signals out of 1 TeV signal data card
+        if '1_area' in subtag:
+            if '_10' in proc: continue
+        
     
     card_new.close()
     ledger.Save(subtag)
@@ -967,7 +1046,7 @@ def make_postfit_workspace(d=''):
 # TODO: Add ability to freeze parameters via var.setConstant() while looping over floatParsFinal()
 def import_fitresult(inCard, fitResult, toDrop=[]):
     # First convert the card and open workspace
-    execute_cmd('text2workspace.py -b %s -o morphedWorkspace.root --channel-masks --X-no-jmax'%inCard)
+    execute_cmd('text2workspace.py -b %s -o morphedWorkspace.root --channel-masks --X-no-xx'%inCard)
     w_f = ROOT.TFile.Open('morphedWorkspace.root', 'UPDATE')
     w = w_f.Get('w')
     # Open fit result we want to import

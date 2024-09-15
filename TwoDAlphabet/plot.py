@@ -185,6 +185,14 @@ class Plotter(object):
                             start,stop = _get_start_stop(islice,slices['idxs'])
                             
                             hslice = getattr(full,'Projection'+proj)(hname,start,stop,'e')
+                            
+#                             if 'prefit' in hslice.GetName() and 'projy2' in hslice.GetName():
+#                                 print 'hname, start, stop'
+#                                 print hname, start, stop
+#                                 print hslice.Integral()
+#                                 print full.Integral()
+#                                 print ''
+
                             hslice_title = '%s, %s, %s, %s-%s'%(proc_title,region,time,slices['vals'][islice],slices['vals'][islice+1])
                             hslice = self._format_1Dhist(
                                 hslice, hslice_title,
@@ -254,7 +262,7 @@ class Plotter(object):
             process, region = pr[0], pr[1]
             out_file_name = '{d}/base_figs/{p}_{r}_%s_2D'.format(d=self.dir,p=process,r=region)
             make_pad_2D(outname=out_file_name%('prefit'), hist=self.Get('{p}_{r}_{t}'.format(p=process,r=region,t='prefit_2D')),
-                            year=self.twoD.options.year, savePDF=True, savePNG=True, extraText='Work In Progress')
+                            year=self.twoD.options.year, savePDF=True, savePNG=True, extraText='Work In Progress, prefit')
             make_pad_2D(outname=out_file_name%('postfit'), hist=self.Get('{p}_{r}_{t}'.format(p=process,r=region,t='postfit_2D')),
                             year=self.twoD.options.year, savePDF=True, savePNG=True, extraText='Work In Progress')
 
@@ -325,6 +333,7 @@ class Plotter(object):
                 these_pads = these_pads.sort_values(by=['region','proj']).pad.to_list()
                 out_can_name = '{d}/{proj}{logy}'.format(d=self.dir, proj=proj, logy=logy)
                 make_can(out_can_name, these_pads)
+                
         
     def plot_pre_vs_post(self):
         '''Make comparisons for each background process of pre and post fit projections.
@@ -490,7 +499,7 @@ def _make_pad_gen(name):
     pad.cd(); pad.SetRightMargin(0.0); pad.SetTopMargin(0.0); pad.SetBottomMargin(0.0)
     return pad
 
-def make_pad_2D(outname, hist, style='lego', logzFlag=False, ROOTout=None,
+def make_pad_2D(outname, hist, style='colz', logzFlag=False, ROOTout=None,
                 savePDF=False, savePNG=False, year=1, extraText='Preliminary'):
     '''Make a pad holding a 2D plot with standardized formatting conventions.
 
@@ -524,6 +533,8 @@ def make_pad_2D(outname, hist, style='lego', logzFlag=False, ROOTout=None,
         hist.GetZaxis().SetTitleOffset(1.4)
 
     hist.SetTitle('')
+    hist.GetXaxis().SetTitle('m_{t} [GeV]')
+    hist.GetYaxis().SetTitle('m_{t #bar{t}} [GeV]')
     hist.Draw(style)
     
     CMS_lumi.extraText = extraText
@@ -581,7 +592,10 @@ def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
             
         
         lumiE.DrawLatex(0.62,0.82,"\it{Work} \it{In} \it{Progress}")
-        lumiE.DrawLatex(0.8,0.5,"$|\Delta y| > 1$")
+        if 'cen' in outname:
+            lumiE.DrawLatex(0.8,0.5,"#bf{central}")
+        elif 'fwd' in outname:
+            lumiE.DrawLatex(0.8,0.5,"#bf{forward}")
 
 
     pad = _make_pad_gen(outname)
@@ -603,6 +617,9 @@ def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
     data.GetXaxis().SetLabelOffset(0.05)
     data.GetYaxis().SetNdivisions(508)
     data.SetMaximum(1.35*data.GetMaximum())
+    
+    
+    
 
     if len(bkgs) == 0:
         data.SetTitle(title)
@@ -674,11 +691,19 @@ def make_pad_1D(outname, data, bkgs=[], signals=[], title='', subtitle='',
         stack = ROOT.THStack(outname.split('/')[-1]+'_stack',outname.split('/')[-1]+'_stack')
         # Build the stack
         legend_info = []
+        if len(bkgs) > 1 and 'prefit' in bkgs[0].GetName():
+            print bkgs
+            print data.Integral(), bkgs[0].Integral(), bkgs[1].Integral()
+            print data.Integral() - bkgs[0].Integral() - bkgs[1].Integral()
+            
         for bkg in bkgs:     # Won't loop if bkglist is empty
             if logyFlag:
                 bkg.SetMinimum(1e-3)
             stack.Add(bkg)
+            
             legend_info.append((bkg.GetTitle().split(',')[0], bkg))
+            
+        print ''
 
         # Deal with legend which needs ordering reversed from stack build
         legend_duplicates = []
@@ -910,7 +935,7 @@ def _get_good_fit_results(tfile):
     return successful_fits
 
 def nuis_pulls():
-    diffnuis_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnosticsTest.root --abs -g nuisance_pulls.root'
+    diffnuis_cmd = 'python $CMSSW_BASE/src/HiggsAnalysis/CombinedLimit/test/diffNuisances.py fitDiagnosticsTest.root --abs -g nuisance_pulls.root --regex "q2|ttbar_xsec|jes|jer|lumi|pileup|prefiring|pdf|ttag_pt"'
     execute_cmd(diffnuis_cmd)
     # Make a PDF of the nuisance_pulls.root
     if os.path.exists('nuisance_pulls.root'):
@@ -1041,6 +1066,7 @@ def plot_gof(tag, subtag, seed=123456, condor=False):
         ROOT.gROOT.SetBatch(True)
         ROOT.gStyle.SetOptStat(False)
         gof_data_file = ROOT.TFile.Open('higgsCombine_gof_data.GoodnessOfFit.mH120.root')
+#         gof_data_file = ROOT.TFile.Open('higgsCombine_gof_toys.GoodnessOfFit.mH120.123456.root')
         gof_limit_tree = gof_data_file.Get('limit')
         gof_limit_tree.GetEntry(0)
         gof_data = gof_limit_tree.limit
@@ -1095,6 +1121,7 @@ def plot_gof(tag, subtag, seed=123456, condor=False):
         arrow.Draw()
         leg.Draw()
 
+        print(tag+'/'+subtag+'gof_plot.pdf')
         cout.Print('gof_plot.pdf','pdf')
         cout.Print('gof_plot.png','png')
 
